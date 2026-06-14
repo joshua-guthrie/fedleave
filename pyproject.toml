@@ -1,0 +1,20 @@
+[project]
+name = "fedleave"
+version = "0.1.0"
+description = "Federal leave and time tracker"
+authors = [
+  {name = "Your Name", email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+
+[project.scripts]
+fedleave = "fedleave.__main__:main"
+
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["fedleave"]
