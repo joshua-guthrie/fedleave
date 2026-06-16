@@ -6,10 +6,11 @@ import typer
 from rich.console import Console
 
 from .cli_helpers import get_leave_year_path, load_leave_year
-from .ledger import add_transaction_to_leave_year, calculate_balances, create_transaction, normalize_direction
+from .ledger import add_transaction_to_leave_year, calculate_balances, calculate_daily_activity, create_transaction, normalize_direction
 from .storage import write_json
 from .config import get_default_data_dir
 from .holidays import generate_federal_holidays
+from . import reports
 import json
 from .payperiods import generate_pay_periods
 from datetime import date as _date, datetime as _datetime
@@ -79,6 +80,7 @@ Command details and examples:
     Examples:
         fedleave holidays generate --year 2026
         fedleave holidays import-ics --year 2026 --file opm-holidays.ics
+    fedleave reports generate --year 2026 --data-dir ./.data --output reports/fedleave_2026.odt
 
 Notes on data directory:
     Default: ~/.local/share/fedleave
@@ -100,6 +102,7 @@ For full project specification and advanced usage, see the README in the project
 """
 
 app = typer.Typer(help=HELP_TEXT, add_completion=False)
+app.add_typer(reports.app, name="reports")
 
 @app.command()
 def init(
@@ -483,17 +486,24 @@ def holidays(
         if not file:
             console.print("[red]ERROR:[/red] --file is required for import-ics")
             raise typer.Exit(code=2)
-        # Minimal ICS import: store as cache metadata and mark source
-        cache = {
-            "schema_version": 1,
-            "year": year,
-            "source": "opm_ics",
-            "generated_at": __import__("datetime").datetime.now().isoformat(),
-            "holidays": [],
-        }
-        write_json(cache_file, cache)
-        console.print(f"Imported ICS to cache (minimal): {cache_file}")
-        return
+        # Full ICS import using icalendar
+        try:
+            from .holidays import import_ics
+
+            parsed = import_ics(Path(file))
+            # set year if possible
+            for h in parsed.get("holidays", []):
+                if parsed.get("year") is None and h.get("actual_date"):
+                    parsed["year"] = int(h.get("actual_date").split("-")[0])
+            write_json(cache_file, parsed)
+            console.print(f"Imported ICS to cache: {cache_file}")
+            return
+        except RuntimeError as exc:
+            console.print(f"[red]ERROR:[/red] {exc}")
+            raise typer.Exit(code=2)
+        except Exception as exc:
+            console.print(f"[red]ERROR:[/red] Failed to import ICS: {exc}")
+            raise typer.Exit(code=2)
 
     console.print(f"Unknown holidays action: {action}")
     raise typer.Exit(code=2)
@@ -529,6 +539,7 @@ def void(
 @app.command()
 def balance(
     year: int = typer.Option(..., help="Leave year."),
+    as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     try:
@@ -537,10 +548,37 @@ def balance(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
 
-    balances = calculate_balances(leave_year)
-    console.print(f"Balances for {year}:")
+    balances = calculate_balances(leave_year, until_date=as_of)
+    if as_of:
+        console.print(f"Balances for {year} as of {as_of}:")
+    else:
+        console.print(f"Balances for {year}:")
     for category, amount in sorted(balances.items()):
         console.print(f"  {category}: {amount:.2f}")
+
+@app.command(name="activity")
+def daily_activity(
+    year: int = typer.Option(..., help="Leave year."),
+    date: str = typer.Option(..., help="Date to query YYYY-MM-DD."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    try:
+        leave_year = load_leave_year(year, data_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    activity = calculate_daily_activity(leave_year, date)
+    if not any(activity.values()):
+        console.print(f"No leave activity recorded on {date} for {year}.")
+        raise typer.Exit(code=0)
+
+    console.print(f"Leave activity for {date} ({year}):")
+    for category in sorted({*activity['earned'], *activity['used'], *activity['net']}):
+        earned = activity['earned'].get(category, 0.0)
+        used = activity['used'].get(category, 0.0)
+        net = activity['net'].get(category, 0.0)
+        console.print(f"  {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
 
 @app.command()
 def help() -> None:

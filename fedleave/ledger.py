@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -153,13 +153,25 @@ def create_transaction(
         raise ValueError(exc)
 
 
-def calculate_balances(leave_year: dict[str, Any]) -> dict[str, float]:
+def _parse_iso_date(date_str: str) -> date:
+    try:
+        return date.fromisoformat(date_str)
+    except Exception as exc:
+        raise ValueError(f"Invalid date: {date_str}") from exc
+
+
+def calculate_balances(leave_year: dict[str, Any], until_date: str | None = None) -> dict[str, float]:
     totals: dict[str, float] = {category: 0.0 for category in TRANSACTION_CATEGORIES}
     starting_balances = leave_year.get("starting_balances", {})
     for category, amount in starting_balances.items():
         totals[category] = float(amount)
 
+    cutoff = _parse_iso_date(until_date) if until_date is not None else None
     for transaction in leave_year.get("transactions", []):
+        tx_date = _parse_iso_date(transaction.get("date", ""))
+        if cutoff is not None and tx_date > cutoff:
+            continue
+
         category = transaction["category"]
         direction = transaction["direction"]
         hours = float(transaction.get("hours", 0.0))
@@ -173,6 +185,39 @@ def calculate_balances(leave_year: dict[str, Any]) -> dict[str, float]:
         else:
             totals[category] += hours
     return totals
+
+
+def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, dict[str, float]]:
+    target = _parse_iso_date(day)
+    earned: dict[str, float] = {}
+    used: dict[str, float] = {}
+    net: dict[str, float] = {}
+
+    for transaction in leave_year.get("transactions", []):
+        tx_date = _parse_iso_date(transaction.get("date", ""))
+        if tx_date != target:
+            continue
+
+        category = transaction["category"]
+        direction = transaction["direction"]
+        hours = float(transaction.get("hours", 0.0))
+
+        if category not in earned:
+            earned[category] = 0.0
+            used[category] = 0.0
+            net[category] = 0.0
+
+        if direction in ("earned", "starting_balance", "restored", "worked", "adjusted", "corrected", "reconciled"):
+            earned[category] += hours
+            net[category] += hours
+        elif direction in ("used", "expired", "forfeited", "voided"):
+            used[category] += hours
+            net[category] -= hours
+        else:
+            earned[category] += hours
+            net[category] += hours
+
+    return {"earned": earned, "used": used, "net": net}
 
 
 def add_transaction_to_leave_year(leave_year: dict[str, Any], transaction: Transaction) -> None:

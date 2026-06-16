@@ -56,11 +56,16 @@ Commands and common options:
 			fedleave list --year YEAR [--data-dir PATH]
 
 	balance
-		Show current balances computed from the ledger for a leave year.
+	Show current balances computed from the ledger for a leave year or as of a specific date.
 
-		Syntax:
-			fedleave balance --year YEAR [--data-dir PATH]
+	Syntax:
+		fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--data-dir PATH]
 
+activity
+	Show earned, used, and net leave activity for one day.
+
+	Syntax:
+		fedleave activity --year YEAR --date YYYY-MM-DD [--data-dir PATH]
 Global notes:
 
 	Data directory:
@@ -106,46 +111,72 @@ Holiday commands:
 	fedleave holidays import-ics --year 2026 --file opm-holidays.ics --data-dir /path/to/data
 	fedleave holidays list --year 2026 --data-dir /path/to/data
 
+Daily and as-of queries:
+
+	fedleave balance --year 2026 --as-of 2026-01-11 --data-dir /path/to/data
+	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
+
 ## Generating reports
 
-Reports are produced from the leave-year JSON plus template files and a chart image pipeline.
+Reports are built from a leave year JSON, a report template, and a generated chart image.
 
 Prerequisites:
 
-- `matplotlib` and `odfpy` installed in your environment (see `requirements.txt`).
-- `libreoffice` available on your PATH to convert ODT/ODS files to PDF.
-- Templates present under `templates/` (e.g. `summary_template.odt`, `yearly_chart_template.ods`).
+- `matplotlib` and `odfpy` installed in your environment.
+- `libreoffice` on PATH if you want automatic ODT → PDF conversion.
+- A report template at `templates/report_template.odt`.
 
-Typical workflow:
-
-1. Prepare the data for the year:
+If you do not have a template yet, generate the default one:
 
 ```bash
+python3 scripts/generate_templates.py
+```
+
+Robust report workflow:
+
+1. Initialize or prepare your year data:
+
+```bash
+fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-start 120 --sick-start 180 --data-dir ./.data
+```
+
+2. Add any transactions and verify the balance file exists:
+
+```bash
+fedleave add --year 2026 --date 2026-06-01 --category annual --used 20 --description "Vacation" --data-dir ./.data
 fedleave balance --year 2026 --data-dir ./.data
 ```
 
-2. Generate charts (the project uses `matplotlib`):
+3. Generate the report chart PNG:
 
 ```bash
-python -m fedleave.charts --year 2026 --data-dir ./.data --output reports/chart_2026.png
+python -m fedleave.charts --year 2026 --data-dir ./.data --output ./.data/reports/chart_2026.png
 ```
 
-3. Produce an ODT/ODS report using templates (this project provides `reports` module hooks):
+4. Generate the ODT report from the template:
 
 ```bash
-python -m fedleave.reports generate --year 2026 --data-dir ./.data --output reports/fedleave_2026.odt
+python -m fedleave.reports generate --year 2026 --data_dir ./.data --chart ./.data/reports/chart_2026.png --output ./.data/reports/fedleave_2026.odt
 ```
 
-4. Convert to PDF with LibreOffice headless:
+If you want to use a custom template, pass `--template`:
 
 ```bash
-libreoffice --headless --convert-to pdf reports/fedleave_2026.odt --outdir reports/
+python -m fedleave.reports generate --year 2026 --data_dir ./.data --chart ./.data/reports/chart_2026.png --template templates/report_template.odt --output ./.data/reports/fedleave_2026.odt
 ```
 
-Notes:
+5. If LibreOffice is installed, the report generator attempts headless PDF conversion automatically. If it does not, convert manually:
 
-- `fedleave.reports` and `fedleave.charts` are the integration points; they may be lightweight stubs in the reference implementation. If a command/module isn't implemented, you can assemble the ODT/ODS by using `odfpy` and inserting the PNG chart(s) produced by `matplotlib`.
-- For small use, exporting charts as PNG and embedding them into a pre-made ODT template is the quickest path.
+```bash
+libreoffice --headless --convert-to pdf ./.data/reports/fedleave_2026.odt --outdir ./.data/reports
+```
+
+Important notes:
+
+- The generator replaces template placeholders `{{TITLE}}`, `{{DATE}}`, `{{PREPARED_BY}}`, `{{SUMMARY_TABLE}}`, and `{{CHART}}`.
+- If `odfpy` is missing, the ODT generator cannot run, but chart generation still works.
+- If the template is missing, run `python3 scripts/generate_templates.py` or provide a custom `--template` path.
+- The summary table is derived from the current leave year balances and is embedded directly into the ODT.
 
 ## Full Project Specification
 
