@@ -94,6 +94,13 @@ Correction (audit-safe):
 	Example:
 		fedleave correct --id 20260310-001 --hours 3 --reason "Only used 3 hours"
 
+Alternatively, you can correct by transaction date and type (more human-friendly):
+
+	fedleave correct --search-date YYYY-MM-DD --search-type CATEGORY --hours HOURS --reason "TEXT" --data-dir /path/to/data
+
+	Example:
+		fedleave correct --search-date 2026-06-01 --search-type annual --hours 3 --reason "Adjust entry" --data-dir ./.data
+
 Void a transaction:
 
 	fedleave void --id TRANSACTION_ID --reason "TEXT" --data-dir /path/to/data

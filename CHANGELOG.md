@@ -8,3 +8,4 @@
 - Harden `rollover`: create starting-balance transactions, generate pay periods, set rollover timestamp, and generate holiday cache for new year.
 - Add `reports` command and ODT template-based report generation with embedded leave summary and chart support.
 - Add `balance --as-of` and `activity --date` for date-specific leave balances and daily earned/used activity.
+- Add `correct --search-date` and `--search-type` human-friendly lookup to find and correct transactions by date and category (in addition to `--id`).

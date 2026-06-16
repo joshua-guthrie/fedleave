@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typer.models import OptionInfo
 
 import typer
 from rich.console import Console
@@ -187,12 +188,15 @@ def add(
 
 @app.command()
 def correct(
-    id: str = typer.Option(..., help="Transaction ID to correct (YYYYMMDD-NNN)."),
+    id: str | None = typer.Option(None, help="Transaction ID to correct (YYYYMMDD-NNN)."),
     hours: float = typer.Option(..., help="Corrected hours to record."),
     reason: str = typer.Option(..., help="Reason for correction."),
     date: str | None = typer.Option(None, help="Optional date for replacement transaction YYYY-MM-DD."),
     category: str | None = typer.Option(None, help="Optional category for replacement transaction."),
     direction: str | None = typer.Option(None, help="Optional direction for replacement transaction (earned/used/worked/adjusted)."),
+    # human-friendly lookup: find transaction by date and type/category
+    search_date: str | None = typer.Option(None, help="Find transaction by this transaction date YYYY-MM-DD."),
+    search_type: str | None = typer.Option(None, help="Find transaction by this transaction category/type."),
     preview: bool = typer.Option(False, help="Preview the correction without writing changes."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
@@ -200,29 +204,79 @@ def correct(
 
     The replacement transaction will link to the original via `replaces_transaction_id`.
     """
-    try:
-        leave_year = load_leave_year(int(id[:4]) if id and id[0:4].isdigit() else None, data_dir)
-    except FileNotFoundError:
-        # Fallback: try reading default year file via scan
-        try:
-            # attempt to locate the leave year containing the transaction
-            base_dir = get_leave_year_path(0, data_dir).parent
-            found = None
-            for pj in base_dir.iterdir():
-                if pj.suffix == ".json":
-                    ly = load_leave_year(int(pj.stem), data_dir)
-                    for t in ly.get("transactions", []):
-                        if t.get("id") == id:
-                            leave_year = ly
-                            found = pj
-                            break
-                if found:
-                    break
-            if not found:
+    # If this function is called directly (tests), Typer Option defaults arrive as OptionInfo objects.
+    # Coerce those to None so direct calls behave like CLI invocation.
+    if isinstance(id, OptionInfo):
+        id = None
+    if isinstance(date, OptionInfo):
+        date = None
+    if isinstance(category, OptionInfo):
+        category = None
+    if isinstance(direction, OptionInfo):
+        direction = None
+    if isinstance(search_date, OptionInfo):
+        search_date = None
+    if isinstance(search_type, OptionInfo):
+        search_type = None
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    # Determine lookup target: if id provided use it, otherwise try search_date+search_type
+    if not id:
+        if search_date and search_type:
+            try:
+                # infer year from the provided transaction date
+                target_year = int(search_date.split("-")[0])
+            except Exception:
+                console.print("[red]ERROR:[/red] Invalid search date; use YYYY-MM-DD")
+                raise typer.Exit(code=2)
+
+            try:
+                ly = load_leave_year(target_year, data_dir)
+            except FileNotFoundError:
+                console.print(f"[red]ERROR:[/red] Leave year for {target_year} not found")
                 raise typer.Exit(code=1)
-        except Exception:
-            console.print(f"[red]ERROR:[/red] Transaction {id} not found")
-            raise typer.Exit(code=1)
+
+            matches = [t for t in ly.get("transactions", []) if t.get("date") == search_date and t.get("category") == search_type and not t.get("void")]
+            if not matches:
+                console.print(f"[red]ERROR:[/red] No matching transaction on {search_date} for category {search_type}")
+                raise typer.Exit(code=1)
+            if len(matches) > 1:
+                console.print(f"[red]ERROR:[/red] Multiple matching transactions found; specify the transaction id:")
+                for t in matches:
+                    console.print(f"  {t.get('id')} {t.get('date')} {t.get('category')} {t.get('direction')} {t.get('hours')}")
+                raise typer.Exit(code=2)
+
+            # single match — use its id and set leave_year to the loaded year
+            id = matches[0].get("id")
+            leave_year = ly
+        else:
+            console.print("[red]ERROR:[/red] Either --id or both --search-date and --search-type are required")
+            raise typer.Exit(code=2)
+    else:
+        try:
+            leave_year = load_leave_year(int(id[:4]) if id and id[0:4].isdigit() else None, data_dir)
+        except FileNotFoundError:
+            # Fallback: try reading default year file via scan
+            try:
+                # attempt to locate the leave year containing the transaction
+                base_dir = get_leave_year_path(0, data_dir).parent
+                found = None
+                for pj in base_dir.iterdir():
+                    if pj.suffix == ".json":
+                        ly = load_leave_year(int(pj.stem), data_dir)
+                        for t in ly.get("transactions", []):
+                            if t.get("id") == id:
+                                leave_year = ly
+                                found = pj
+                                break
+                    if found:
+                        break
+                if not found:
+                    raise typer.Exit(code=1)
+            except Exception:
+                console.print(f"[red]ERROR:[/red] Transaction {id} not found")
+                raise typer.Exit(code=1)
 
     # locate original transaction
     orig = None
