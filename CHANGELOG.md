@@ -1,11 +1,9 @@
 # Changelog
 
-## Unreleased - 2026-06-13
+## 0.2.0 - 2026-06-15
 
-- Add `rollover` and `holidays` CLI subcommands (preview & apply).
-- Improve `correct` and `void` commands with tests and preview support.
-- Add unit tests for corrections, voiding, and rollover preview/apply.
-- Harden `rollover`: create starting-balance transactions, generate pay periods, set rollover timestamp, and generate holiday cache for new year.
-- Add `reports` command and ODT template-based report generation with embedded leave summary and chart support.
-- Add `balance --as-of` and `activity --date` for date-specific leave balances and daily earned/used activity.
-- Add `correct --search-date` and `--search-type` human-friendly lookup to find and correct transactions by date and category (in addition to `--id`).
+- Release: include human-friendly correction lookup (`--search-date`/`--search-type`), ODT reports with embedded charts, date-specific balance and activity queries, rollover and holidays improvements, and related tests.
+
+## Unreleased - 2026-06-15
+
+- Populate report summary from actual balances.
