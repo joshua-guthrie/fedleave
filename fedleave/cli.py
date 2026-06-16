@@ -15,6 +15,8 @@ from . import reports
 import json
 from .payperiods import generate_pay_periods
 from datetime import date as _date, datetime as _datetime
+import shutil
+import tempfile
 
 console = Console()
 
@@ -493,6 +495,70 @@ def types(
     if which in ("directions", "both"):
         console.print("Supported transaction directions:")
         console.print("  " + ", ".join(TRANSACTION_DIRECTIONS))
+
+
+@app.command()
+def report(
+    year: int = typer.Option(..., help="Leave year."),
+    output: str = typer.Option("fedleave_report.odt", help="Output path (ODT or PDF)."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    chart: str | None = typer.Option(None, help="Path to existing chart PNG."),
+    template: str | None = typer.Option(None, help="Path to ODT template."),
+) -> None:
+    """Generate a report. If `--output` ends with `.pdf`, attempt to produce a PDF (requires LibreOffice).
+
+    The command checks for `odfpy` and LibreOffice and prints helpful install instructions when missing.
+    """
+    out_path = Path(output)
+    is_pdf = out_path.suffix.lower() == ".pdf"
+
+    # Ensure odfpy is installed
+    try:
+        import odf.opendocument  # noqa: F401
+    except Exception:
+        console.print("[red]ERROR:[/red] Missing Python dependency `odfpy`. Install with: `pip install odfpy`")
+        raise typer.Exit(code=2)
+
+    if is_pdf:
+        # generate a temporary ODT then convert
+        reports_dir = Path("reports")
+        reports_dir.mkdir(exist_ok=True)
+        with tempfile.NamedTemporaryFile(suffix=".odt", delete=False) as tf:
+            tmp_odt = Path(tf.name)
+
+        # generate ODT
+        reports.generate(year=year, data_dir=data_dir, chart=chart, output=str(tmp_odt), template=template)
+
+        # check for conversion
+        pdf_candidate = tmp_odt.with_suffix(".pdf")
+        if not pdf_candidate.exists():
+            lo = shutil.which("libreoffice") or shutil.which("soffice")
+            if not lo:
+                console.print("[red]ERROR:[/red] LibreOffice not found. Install it to enable PDF conversion." )
+                console.print("  Debian/Ubuntu: sudo apt-get install -y libreoffice-core libreoffice-writer")
+                console.print("  macOS: brew install --cask libreoffice")
+                console.print("  Windows: install LibreOffice from https://www.libreoffice.org/")
+                raise typer.Exit(code=2)
+            # attempt conversion using reports helper
+            try:
+                reports._convert_to_pdf(tmp_odt)
+            except Exception as exc:
+                console.print(f"[red]ERROR:[/red] PDF conversion failed: {exc}")
+                raise typer.Exit(code=4)
+
+        # move PDF to desired output
+        final_pdf = tmp_odt.with_suffix(".pdf")
+        try:
+            shutil.move(str(final_pdf), str(out_path))
+            console.print(f"Wrote PDF: {out_path}")
+        finally:
+            try:
+                tmp_odt.unlink()
+            except Exception:
+                pass
+    else:
+        # output ODT
+        reports.generate(year=year, data_dir=data_dir, chart=chart, output=str(out_path), template=template)
 
     # create new leave year file
     new_start_date = src.get("leave_year_end")

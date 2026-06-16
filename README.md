@@ -178,6 +178,36 @@ python -m fedleave.reports generate --year 2026 --data_dir ./.data --chart ./.da
 libreoffice --headless --convert-to pdf ./.data/reports/fedleave_2026.odt --outdir ./.data/reports
 ```
 
+Direct `fedleave` report command
+--------------------------------
+
+You can call the report generator directly from the `fedleave` CLI. The command accepts the same options as the report generator and will attempt to produce a PDF when the `--output` filename ends in `.pdf`.
+
+Examples:
+
+```bash
+# produce an ODT
+fedleave report --year 2026 --output reports/fedleave_2026.odt --data-dir ./.data
+
+# produce a PDF (requires LibreOffice on PATH)
+fedleave report --year 2026 --output reports/fedleave_2026.pdf --data-dir ./.data
+```
+
+Helpful notes when dependencies are missing
+------------------------------------------
+
+- If the Python package `odfpy` is missing you will see an error instructing you to install it:
+
+	pip install odfpy
+
+- If LibreOffice is not installed and you request a PDF, the CLI will print platform-specific suggestions to install it:
+
+	- Debian/Ubuntu: `sudo apt-get install -y libreoffice-core libreoffice-writer`
+	- macOS: `brew install --cask libreoffice`
+	- Windows: download + install from https://www.libreoffice.org/
+
+The CLI gives clear errors and exit codes when these dependencies are missing so you can quickly remedy the environment.
+
 Important notes:
 
 - The generator replaces template placeholders `{{TITLE}}`, `{{DATE}}`, `{{PREPARED_BY}}`, `{{SUMMARY_TABLE}}`, and `{{CHART}}`.
