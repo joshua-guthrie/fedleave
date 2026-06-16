@@ -106,6 +106,47 @@ Holiday commands:
 	fedleave holidays import-ics --year 2026 --file opm-holidays.ics --data-dir /path/to/data
 	fedleave holidays list --year 2026 --data-dir /path/to/data
 
+## Generating reports
+
+Reports are produced from the leave-year JSON plus template files and a chart image pipeline.
+
+Prerequisites:
+
+- `matplotlib` and `odfpy` installed in your environment (see `requirements.txt`).
+- `libreoffice` available on your PATH to convert ODT/ODS files to PDF.
+- Templates present under `templates/` (e.g. `summary_template.odt`, `yearly_chart_template.ods`).
+
+Typical workflow:
+
+1. Prepare the data for the year:
+
+```bash
+fedleave balance --year 2026 --data-dir ./.data
+```
+
+2. Generate charts (the project uses `matplotlib`):
+
+```bash
+python -m fedleave.charts --year 2026 --data-dir ./.data --output reports/chart_2026.png
+```
+
+3. Produce an ODT/ODS report using templates (this project provides `reports` module hooks):
+
+```bash
+python -m fedleave.reports generate --year 2026 --data-dir ./.data --output reports/fedleave_2026.odt
+```
+
+4. Convert to PDF with LibreOffice headless:
+
+```bash
+libreoffice --headless --convert-to pdf reports/fedleave_2026.odt --outdir reports/
+```
+
+Notes:
+
+- `fedleave.reports` and `fedleave.charts` are the integration points; they may be lightweight stubs in the reference implementation. If a command/module isn't implemented, you can assemble the ODT/ODS by using `odfpy` and inserting the PNG chart(s) produced by `matplotlib`.
+- For small use, exporting charts as PNG and embedding them into a pre-made ODT template is the quickest path.
+
 ## Full Project Specification
 
 The following is the complete project specification for `fedleave`. It describes the required folder structure, JSON models, rules, commands, and acceptance criteria.
@@ -117,8 +158,7 @@ Project folder:
 	fedleave/
 
 Primary language:
-	Python 3 first.
-	Possible later C++ rewrite after Python behavior is stable.
+	Python 3.
 
 Reason for Python-first approach:
 	The project is logic-heavy and report-heavy, not performance-heavy.
@@ -131,13 +171,6 @@ Reason for Python-first approach:
 		- LibreOffice report generation
 		- Chart generation
 		- Testing
-
-Later C++ conversion:
-	After the Python version is working correctly, a C++ version may be created.
-	The Python version shall serve as the reference implementation.
-	The JSON schema, command syntax, test cases, and generated reports shall remain stable so a C++ rewrite can be validated against the Python output.
-
-Do not start in C++ unless the Python version proves inadequate.
 
 ===============================================================================
 1. PROJECT PURPOSE
