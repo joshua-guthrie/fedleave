@@ -215,6 +215,38 @@ Important notes:
 - If the template is missing, run `python3 scripts/generate_templates.py` or provide a custom `--template` path.
 - The summary table is derived from the current leave year balances and is embedded directly into the ODT.
 
+Building a standalone `fedleave` binary
+--------------------------------------
+
+If you'd rather have a single `fedleave` executable you can build a platform-specific binary using PyInstaller. The repository includes a helper script and Makefile target.
+
+1. Prepare a clean build environment (recommended):
+
+```bash
+python -m venv .build-venv
+source .build-venv/bin/activate
+pip install --upgrade pip
+```
+
+2. Build using the Makefile (or run the script directly):
+
+```bash
+make build
+# or:
+./scripts/build_pyinstaller.sh
+```
+
+3. Output:
+
+- The built executable will appear in `dist/fedleave` (Linux) and is platform-specific. Build on the target platform or use an appropriate builder.
+- The script bundles the ODT template into the binary; to include additional files, edit `scripts/build_pyinstaller.sh` and add more `--add-data` entries.
+
+Notes and caveats:
+
+- PyInstaller build installs PyInstaller and your package into a temporary venv under `.pyinstaller-venv`.
+- The produced binary is not cross-platform; build on the OS you intend to run on.
+- If you want me to run the build here, I can — it will take several minutes and produce `dist/fedleave`.
+
 ## Full Project Specification
 
 The following is the complete project specification for `fedleave`. It describes the required folder structure, JSON models, rules, commands, and acceptance criteria.
