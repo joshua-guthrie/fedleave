@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 
 from .cli_helpers import get_leave_year_path, load_leave_year
-from .ledger import add_transaction_to_leave_year, calculate_balances, calculate_daily_activity, create_transaction, normalize_direction
+from .ledger import add_transaction_to_leave_year, calculate_balances, calculate_daily_activity, create_transaction, normalize_direction, TRANSACTION_CATEGORIES, TRANSACTION_DIRECTIONS
 from .storage import write_json
 from .config import get_default_data_dir
 from .holidays import generate_federal_holidays
@@ -398,6 +398,101 @@ def rollover(
 
     if preview:
         return
+
+    # Apply rollover: create the new leave year JSON and write starting balances
+    # determine new leave_year_start by advancing the year in the source start
+    src_start = src.get("leave_year_start")
+    try:
+        if src_start:
+            src_date = _date.fromisoformat(src_start)
+            new_start_date = src_date.replace(year=to_year)
+            new_start = new_start_date.isoformat()
+        else:
+            new_start = _date(to_year, 1, 1).isoformat()
+    except Exception:
+        try:
+            parts = src_start.split("-")
+            new_start = f"{to_year}-{parts[1]}-{parts[2]}"
+        except Exception:
+            new_start = f"{to_year}-01-01"
+
+    # ensure to_year as int
+    to_year_int = int(to_year)
+
+    try:
+        ly_start_date = _date.fromisoformat(new_start)
+        pay_periods = generate_pay_periods(ly_start_date, 26)
+        ly_end = pay_periods[-1]["end_date"]
+    except Exception:
+        pay_periods = []
+        ly_end = new_start
+
+    new_ly = {
+        "schema_version": 1,
+        "leave_year": to_year_int,
+        "leave_year_start": new_start,
+        "leave_year_end": ly_end,
+        "pay_period_count": len(pay_periods),
+        "annual_leave_accrual_hours": src.get("annual_leave_accrual_hours", 6.0),
+        "sick_leave_accrual_hours": src.get("sick_leave_accrual_hours", 4.0),
+        "starting_balances": {
+            "annual": carry_forward,
+            "sick": sick_balance,
+            "comp": 0.0,
+            "credit": 0.0,
+            "travel_comp": 0.0,
+            "time_off_award": 0.0,
+            "religious_comp": 0.0,
+            "restored_annual": 0.0,
+        },
+        "carryover_from_previous_year": {"annual": carry_forward},
+        "transactions": [],
+        "pay_periods": pay_periods,
+        "holidays": [],
+        "rollover_status": {"rolled_from_previous_year": True, "rolled_to_next_year": False, "rollover_completed_at": None},
+    }
+
+    # create starting-balance transactions
+    existing_ids = []
+    try:
+        from .ledger import create_transaction as _create_tx
+        if carry_forward and carry_forward > 0:
+            tx = _create_tx(date=new_start, category="annual", direction="starting_balance", hours=carry_forward, existing_ids=existing_ids)
+            new_ly["transactions"].append(tx.model_dump())
+            existing_ids.append(tx.id)
+        if sick_balance and sick_balance > 0:
+            tx2 = _create_tx(date=new_start, category="sick", direction="starting_balance", hours=sick_balance, existing_ids=existing_ids)
+            new_ly["transactions"].append(tx2.model_dump())
+    except Exception:
+        pass
+
+    # write new leave year file
+    year_path = base / "leave_years" / f"{to_year_int}.json"
+    try:
+        write_json(year_path, new_ly)
+        console.print(f"Created leave year file: {year_path}")
+    except Exception as exc:
+        console.print(f"[red]ERROR:[/red] Failed to write new leave year: {exc}")
+        raise typer.Exit(code=4)
+
+
+@app.command()
+def types(
+    which: str = typer.Option("both", help="Which types to show: 'categories', 'directions', or 'both'."),
+) -> None:
+    """Show supported leave categories and transaction directions."""
+    valid = {"categories", "directions", "both"}
+    if which not in valid:
+        console.print(f"[red]ERROR:[/red] Invalid --which value: {which}. Use categories|directions|both")
+        raise typer.Exit(code=2)
+
+    if which in ("categories", "both"):
+        console.print("Supported leave categories:")
+        console.print("  " + ", ".join(TRANSACTION_CATEGORIES))
+
+    if which in ("directions", "both"):
+        console.print("Supported transaction directions:")
+        console.print("  " + ", ".join(TRANSACTION_DIRECTIONS))
 
     # create new leave year file
     new_start_date = src.get("leave_year_end")
