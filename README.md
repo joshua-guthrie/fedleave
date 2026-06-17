@@ -30,16 +30,38 @@ Commands and common options:
 		Initialize the data directory and create a leave year JSON file.
 
 		Syntax:
-			fedleave init --year YEAR --leave-year-start YYYY-MM-DD [--annual-accrual FLOAT] [--annual-start FLOAT] [--sick-start FLOAT] [--comp-start FLOAT] [--credit-start FLOAT] [--travel-comp-start FLOAT] [--data-dir PATH]
+			fedleave init --year YEAR --leave-year-start YYYY-MM-DD [--annual-accrual FLOAT] [--annual-start FLOAT] [--sick-start FLOAT] [--comp-start FLOAT] [--credit-start FLOAT] [--travel-comp-start FLOAT] [--holiday-source python_holidays|opm_ics] [--holiday-ics-url URL] [--data-dir PATH]
+
+		Defaults:
+			--annual-accrual 6.0
+			--annual-start 0.0
+			--sick-start 0.0
+			--comp-start 0.0
+			--credit-start 0.0
+			--travel-comp-start 0.0
+			--time-off-award-start 0.0
+			--religious-comp-start 0.0
+			--restored-annual-start 0.0
+			--holiday-source python_holidays
+			--holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics
+			--data-dir ~/.local/share/fedleave
 
 		Example:
 			fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir ~/.local/share/fedleave
+
+		Optional OPM ICS holiday import:
+			fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --holiday-source opm_ics --holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics --data-dir ~/.local/share/fedleave
 
 	add
 		Add a transaction to a leave year ledger.
 
 		Syntax:
 			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--data-dir PATH]
+
+		Defaults:
+			--status planned
+			--source manual
+			--data-dir ~/.local/share/fedleave
 
 		Notes:
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
@@ -56,10 +78,18 @@ Commands and common options:
 			fedleave list --year YEAR [--data-dir PATH]
 
 	balance
-	Show current balances computed from the ledger for a leave year or as of a specific date.
+	Show leave balances for a year, optionally as of a given date, projected to year end, and/or with use-or-lose calculations.
 
 	Syntax:
-		fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--data-dir PATH]
+		fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--data-dir PATH]
+
+	Notes:
+		- `--year YEAR` reads the leave year file and computes balances from all recorded transactions.
+		- `--as-of YYYY-MM-DD` computes balances using only transactions on or before that date.
+		- `--project` adds projected automatic annual and sick accruals for future pay periods through the leave year end (or via `--project-to`).
+		- `--project-to YYYY-MM-DD` projects accruals only through the specified date instead of year end.
+		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit.
+		- Federal employees earn annual and sick leave automatically each pay period; this tool projects that accrual based on the leave year pay periods and configured accrual rates.
 
 activity
 	Show earned, used, and net leave activity for one day.
@@ -114,13 +144,24 @@ Rollover preview/apply:
 
 Holiday commands:
 
-	fedleave holidays generate --year 2026 --data-dir /path/to/data
+	fedleave holidays generate --year 2026 [--source python_holidays|opm_ics] --data-dir /path/to/data
 	fedleave holidays import-ics --year 2026 --file opm-holidays.ics --data-dir /path/to/data
 	fedleave holidays list --year 2026 --data-dir /path/to/data
 
 Daily and as-of queries:
 
-	fedleave balance --year 2026 --as-of 2026-01-11 --data-dir /path/to/data
+	# Current ledger balance through all recorded transactions
+	fedleave balance --year 2026 --data-dir /path/to/data
+
+	# Balance as of a specific date
+	fedleave balance --year 2026 --as-of 2026-06-01 --data-dir /path/to/data
+
+	# Project end-of-year balance including automatic annual/sick accrual
+	fedleave balance --year 2026 --project --use-or-lose --data-dir /path/to/data
+
+	# Project balance to a custom date
+	fedleave balance --year 2026 --project --project-to 2026-12-15 --data-dir /path/to/data
+
 	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
 
 ## Generating reports

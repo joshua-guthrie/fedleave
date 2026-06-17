@@ -6,10 +6,10 @@ from typer.models import OptionInfo
 import typer
 from rich.console import Console
 
-from .cli_helpers import get_leave_year_path, load_leave_year
+from .cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, sanitize_text
 from .ledger import add_transaction_to_leave_year, calculate_balances, calculate_daily_activity, create_transaction, normalize_direction, TRANSACTION_CATEGORIES, TRANSACTION_DIRECTIONS
 from .storage import write_json
-from .config import get_default_data_dir
+from .config import get_default_data_dir, load_config
 from .holidays import generate_federal_holidays
 from . import reports
 import json
@@ -51,6 +51,12 @@ Command details and examples:
     Examples:
         fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 \
             --annual-start 120 --sick-start 180 --data-dir ~/.local/share/fedleave
+
+    Optional OPM ICS holiday import:
+        fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 \
+            --annual-start 120 --sick-start 180 --holiday-source opm_ics \
+            --holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics \
+            --data-dir ~/.local/share/fedleave
 
     fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE]
         Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
@@ -120,9 +126,20 @@ def init(
     time_off_award_start: float = typer.Option(0.0, help="Starting time-off award hours."),
     religious_comp_start: float = typer.Option(0.0, help="Starting religious comp hours."),
     restored_annual_start: float = typer.Option(0.0, help="Starting restored annual leave hours."),
+    holiday_source: str = typer.Option("python_holidays", help="Holiday source: python_holidays or opm_ics."),
+    holiday_ics_url: str = typer.Option(
+        "https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics",
+        help="iCalendar URL to download federal holidays from when --holiday-source=opm_ics.",
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     from .config import init_config
+    # validate leave_year_start early to avoid creating bad state
+    try:
+        parse_iso_date(leave_year_start)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
 
     init_config(
         year=year,
@@ -138,6 +155,8 @@ def init(
             "religious_comp": religious_comp_start,
             "restored_annual": restored_annual_start,
         },
+        holiday_source=holiday_source,
+        holiday_ics_url=holiday_ics_url,
         data_dir=data_dir,
     )
 
@@ -157,6 +176,21 @@ def add(
 ) -> None:
     try:
         direction, hours = normalize_direction(earned, used, worked, adjusted)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    # validate date and sanitize inputs before proceeding
+    try:
+        parsed = parse_iso_date(date)
+        date = parsed.isoformat()
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    try:
+        description = sanitize_text(description, field_name="description")
+        source = sanitize_text(source, field_name="source")
     except ValueError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
@@ -308,6 +342,20 @@ def correct(
     # void original
     orig["void"] = True
     orig["void_reason"] = f"Correction: {reason}"
+
+    # validate optional replacement date and sanitize reason before creating replacement
+    if date:
+        try:
+            date = parse_iso_date(date).isoformat()
+        except ValueError as exc:
+            console.print(f"[red]ERROR:[/red] {exc}")
+            raise typer.Exit(code=2)
+
+    try:
+        reason = sanitize_text(reason, field_name="reason")
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
 
     # create replacement
     existing_ids = [t["id"] for t in leave_year.get("transactions", [])]
@@ -704,8 +752,14 @@ def holidays(
         # Full ICS import using icalendar
         try:
             from .holidays import import_ics
+            # sanitize file path
+            try:
+                file_text = sanitize_text(file, field_name="file")
+            except ValueError as exc:
+                console.print(f"[red]ERROR:[/red] {exc}")
+                raise typer.Exit(code=2)
 
-            parsed = import_ics(Path(file))
+            parsed = import_ics(Path(file_text))
             # set year if possible
             for h in parsed.get("holidays", []):
                 if parsed.get("year") is None and h.get("actual_date"):
@@ -722,6 +776,50 @@ def holidays(
 
     console.print(f"Unknown holidays action: {action}")
     raise typer.Exit(code=2)
+
+
+@app.command(name="validate")
+def validate(
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    apply: bool = typer.Option(False, help="Apply automatic fixes where possible."),
+) -> None:
+    """Validate leave year JSON files in the data directory.
+
+    With `--apply` the command will write back normalized dates for transactions when safe.
+    """
+    from .storage import write_json
+    base = get_default_data_dir(data_dir)
+    year_dir = base / "leave_years"
+    if not year_dir.exists():
+        console.print(f"No leave_years directory found in {base}")
+        raise typer.Exit(code=1)
+
+    any_issues = False
+    for pj in sorted(year_dir.iterdir()):
+        if pj.suffix != ".json":
+            continue
+        ly = load_leave_year(int(pj.stem), data_dir)
+        issues = validate_leave_year(ly)
+        if not issues:
+            console.print(f"{pj.name}: OK")
+            continue
+
+        any_issues = True
+        console.print(f"{pj.name}: {len(issues)} issues found")
+        for iss in issues:
+            console.print(f"  - {iss.get('path')}: {iss.get('message')}")
+        # interactive prompt: apply suggested fixes for this file?
+        if apply or typer.confirm(f"Apply suggested fixes to {pj.name}?"):
+            fixed = apply_fixes_to_leave_year(ly, issues)
+            try:
+                write_json(pj, fixed)
+                console.print(f"  Applied fixes to {pj.name}")
+            except Exception as exc:
+                console.print(f"  Failed to write fixes: {exc}")
+
+    if any_issues:
+        raise typer.Exit(code=2)
+    console.print("Validation completed: no issues found")
 
 
 @app.command()
@@ -755,6 +853,9 @@ def void(
 def balance(
     year: int = typer.Option(..., help="Leave year."),
     as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD."),
+    project: bool = typer.Option(False, help="Project future automatic annual and sick accrual to the projection date or year end."),
+    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD. Defaults to leave year end when --project is enabled."),
+    use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     try:
@@ -763,13 +864,36 @@ def balance(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
 
-    balances = calculate_balances(leave_year, until_date=as_of)
+    include_projected = project or use_or_lose
+    balances = calculate_balances(
+        leave_year,
+        until_date=as_of,
+        include_projected=include_projected,
+        project_until=project_to,
+    )
+
     if as_of:
         console.print(f"Balances for {year} as of {as_of}:")
+    elif include_projected:
+        projection_label = project_to or leave_year.get("leave_year_end") or "year end"
+        console.print(f"Projected balances for {year} as of {projection_label}:")
     else:
         console.print(f"Balances for {year}:")
+
     for category, amount in sorted(balances.items()):
         console.print(f"  {category}: {amount:.2f}")
+
+    if use_or_lose:
+        try:
+            cfg = load_config(data_dir)
+        except FileNotFoundError:
+            cfg = None
+
+        use_or_lose_data = calculate_use_or_lose(leave_year, balances, cfg)
+        console.print("")
+        console.print(f"Carryover limit: {use_or_lose_data['carryover_limit']:.2f}")
+        console.print(f"Projected annual carryover: {use_or_lose_data['annual_carryover']:.2f}")
+        console.print(f"Projected use-or-lose: {use_or_lose_data['use_or_lose']:.2f}")
 
 @app.command(name="activity")
 def daily_activity(

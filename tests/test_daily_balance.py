@@ -33,3 +33,26 @@ def test_calculate_daily_activity(tmp_path: Path):
     assert activity["used"]["annual"] == 4.0
     assert activity["net"]["annual"] == -4.0
     assert activity["net"]["comp"] == 2.0
+
+
+def test_calculate_balances_accepts_single_digit_month_day():
+    leave_year = {
+        "starting_balances": {"annual": 40.0},
+        "transactions": [
+            {"date": "2026-1-11", "category": "annual", "direction": "used", "hours": 4.0},
+        ],
+    }
+
+    balances = calculate_balances(leave_year, until_date="2026-1-11")
+    assert balances["annual"] == 36.0
+
+
+def test_calculate_daily_activity_accepts_single_digit_month_day():
+    leave_year = {
+        "transactions": [
+            {"date": "2026-1-11", "category": "annual", "direction": "used", "hours": 4.0},
+        ],
+    }
+
+    activity = calculate_daily_activity(leave_year, "2026-1-11")
+    assert activity["used"]["annual"] == 4.0

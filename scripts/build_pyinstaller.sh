@@ -26,11 +26,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo "Building fedleave with PyInstaller (venv: $VENV_DIR)"
-python -m venv "$VENV_DIR"
+python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
-pip install --upgrade pip
-pip install pyinstaller
-pip install -e .
+python -m pip install --upgrade pip
+python -m pip install pyinstaller
+
+# Install runtime dependencies used by the package and the build itself.
+python -m pip install -r "$HERE/requirements.txt"
 
 # Ensure templates are bundled. Adjust paths as needed.
 TEMPLATE_PATH="$HERE/templates/report_template.odt"
@@ -49,6 +51,8 @@ pyinstaller $ONEFILE \
   --name fedleave \
   --console \
   --add-data "$ADDDATA" \
+  --hidden-import holidays \
+  --hidden-import icalendar \
   --distpath "$DIST_DIR" \
   --workpath "$HERE/.pyinstaller-build" \
   --specpath "$HERE/.pyinstaller-spec" \

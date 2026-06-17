@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, validator
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 
 TRANSACTION_CATEGORIES = [
@@ -73,29 +74,45 @@ class Transaction(BaseModel):
     expiration_pay_period: int | None = None
     earned_transaction_id: str | None = None
 
-    @validator("category")
+    @field_validator("category")
     def validate_category(cls, value: str) -> str:
         if value not in TRANSACTION_CATEGORIES:
-            raise ValueError(f"Invalid category: {value}")
+            raise ValueError(
+                f"Invalid category: {value}. Valid categories: {', '.join(TRANSACTION_CATEGORIES)}."
+            )
         return value
 
-    @validator("direction")
+    @field_validator("direction")
     def validate_direction(cls, value: str) -> str:
         if value not in TRANSACTION_DIRECTIONS:
-            raise ValueError(f"Invalid direction: {value}")
+            raise ValueError(
+                f"Invalid direction: {value}. Valid directions: {', '.join(TRANSACTION_DIRECTIONS)}."
+            )
         return value
 
-    @validator("status")
+    @field_validator("status")
     def validate_status(cls, value: str) -> str:
         if value not in TRANSACTION_STATUSES:
-            raise ValueError(f"Invalid status: {value}")
+            raise ValueError(
+                f"Invalid status: {value}. Valid statuses: {', '.join(TRANSACTION_STATUSES)}."
+            )
         return value
 
-    @validator("hours")
+    @field_validator("hours")
     def validate_hours(cls, value: float) -> float:
         if value < 0:
-            raise ValueError("hours must be non-negative")
+            raise ValueError("Invalid hours: must be zero or positive. Example: --used 4.0")
         return value
+
+    @field_validator("date")
+    def validate_date(cls, value: str) -> str:
+        try:
+            normalized = _parse_iso_date(value).isoformat()
+        except ValueError:
+            raise ValueError(
+                f"Invalid date: {value}. Use YYYY-MM-DD, for example 2026-01-11."
+            )
+        return normalized
 
 
 def generate_transaction_id(date_str: str, existing_ids: list[str]) -> str:
@@ -150,17 +167,38 @@ def create_transaction(
             source=source,
         )
     except ValidationError as exc:
-        raise ValueError(exc)
+        errors = []
+        for err in exc.errors():
+            loc = ".".join(str(part) for part in err.get("loc", []))
+            msg = err.get("msg", "Invalid value")
+            errors.append(f"{loc}: {msg}" if loc else msg)
+        raise ValueError("; ".join(errors)) from exc
 
 
 def _parse_iso_date(date_str: str) -> date:
+    normalized = _normalize_iso_date(date_str)
     try:
-        return date.fromisoformat(date_str)
+        return date.fromisoformat(normalized)
     except Exception as exc:
-        raise ValueError(f"Invalid date: {date_str}") from exc
+        raise ValueError(
+            f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11."
+        ) from exc
 
 
-def calculate_balances(leave_year: dict[str, Any], until_date: str | None = None) -> dict[str, float]:
+def _normalize_iso_date(date_str: str) -> str:
+    match = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", date_str)
+    if not match:
+        return date_str
+    year, month, day = match.groups()
+    return f"{year}-{int(month):02d}-{int(day):02d}"
+
+
+def calculate_balances(
+    leave_year: dict[str, Any],
+    until_date: str | None = None,
+    include_projected: bool = False,
+    project_until: str | None = None,
+) -> dict[str, float]:
     totals: dict[str, float] = {category: 0.0 for category in TRANSACTION_CATEGORIES}
     starting_balances = leave_year.get("starting_balances", {})
     for category, amount in starting_balances.items():
@@ -184,7 +222,47 @@ def calculate_balances(leave_year: dict[str, Any], until_date: str | None = None
             totals[category] -= hours
         else:
             totals[category] += hours
+
+    if include_projected:
+        if project_until is not None:
+            projection_end = _parse_iso_date(project_until)
+        else:
+            projection_end = _parse_iso_date(leave_year.get("leave_year_end", ""))
+
+        pay_periods = leave_year.get("pay_periods", [])
+        annual_accrual = float(leave_year.get("annual_leave_accrual_hours", 0.0))
+        sick_accrual = float(leave_year.get("sick_leave_accrual_hours", 0.0))
+
+        for pay_period in pay_periods:
+            accrual_date_str = pay_period.get("accrual_date") or pay_period.get("end_date")
+            if not accrual_date_str:
+                continue
+            accrual_date = _parse_iso_date(accrual_date_str)
+            if cutoff is not None and accrual_date <= cutoff:
+                continue
+            if accrual_date > projection_end:
+                continue
+
+            totals["annual"] += annual_accrual
+            totals["sick"] += sick_accrual
+
     return totals
+
+
+def calculate_use_or_lose(leave_year: dict[str, Any], balances: dict[str, float], config: dict[str, Any] | None = None) -> dict[str, float]:
+    carryover_limit = 240.0
+    if config is not None:
+        carryover_limit = float(
+            config.get("rules", {}).get("annual", {}).get("carryover_limit_hours", carryover_limit)
+        )
+    annual_balance = balances.get("annual", 0.0)
+    carryover_amount = min(annual_balance, carryover_limit)
+    use_or_lose_amount = max(0.0, annual_balance - carryover_limit)
+    return {
+        "carryover_limit": carryover_limit,
+        "annual_carryover": carryover_amount,
+        "use_or_lose": use_or_lose_amount,
+    }
 
 
 def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, dict[str, float]]:
@@ -224,3 +302,73 @@ def add_transaction_to_leave_year(leave_year: dict[str, Any], transaction: Trans
     if "transactions" not in leave_year:
         leave_year["transactions"] = []
     leave_year["transactions"].append(transaction.model_dump())
+
+
+def validate_leave_year(leave_year: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return a list of issues found in a leave_year dict.
+
+    Each issue is a dict with keys: 'type', 'path', 'message', and optional 'fix'.
+    """
+    issues: list[dict[str, Any]] = []
+    # check starting balances
+    sb = leave_year.get("starting_balances", {})
+    if not isinstance(sb, dict):
+        issues.append({"type": "starting_balances", "path": "starting_balances", "message": "starting_balances must be a mapping"})
+
+    # check transactions
+    for idx, tx in enumerate(leave_year.get("transactions", [])):
+        path = f"transactions[{idx}]"
+        # date
+        date_str = tx.get("date", "")
+        try:
+            d = _parse_iso_date(date_str)
+        except ValueError:
+            # try to normalize; if normalization succeeds, suggest fix
+            normalized = _normalize_iso_date(date_str)
+            try:
+                _ = date.fromisoformat(normalized)
+                issues.append({"type": "date", "path": path + ".date", "message": f"Non-canonical date: {date_str}", "fix": {"date": normalized}})
+            except Exception:
+                issues.append({"type": "date", "path": path + ".date", "message": f"Invalid date: {date_str}"})
+
+        # category
+        cat = tx.get("category")
+        if cat not in TRANSACTION_CATEGORIES:
+            issues.append({"type": "category", "path": path + ".category", "message": f"Invalid category: {cat}"})
+
+        # direction
+        dirn = tx.get("direction")
+        if dirn not in TRANSACTION_DIRECTIONS:
+            issues.append({"type": "direction", "path": path + ".direction", "message": f"Invalid direction: {dirn}"})
+
+        # status
+        st = tx.get("status")
+        if st not in TRANSACTION_STATUSES:
+            issues.append({"type": "status", "path": path + ".status", "message": f"Invalid status: {st}"})
+
+        # hours
+        try:
+            h = float(tx.get("hours", 0.0))
+            if h < 0:
+                issues.append({"type": "hours", "path": path + ".hours", "message": f"Negative hours: {h}"})
+        except Exception:
+            issues.append({"type": "hours", "path": path + ".hours", "message": f"Invalid hours value: {tx.get('hours')}"})
+
+    return issues
+
+
+def apply_fixes_to_leave_year(leave_year: dict[str, Any], issues: list[dict[str, Any]]) -> dict[str, Any]:
+    """Apply automatic fixes suggested in issues and return new leave_year dict."""
+    new = dict(leave_year)
+    txs = [dict(t) for t in new.get("transactions", [])]
+    for issue in issues:
+        if issue.get("type") == "date" and issue.get("fix"):
+            # path like transactions[3].date
+            path = issue["path"]
+            m = re.fullmatch(r"transactions\[(\d+)\]\.date", path)
+            if m:
+                idx = int(m.group(1))
+                txs[idx]["date"] = issue["fix"]["date"]
+
+    new["transactions"] = txs
+    return new

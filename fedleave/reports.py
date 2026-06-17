@@ -12,7 +12,6 @@ from pathlib import Path
 
 import typer
 
-from .charts import generate as generate_chart
 from .config import get_default_data_dir
 from .ledger import calculate_balances
 
@@ -53,6 +52,7 @@ def generate(
         chart_path = Path(chart)
     else:
         chart_path = report_dir / f"chart_{year}.png"
+        from .charts import generate as generate_chart
         generate_chart(year=year, data_dir=data_dir, output=str(chart_path))
 
     if not chart_path.exists():

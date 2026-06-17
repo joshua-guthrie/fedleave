@@ -3,15 +3,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from datetime import datetime
+from typing import Any
 
 import typer
 from pydantic import BaseModel, Field
 from dateutil.parser import isoparse
+from .validation import sanitize_url
 from rich.console import Console
 
 from .storage import ensure_data_dir, atomic_write_json
 from .payperiods import generate_pay_periods
-from .holidays import generate_federal_holidays
+from .holidays import DEFAULT_OPM_ICS_URL, generate_federal_holidays
 
 console = Console()
 
@@ -36,6 +38,7 @@ class HolidaysConfig(BaseModel):
     enabled: bool = True
     country: str = "US"
     source_preference: str = "opm_ics_then_python_holidays"
+    ics_url: str = DEFAULT_OPM_ICS_URL
     cache_enabled: bool = True
     cache_dir: str = "holiday_cache"
     allow_manual_override: bool = True
@@ -148,12 +151,21 @@ def get_default_data_dir(data_dir: Path | None = None) -> Path:
     return env_dir
 
 
+def load_config(data_dir: Path | None = None) -> dict[str, Any]:
+    config_path = get_default_data_dir(data_dir) / "config.json"
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+    return json.loads(config_path.read_text())
+
+
 def init_config(
     year: int,
     leave_year_start: str,
     annual_accrual: float,
     starting_balances: dict[str, float],
     data_dir: Path | None = None,
+    holiday_source: str = "python_holidays",
+    holiday_ics_url: str = DEFAULT_OPM_ICS_URL,
 ) -> None:
     data_dir = get_default_data_dir(data_dir)
     ensure_data_dir(data_dir)
@@ -161,12 +173,24 @@ def init_config(
     config = Config()
     config.user.display_name = "User"
     config.defaults.annual_leave_accrual_hours = annual_accrual
+    config.holidays.source_preference = holiday_source
+    # sanitize holiday ICS URL
+    try:
+        config.holidays.ics_url = sanitize_url(holiday_ics_url)
+    except Exception:
+        # fallback to default if provided URL invalid
+        config.holidays.ics_url = DEFAULT_OPM_ICS_URL
 
     config_path = data_dir / "config.json"
     if config_path.exists():
         raise typer.Exit(code=1)
 
-    leave_year_start_date = isoparse(leave_year_start).date()
+    try:
+        leave_year_start_date = isoparse(leave_year_start).date()
+    except Exception as exc:
+        raise ValueError(
+            f"Invalid leave year start date: {leave_year_start}. Use YYYY-MM-DD, for example 2026-01-11."
+        ) from exc
     pay_periods = generate_pay_periods(leave_year_start_date, 26)
     leave_year_end = pay_periods[-1]["end_date"]
 
@@ -188,7 +212,7 @@ def init_config(
     year_file = year_path / f"{year}.json"
     atomic_write_json(year_file, leave_year.model_dump(), overwrite=False)
 
-    holiday_cache = generate_federal_holidays(year, data_dir)
+    holiday_cache = generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
     atomic_write_json(data_dir / "holiday_cache" / f"federal_holidays_{year}.json", holiday_cache, overwrite=True)
 
     console.print(f"Initialized fedleave data in [bold]{data_dir}[/bold]")
