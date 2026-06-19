@@ -6,7 +6,7 @@ This project is a command-line application for tracking federal-style leave bala
 
 The hope is that it is not only useful at the CLI, but could become the basis of larger leave tracking applications (web apps or GUIs).
 
-Note:  In-case you're wondering... it was a 100% at work project.  None of it was done on company time!   It was also my first experiemnt into vibe coding.  So far, I'm impressed.
+Note:  In-case you're wondering... it was a 100% at home project.  None of it was done on company time!   It was also my first experiemnt into vibe coding.  So far, I'm impressed.
 
 ## Setup
 
