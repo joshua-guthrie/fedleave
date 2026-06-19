@@ -25,7 +25,7 @@ from .config import get_default_data_dir, load_config
 from .holidays import generate_federal_holidays
 import json
 from .payperiods import generate_pay_periods
-from datetime import date as _date, datetime as _datetime
+from datetime import date as _date, datetime as _datetime, timedelta as _timedelta
 
 console = Console()
 
@@ -40,7 +40,8 @@ Primary commands:
     add         Add a transaction to a leave year
     list        List transactions for a leave year
     balance     Show balances calculated from the ledger
-    pay-period  Show earned, used, and overtime totals for a pay period
+    pay-period  Show earned, used, overtime totals, and balances for a pay period
+    pay-periods Show earned, used, overtime totals, and balances for every pay period
     export-data Export config, leave years, and holiday cache to a JSON archive
     import-data Import a JSON archive created by export-data
     correct     Audit-safe correction of transactions
@@ -70,16 +71,21 @@ Command details and examples:
             --holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics \
             --data-dir ~/.local/share/fedleave
 
-    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE]
+    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative]
         Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
+        --authoritative voids active transactions with the same date, category, and direction before adding the new transaction.
         Valid categories: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual
 
     Examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
+        fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
 
-    fedleave pay-period --year YEAR --date YYYY-MM-DD [--data-dir PATH]
-        Show leave earned/used and overtime worked for the pay period containing the date.
+    fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--data-dir PATH]
+        Show leave earned/used, overtime worked, optional daily activity, and ending balances for the pay period containing the date.
+
+    fedleave pay-periods --year YEAR [--data-dir PATH]
+        Show earned/used/worked totals and ending balances for every pay period in the leave year.
 
     fedleave export-data --output fedleave_backup.json [--data-dir PATH]
         Export config, leave year files, and holiday cache to a portable JSON archive.
@@ -190,6 +196,7 @@ def add(
     description: str = typer.Option("", help="Transaction description."),
     status: str = typer.Option("planned", help="Transaction status."),
     source: str = typer.Option("manual", help="Transaction source."),
+    authoritative: bool = typer.Option(False, help="Void existing same-date/category/direction transactions before adding this one."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     try:
@@ -235,9 +242,26 @@ def add(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
+    replaced_ids: list[str] = []
+    if authoritative:
+        for existing in leave_year.get("transactions", []):
+            if existing.get("void"):
+                continue
+            if (
+                existing.get("date") == date
+                and existing.get("category") == category
+                and existing.get("direction") == direction
+            ):
+                existing["void"] = True
+                existing["void_reason"] = f"Replaced by authoritative transaction {transaction.id}"
+                replaced_ids.append(existing.get("id", ""))
+
     add_transaction_to_leave_year(leave_year, transaction)
     write_json(get_leave_year_path(year, data_dir), leave_year)
-    console.print(f"Added transaction [bold]{transaction.id}[/bold] to {year}")
+    if replaced_ids:
+        console.print(f"Added transaction [bold]{transaction.id}[/bold] to {year}; replaced {', '.join(replaced_ids)}")
+    else:
+        console.print(f"Added transaction [bold]{transaction.id}[/bold] to {year}")
 
 
 def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
@@ -882,8 +906,11 @@ def balance(
 def pay_period_summary(
     year: int = typer.Option(..., help="Leave year."),
     date: str = typer.Option(..., help="Date inside the pay period YYYY-MM-DD."),
+    daily: bool = typer.Option(False, help="Show activity for each day in the pay period."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if not isinstance(daily, bool):
+        daily = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
@@ -905,6 +932,7 @@ def pay_period_summary(
         raise typer.Exit(code=2)
 
     pay_period = activity["pay_period"]
+    ending_balances = calculate_balances(leave_year, until_date=pay_period.get("end_date"))
     console.print(
         f"Pay period {pay_period.get('pay_period_number')} "
         f"({pay_period.get('start_date')} to {pay_period.get('end_date')})"
@@ -912,11 +940,33 @@ def pay_period_summary(
     if added_accruals:
         console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions for this pay period.")
 
+    if daily:
+        console.print("")
+        console.print("Daily activity:")
+        current = _date.fromisoformat(pay_period["start_date"])
+        end = _date.fromisoformat(pay_period["end_date"])
+        while current <= end:
+            day = current.isoformat()
+            day_activity = calculate_daily_activity(leave_year, day)
+            day_categories = sorted({*day_activity["earned"], *day_activity["used"], *day_activity["net"]})
+            if day_categories:
+                console.print(f"  {day}:")
+                for category in day_categories:
+                    earned = day_activity["earned"].get(category, 0.0)
+                    used = day_activity["used"].get(category, 0.0)
+                    net = day_activity["net"].get(category, 0.0)
+                    console.print(f"    {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
+            else:
+                console.print(f"  {day}: no activity")
+            current += _timedelta(days=1)
+
     categories = sorted({*activity["earned"], *activity["used"], *activity["worked"], *activity["net"]})
     if not categories:
         console.print("No leave or overtime activity recorded for this pay period.")
         return
 
+    console.print("")
+    console.print("Pay period totals:")
     for category in categories:
         earned = activity["earned"].get(category, 0.0)
         used = activity["used"].get(category, 0.0)
@@ -926,6 +976,69 @@ def pay_period_summary(
             console.print(f"  {category}: worked={worked:.2f} net={net:.2f}")
         else:
             console.print(f"  {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
+
+    console.print("")
+    console.print(f"Balances at end of pay period {pay_period.get('pay_period_number')}:")
+    for category, amount in sorted(ending_balances.items()):
+        if amount:
+            console.print(f"  {category}: {amount:.2f}")
+
+
+@app.command(name="pay-periods")
+def pay_periods_summary(
+    year: int = typer.Option(..., help="Leave year."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    try:
+        leave_year = load_leave_year(year, data_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    pay_periods = leave_year.get("pay_periods", [])
+    if not pay_periods:
+        console.print(f"No pay periods found for {year}.")
+        raise typer.Exit(code=1)
+
+    final_accrual_date = pay_periods[-1].get("accrual_date") or pay_periods[-1].get("end_date")
+    try:
+        added_accruals = ensure_automatic_accruals(leave_year, final_accrual_date)
+        if added_accruals:
+            write_json(get_leave_year_path(year, data_dir), leave_year)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    console.print(f"Pay period summary for {year}:")
+    if added_accruals:
+        console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {final_accrual_date}.")
+
+    for pay_period in pay_periods:
+        activity = calculate_pay_period_activity(leave_year, pay_period["start_date"])
+        balances = calculate_balances(leave_year, until_date=pay_period["end_date"])
+        console.print(
+            f"Pay period {pay_period.get('pay_period_number')} "
+            f"({pay_period.get('start_date')} to {pay_period.get('end_date')})"
+        )
+        categories = sorted({*activity["earned"], *activity["used"], *activity["worked"], *activity["net"]})
+        if categories:
+            for category in categories:
+                earned = activity["earned"].get(category, 0.0)
+                used = activity["used"].get(category, 0.0)
+                worked = activity["worked"].get(category, 0.0)
+                net = activity["net"].get(category, 0.0)
+                if category == "overtime":
+                    console.print(f"  {category}: worked={worked:.2f} net={net:.2f}")
+                else:
+                    console.print(f"  {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
+        else:
+            console.print("  no activity")
+        nonzero_balances = {category: amount for category, amount in sorted(balances.items()) if amount}
+        balance_text = ", ".join(f"{category}={amount:.2f}" for category, amount in nonzero_balances.items())
+        console.print(f"  ending balances: {balance_text or 'none'}")
 
 
 @app.command(name="activity")

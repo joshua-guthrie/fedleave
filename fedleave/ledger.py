@@ -279,6 +279,8 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
     net: dict[str, float] = {}
 
     for transaction in leave_year.get("transactions", []):
+        if transaction.get("void"):
+            continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if tx_date != target:
             continue

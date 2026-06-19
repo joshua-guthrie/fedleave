@@ -34,6 +34,7 @@ Record leave usage and overtime as it happens:
 ```bash
 fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
 fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3 --description "Release support"
+fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 ```
 
 Check balances. Missing automatic annual and sick accrual transactions are posted through the balance date.
@@ -46,6 +47,8 @@ Check what was earned, used, and worked during the pay period containing a date:
 
 ```bash
 fedleave pay-period --year 2026 --date 2026-06-01
+fedleave pay-period --year 2026 --date 2026-06-01 --daily
+fedleave pay-periods --year 2026
 ```
 
 Export or restore data:
@@ -101,7 +104,7 @@ Commands and common options:
 		Add a transaction to a leave year ledger.
 
 		Syntax:
-			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--data-dir PATH]
+			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--data-dir PATH]
 
 		Defaults:
 			--status planned
@@ -110,11 +113,13 @@ Commands and common options:
 
 		Notes:
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
+			- `--authoritative` voids active transactions with the same date, category, and direction before adding the new transaction.
 			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual.
 
 		Examples:
 			fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
 			fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+			fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 
 	export-data
 		Export config, leave year files, and holiday cache to a portable JSON archive.
@@ -154,14 +159,24 @@ Commands and common options:
 		- Federal employees earn annual and sick leave automatically each pay period; this tool posts or projects that accrual based on the leave year pay periods and configured accrual rates.
 
 	pay-period
-		Show earned, used, net leave, and overtime worked for the pay period containing a date.
+		Show earned, used, net leave, overtime worked, optional daily activity, and ending balances for the pay period containing a date.
 
 		Syntax:
-			fedleave pay-period --year YEAR --date YYYY-MM-DD [--data-dir PATH]
+			fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--data-dir PATH]
 
 		Notes:
 			- Missing automatic annual and sick accrual transactions for the containing pay period are posted before totals are calculated.
 			- Overtime is shown as `worked`, which is the amount expected for that pay period's paycheck.
+			- `--daily` prints one row for every day in the pay period, including days with no activity.
+
+	pay-periods
+		Show earned, used, worked totals, and ending balances for every pay period in the leave year.
+
+		Syntax:
+			fedleave pay-periods --year YEAR [--data-dir PATH]
+
+		Notes:
+			- Missing automatic annual and sick accrual transactions are posted through the final pay period accrual date before totals are calculated.
 
 activity
 	Show earned, used, and net leave activity for one day.
@@ -236,6 +251,10 @@ Daily and as-of queries:
 
 	# Leave earned/used and overtime worked for the pay period containing a date
 	fedleave pay-period --year 2026 --date 2026-06-01 --data-dir /path/to/data
+	fedleave pay-period --year 2026 --date 2026-06-01 --daily --data-dir /path/to/data
+
+	# Leave earned/used and ending balances for every pay period in a year
+	fedleave pay-periods --year 2026 --data-dir /path/to/data
 
 	# Project end-of-year balance including automatic annual/sick accrual
 	fedleave balance --year 2026 --project --use-or-lose --data-dir /path/to/data

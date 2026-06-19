@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 
-from fedleave.cli import balance, pay_period_summary
+from fedleave.cli import balance, pay_period_summary, pay_periods_summary
 from fedleave.config import init_config
 from fedleave.ledger import calculate_balances, calculate_pay_period_activity, ensure_automatic_accruals
 from fedleave.storage import write_json
@@ -104,3 +104,43 @@ def test_pay_period_command_posts_and_reports_period(tmp_path: Path):
     updated = json.loads((data_dir / "leave_years" / "2026.json").read_text(encoding="utf-8"))
     auto_accruals = [tx for tx in updated["transactions"] if tx.get("source") == "auto_accrual"]
     assert len(auto_accruals) == 2
+
+
+def test_pay_period_command_with_daily_keeps_accruals_and_daily_activity(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    leave_year = _init_data_dir(data_dir)
+    leave_year["transactions"].append(
+        {
+            "id": "20260113-001",
+            "date": "2026-01-13",
+            "category": "annual",
+            "direction": "used",
+            "hours": 2.0,
+            "status": "approved",
+            "source": "manual",
+        }
+    )
+    write_json(data_dir / "leave_years" / "2026.json", leave_year)
+
+    pay_period_summary(year=2026, date="2026-01-20", daily=True, data_dir=data_dir)
+
+    output = capsys.readouterr().out
+    assert "Daily activity:" in output
+    assert "2026-01-13:" in output
+    assert "Balances at end of pay period 1:" in output
+
+
+def test_pay_periods_summary_posts_accruals_for_all_periods(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+
+    pay_periods_summary(year=2026, data_dir=data_dir)
+
+    output = capsys.readouterr().out
+    assert "Pay period summary for 2026:" in output
+    assert "Pay period 1" in output
+    assert "Pay period 26" in output
+
+    updated = json.loads((data_dir / "leave_years" / "2026.json").read_text(encoding="utf-8"))
+    auto_accruals = [tx for tx in updated["transactions"] if tx.get("source") == "auto_accrual"]
+    assert len(auto_accruals) == 52
