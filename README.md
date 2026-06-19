@@ -2,19 +2,60 @@
 
 Federal leave and time tracker.
 
-This project is a Python-first command-line application for tracking federal-style leave balances, generating pay period calendars, and producing LibreOffice-compatible reports.
+This project is a Python-first command-line application for tracking federal-style leave balances and generating pay period calendars.
 
 ## Setup
 
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
+pip install -r requirements.txt
 pip install -e .
 ```
 
 ## Commands
 
 Run `fedleave --help` after installation.
+
+## Typical workflow
+
+Initialize a leave year. The leave year start date should be the first day of pay period 1 for that leave year. Annual leave accrual is configured per pay period; sick leave accrues at 4 hours per pay period.
+
+```bash
+fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180
+```
+
+Record leave usage and overtime as it happens:
+
+```bash
+fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
+fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3 --description "Release support"
+```
+
+Check balances. Missing automatic annual and sick accrual transactions are posted through the balance date.
+
+```bash
+fedleave balance --year 2026 --as-of 2026-06-01
+```
+
+Check what was earned, used, and worked during the pay period containing a date:
+
+```bash
+fedleave pay-period --year 2026 --date 2026-06-01
+```
+
+Export or restore data:
+
+```bash
+fedleave export-data --output fedleave_backup.json
+fedleave import-data --input fedleave_backup.json --data-dir /path/to/new_data
+```
+
+Validate and normalize stored JSON data:
+
+```bash
+fedleave validate --data-dir ~/.local/share/fedleave --apply
+```
 
 ## CLI Detailed Help
 
@@ -71,6 +112,22 @@ Commands and common options:
 			fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
 			fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
 
+	export-data
+		Export config, leave year files, and holiday cache to a portable JSON archive.
+
+		Syntax:
+			fedleave export-data --output PATH [--data-dir PATH]
+
+	import-data
+		Import an archive created by `export-data`.
+
+		Syntax:
+			fedleave import-data --input PATH [--overwrite] [--data-dir PATH]
+
+		Notes:
+			- Existing files are preserved by default.
+			- Use `--overwrite` to replace existing files; overwritten files are backed up first.
+
 	list
 		List transactions for a leave year.
 
@@ -86,10 +143,21 @@ Commands and common options:
 	Notes:
 		- `--year YEAR` reads the leave year file and computes balances from all recorded transactions.
 		- `--as-of YYYY-MM-DD` computes balances using only transactions on or before that date.
+		- Missing automatic annual and sick leave accrual transactions are posted through `--as-of`, or through today when `--as-of` is omitted.
 		- `--project` adds projected automatic annual and sick accruals for future pay periods through the leave year end (or via `--project-to`).
 		- `--project-to YYYY-MM-DD` projects accruals only through the specified date instead of year end.
 		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit.
-		- Federal employees earn annual and sick leave automatically each pay period; this tool projects that accrual based on the leave year pay periods and configured accrual rates.
+		- Federal employees earn annual and sick leave automatically each pay period; this tool posts or projects that accrual based on the leave year pay periods and configured accrual rates.
+
+	pay-period
+		Show earned, used, net leave, and overtime worked for the pay period containing a date.
+
+		Syntax:
+			fedleave pay-period --year YEAR --date YYYY-MM-DD [--data-dir PATH]
+
+		Notes:
+			- Missing automatic annual and sick accrual transactions for the containing pay period are posted before totals are calculated.
+			- Overtime is shown as `worked`, which is the amount expected for that pay period's paycheck.
 
 activity
 	Show earned, used, and net leave activity for one day.
@@ -113,7 +181,7 @@ Global notes:
 		3   JSON validation error
 		4   File read/write error
 
-For the full project specification, rules, and report details see the project documentation or the repository spec.
+For the full project specification and rules, see the project documentation or the repository spec.
 
 ## Additional Command Examples
 
@@ -148,6 +216,12 @@ Holiday commands:
 	fedleave holidays import-ics --year 2026 --file opm-holidays.ics --data-dir /path/to/data
 	fedleave holidays list --year 2026 --data-dir /path/to/data
 
+Export/import:
+
+	fedleave export-data --output fedleave_backup.json --data-dir /path/to/data
+	fedleave import-data --input fedleave_backup.json --data-dir /path/to/new_data
+	fedleave import-data --input fedleave_backup.json --overwrite --data-dir /path/to/data
+
 Daily and as-of queries:
 
 	# Current ledger balance through all recorded transactions
@@ -156,6 +230,9 @@ Daily and as-of queries:
 	# Balance as of a specific date
 	fedleave balance --year 2026 --as-of 2026-06-01 --data-dir /path/to/data
 
+	# Leave earned/used and overtime worked for the pay period containing a date
+	fedleave pay-period --year 2026 --date 2026-06-01 --data-dir /path/to/data
+
 	# Project end-of-year balance including automatic annual/sick accrual
 	fedleave balance --year 2026 --project --use-or-lose --data-dir /path/to/data
 
@@ -163,98 +240,6 @@ Daily and as-of queries:
 	fedleave balance --year 2026 --project --project-to 2026-12-15 --data-dir /path/to/data
 
 	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
-
-## Generating reports
-
-Reports are built from a leave year JSON, a report template, and a generated chart image.
-
-Prerequisites:
-
-- `matplotlib` and `odfpy` installed in your environment.
-- `libreoffice` on PATH if you want automatic ODT → PDF conversion.
-- A report template at `templates/report_template.odt`.
-
-If you do not have a template yet, generate the default one:
-
-```bash
-python3 scripts/generate_templates.py
-```
-
-Robust report workflow:
-
-1. Initialize or prepare your year data:
-
-```bash
-fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-start 120 --sick-start 180 --data-dir ./.data
-```
-
-2. Add any transactions and verify the balance file exists:
-
-```bash
-fedleave add --year 2026 --date 2026-06-01 --category annual --used 20 --description "Vacation" --data-dir ./.data
-fedleave balance --year 2026 --data-dir ./.data
-```
-
-3. Generate the report chart PNG:
-
-```bash
-python -m fedleave.charts --year 2026 --data-dir ./.data --output ./.data/reports/chart_2026.png
-```
-
-4. Generate the ODT report from the template:
-
-```bash
-python -m fedleave.reports generate --year 2026 --data_dir ./.data --chart ./.data/reports/chart_2026.png --output ./.data/reports/fedleave_2026.odt
-```
-
-If you want to use a custom template, pass `--template`:
-
-```bash
-python -m fedleave.reports generate --year 2026 --data_dir ./.data --chart ./.data/reports/chart_2026.png --template templates/report_template.odt --output ./.data/reports/fedleave_2026.odt
-```
-
-5. If LibreOffice is installed, the report generator attempts headless PDF conversion automatically. If it does not, convert manually:
-
-```bash
-libreoffice --headless --convert-to pdf ./.data/reports/fedleave_2026.odt --outdir ./.data/reports
-```
-
-Direct `fedleave` report command
---------------------------------
-
-You can call the report generator directly from the `fedleave` CLI. The command accepts the same options as the report generator and will attempt to produce a PDF when the `--output` filename ends in `.pdf`.
-
-Examples:
-
-```bash
-# produce an ODT
-fedleave report --year 2026 --output reports/fedleave_2026.odt --data-dir ./.data
-
-# produce a PDF (requires LibreOffice on PATH)
-fedleave report --year 2026 --output reports/fedleave_2026.pdf --data-dir ./.data
-```
-
-Helpful notes when dependencies are missing
-------------------------------------------
-
-- If the Python package `odfpy` is missing you will see an error instructing you to install it:
-
-	pip install odfpy
-
-- If LibreOffice is not installed and you request a PDF, the CLI will print platform-specific suggestions to install it:
-
-	- Debian/Ubuntu: `sudo apt-get install -y libreoffice-core libreoffice-writer`
-	- macOS: `brew install --cask libreoffice`
-	- Windows: download + install from https://www.libreoffice.org/
-
-The CLI gives clear errors and exit codes when these dependencies are missing so you can quickly remedy the environment.
-
-Important notes:
-
-- The generator replaces template placeholders `{{TITLE}}`, `{{DATE}}`, `{{PREPARED_BY}}`, `{{SUMMARY_TABLE}}`, and `{{CHART}}`.
-- If `odfpy` is missing, the ODT generator cannot run, but chart generation still works.
-- If the template is missing, run `python3 scripts/generate_templates.py` or provide a custom `--template` path.
-- The summary table is derived from the current leave year balances and is embedded directly into the ODT.
 
 Building a standalone `fedleave` binary
 --------------------------------------
@@ -280,7 +265,6 @@ make build
 3. Output:
 
 - The built executable will appear in `dist/fedleave` (Linux) and is platform-specific. Build on the target platform or use an appropriate builder.
-- The script bundles the ODT template into the binary; to include additional files, edit `scripts/build_pyinstaller.sh` and add more `--add-data` entries.
 
 Notes and caveats:
 
@@ -302,15 +286,13 @@ Primary language:
 	Python 3.
 
 Reason for Python-first approach:
-	The project is logic-heavy and report-heavy, not performance-heavy.
+	The project is logic-heavy, not performance-heavy.
 	Python is better for rapid iteration on:
 		- Federal leave rules
 		- Pay period calculations
 		- JSON validation
 		- Federal holiday handling
 		- CLI syntax
-		- LibreOffice report generation
-		- Chart generation
 		- Testing
 
 ===============================================================================
@@ -320,8 +302,6 @@ Reason for Python-first approach:
 Create a local Linux command-line application named fedleave.
 
 The application tracks federal-style leave and time balances using JSON files.
-It generates printable yearly leave charts and summary reports using
-LibreOffice-compatible formats, then converts those reports to PDF.
 
 The application is a personal planning, tracking, and reconciliation tool.
 It is not the official system of record.
@@ -376,18 +356,10 @@ Recommended structure:
 	|   |-- holidays.py
 	|   |-- rollover.py
 	|   |-- balances.py
-	|   |-- reports.py
-	|   |-- charts.py
-	|   |-- libreoffice.py
 	|   |-- validation.py
 	|   |-- corrections.py
 	|   |-- theme.py
 	|   |-- utils.py
-	|
-	|-- templates/
-	|   |-- yearly_chart_template.ods
-	|   |-- summary_template.odt
-	|   |-- theme.json
 	|
 	|-- examples/
 	|   |-- example_config.json
@@ -407,7 +379,6 @@ Recommended structure:
 	|
 	|-- scripts/
 	|   |-- build_pyinstaller.sh
-	|   |-- clean_reports.sh
 	|   |-- create_sample_data.sh
 
 ===============================================================================
@@ -425,8 +396,6 @@ Recommended packages:
 	python-dateutil
 	holidays
 	icalendar
-	matplotlib
-	odfpy
 	rich
 	pytest
 	pyinstaller
@@ -448,12 +417,6 @@ Purpose of each:
 	icalendar:
 		Import OPM iCalendar holiday files if available.
 
-	matplotlib:
-		Generate trend chart images.
-
-	odfpy:
-		Generate or modify ODS/ODT LibreOffice-compatible files.
-
 	rich:
 		Better command-line tables and error output.
 
@@ -462,4 +425,3 @@ Purpose of each:
 
 	pyinstaller:
 		Single-file executable distribution.
-

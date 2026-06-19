@@ -34,10 +34,6 @@ python -m pip install pyinstaller
 # Install runtime dependencies used by the package and the build itself.
 python -m pip install -r "$HERE/requirements.txt"
 
-# Ensure templates are bundled. Adjust paths as needed.
-TEMPLATE_PATH="$HERE/templates/report_template.odt"
-ADDDATA="${TEMPLATE_PATH}:templates"
-
 # create a tiny entry script PyInstaller can use
 ENTRY="$HERE/.pyinstaller_entry.py"
 cat > "$ENTRY" <<'PY'
@@ -50,7 +46,6 @@ PY
 pyinstaller $ONEFILE \
   --name fedleave \
   --console \
-  --add-data "$ADDDATA" \
   --hidden-import holidays \
   --hidden-import icalendar \
   --distpath "$DIST_DIR" \

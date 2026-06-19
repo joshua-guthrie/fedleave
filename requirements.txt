@@ -3,8 +3,6 @@ pydantic>=2.0
 python-dateutil
 holidays
 icalendar
-matplotlib
-odfpy
 rich
 pytest
 pyinstaller

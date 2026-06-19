@@ -55,6 +55,11 @@ TRANSACTION_STATUSES = [
 ]
 
 
+EARNED_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled"}
+USED_DIRECTIONS = {"used", "expired", "forfeited", "voided"}
+WORKED_DIRECTIONS = {"worked"}
+
+
 class Transaction(BaseModel):
     id: str
     date: str
@@ -216,9 +221,9 @@ def calculate_balances(
         if category not in totals:
             totals[category] = 0.0
 
-        if direction in ("earned", "starting_balance", "restored", "worked", "adjusted", "corrected", "reconciled"):
+        if direction in EARNED_DIRECTIONS or direction in WORKED_DIRECTIONS or direction == "starting_balance":
             totals[category] += hours
-        elif direction in ("used", "expired", "forfeited", "voided"):
+        elif direction in USED_DIRECTIONS:
             totals[category] -= hours
         else:
             totals[category] += hours
@@ -243,8 +248,10 @@ def calculate_balances(
             if accrual_date > projection_end:
                 continue
 
-            totals["annual"] += annual_accrual
-            totals["sick"] += sick_accrual
+            if not _has_auto_accrual(leave_year, "annual", accrual_date.isoformat()):
+                totals["annual"] += annual_accrual
+            if not _has_auto_accrual(leave_year, "sick", accrual_date.isoformat()):
+                totals["sick"] += sick_accrual
 
     return totals
 
@@ -285,10 +292,10 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
             used[category] = 0.0
             net[category] = 0.0
 
-        if direction in ("earned", "starting_balance", "restored", "worked", "adjusted", "corrected", "reconciled"):
+        if direction in EARNED_DIRECTIONS or direction in WORKED_DIRECTIONS or direction == "starting_balance":
             earned[category] += hours
             net[category] += hours
-        elif direction in ("used", "expired", "forfeited", "voided"):
+        elif direction in USED_DIRECTIONS:
             used[category] += hours
             net[category] -= hours
         else:
@@ -296,6 +303,110 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
             net[category] += hours
 
     return {"earned": earned, "used": used, "net": net}
+
+
+def find_pay_period(leave_year: dict[str, Any], day: str) -> dict[str, Any]:
+    target = _parse_iso_date(day)
+    for pay_period in leave_year.get("pay_periods", []):
+        start = _parse_iso_date(pay_period["start_date"])
+        end = _parse_iso_date(pay_period["end_date"])
+        if start <= target <= end:
+            return pay_period
+    raise ValueError(f"No pay period contains {day}")
+
+
+def _has_auto_accrual(leave_year: dict[str, Any], category: str, accrual_date: str) -> bool:
+    return any(
+        transaction.get("source") == "auto_accrual"
+        and transaction.get("category") == category
+        and transaction.get("direction") == "earned"
+        and transaction.get("date") == accrual_date
+        and not transaction.get("void")
+        for transaction in leave_year.get("transactions", [])
+    )
+
+
+def ensure_automatic_accruals(leave_year: dict[str, Any], through_date: str) -> int:
+    """Add missing automatic annual/sick accrual transactions through a date."""
+    cutoff = _parse_iso_date(through_date)
+    existing_ids = [transaction.get("id", "") for transaction in leave_year.get("transactions", [])]
+    annual_accrual = float(leave_year.get("annual_leave_accrual_hours", 0.0))
+    sick_accrual = float(leave_year.get("sick_leave_accrual_hours", 4.0))
+    added = 0
+
+    for pay_period in leave_year.get("pay_periods", []):
+        period_number = pay_period.get("pay_period_number")
+        accrual_date = pay_period.get("accrual_date") or pay_period.get("end_date")
+        if not accrual_date or _parse_iso_date(accrual_date) > cutoff:
+            continue
+
+        for category, hours in (("annual", annual_accrual), ("sick", sick_accrual)):
+            if hours <= 0 or _has_auto_accrual(leave_year, category, accrual_date):
+                continue
+            transaction = create_transaction(
+                date=accrual_date,
+                category=category,
+                direction="earned",
+                hours=hours,
+                description=f"Automatic {category} leave accrual for pay period {period_number}",
+                status="reconciled",
+                source="auto_accrual",
+                existing_ids=existing_ids,
+            )
+            add_transaction_to_leave_year(leave_year, transaction)
+            existing_ids.append(transaction.id)
+            added += 1
+
+    return added
+
+
+def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[str, Any]:
+    pay_period = find_pay_period(leave_year, day)
+    start = _parse_iso_date(pay_period["start_date"])
+    end = _parse_iso_date(pay_period["end_date"])
+    earned: dict[str, float] = {}
+    used: dict[str, float] = {}
+    worked: dict[str, float] = {}
+    net: dict[str, float] = {}
+
+    for transaction in leave_year.get("transactions", []):
+        if transaction.get("void"):
+            continue
+        tx_date = _parse_iso_date(transaction.get("date", ""))
+        if not (start <= tx_date <= end):
+            continue
+
+        category = transaction["category"]
+        direction = transaction["direction"]
+        hours = float(transaction.get("hours", 0.0))
+        earned.setdefault(category, 0.0)
+        used.setdefault(category, 0.0)
+        worked.setdefault(category, 0.0)
+        net.setdefault(category, 0.0)
+
+        if direction in WORKED_DIRECTIONS:
+            worked[category] += hours
+            earned[category] += hours
+            net[category] += hours
+        elif direction in EARNED_DIRECTIONS:
+            earned[category] += hours
+            net[category] += hours
+        elif direction in USED_DIRECTIONS:
+            used[category] += hours
+            net[category] -= hours
+        elif direction == "starting_balance":
+            continue
+        else:
+            earned[category] += hours
+            net[category] += hours
+
+    return {
+        "pay_period": pay_period,
+        "earned": earned,
+        "used": used,
+        "worked": worked,
+        "net": net,
+    }
 
 
 def add_transaction_to_leave_year(leave_year: dict[str, Any], transaction: Transaction) -> None:
@@ -322,6 +433,9 @@ def validate_leave_year(leave_year: dict[str, Any]) -> list[dict[str, Any]]:
         date_str = tx.get("date", "")
         try:
             d = _parse_iso_date(date_str)
+            normalized = d.isoformat()
+            if normalized != date_str:
+                issues.append({"type": "date", "path": path + ".date", "message": f"Non-canonical date: {date_str}", "fix": {"date": normalized}})
         except ValueError:
             # try to normalize; if normalization succeeds, suggest fix
             normalized = _normalize_iso_date(date_str)

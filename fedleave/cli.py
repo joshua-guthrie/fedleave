@@ -7,16 +7,25 @@ import typer
 from rich.console import Console
 
 from .cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, sanitize_text
-from .ledger import add_transaction_to_leave_year, calculate_balances, calculate_daily_activity, create_transaction, normalize_direction, TRANSACTION_CATEGORIES, TRANSACTION_DIRECTIONS
-from .storage import write_json
+from .ledger import (
+    TRANSACTION_CATEGORIES,
+    TRANSACTION_DIRECTIONS,
+    add_transaction_to_leave_year,
+    apply_fixes_to_leave_year,
+    calculate_balances,
+    calculate_daily_activity,
+    calculate_pay_period_activity,
+    create_transaction,
+    ensure_automatic_accruals,
+    normalize_direction,
+    validate_leave_year,
+)
+from .storage import atomic_write_json, ensure_data_dir, load_json, write_json
 from .config import get_default_data_dir, load_config
 from .holidays import generate_federal_holidays
-from . import reports
 import json
 from .payperiods import generate_pay_periods
 from datetime import date as _date, datetime as _datetime
-import shutil
-import tempfile
 
 console = Console()
 
@@ -31,6 +40,9 @@ Primary commands:
     add         Add a transaction to a leave year
     list        List transactions for a leave year
     balance     Show balances calculated from the ledger
+    pay-period  Show earned, used, and overtime totals for a pay period
+    export-data Export config, leave years, and holiday cache to a JSON archive
+    import-data Import a JSON archive created by export-data
     correct     Audit-safe correction of transactions
     void        Void a transaction (preserve audit history)
     rollover    Preview or apply leave year rollover
@@ -66,6 +78,15 @@ Command details and examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
 
+    fedleave pay-period --year YEAR --date YYYY-MM-DD [--data-dir PATH]
+        Show leave earned/used and overtime worked for the pay period containing the date.
+
+    fedleave export-data --output fedleave_backup.json [--data-dir PATH]
+        Export config, leave year files, and holiday cache to a portable JSON archive.
+
+    fedleave import-data --input fedleave_backup.json [--overwrite] [--data-dir PATH]
+        Import a JSON archive created by export-data. Existing files are preserved unless --overwrite is used.
+
     fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--data-dir PATH]
         Perform an audit-safe correction: void the original transaction and create a replacement linked to it.
     Example:
@@ -89,8 +110,6 @@ Command details and examples:
     Examples:
         fedleave holidays generate --year 2026
         fedleave holidays import-ics --year 2026 --file opm-holidays.ics
-    fedleave reports generate --year 2026 --data-dir ./.data --output reports/fedleave_2026.odt
-
 Notes on data directory:
     Default: ~/.local/share/fedleave
     Override per-command with `--data-dir /path/to/data`.
@@ -111,7 +130,6 @@ For full project specification and advanced usage, see the README in the project
 """
 
 app = typer.Typer(help=HELP_TEXT, add_completion=False)
-app.add_typer(reports.app, name="reports")
 
 @app.command()
 def init(
@@ -220,6 +238,114 @@ def add(
     add_transaction_to_leave_year(leave_year, transaction)
     write_json(get_leave_year_path(year, data_dir), leave_year)
     console.print(f"Added transaction [bold]{transaction.id}[/bold] to {year}")
+
+
+def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
+    if not directory.exists():
+        return {}
+    return {
+        path.stem: load_json(path)
+        for path in sorted(directory.iterdir())
+        if path.is_file() and path.suffix == ".json"
+    }
+
+
+@app.command("export-data")
+def export_data(
+    output: Path = typer.Option(..., help="Output JSON archive path."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    """Export fedleave data to a portable JSON archive."""
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    base = get_default_data_dir(data_dir)
+    if not base.exists():
+        console.print(f"[red]ERROR:[/red] Data directory not found: {base}")
+        raise typer.Exit(code=1)
+
+    archive = {
+        "schema_version": 1,
+        "exported_at": _datetime.now().isoformat(),
+        "source_data_dir": str(base),
+        "config": load_json(base / "config.json") if (base / "config.json").exists() else None,
+        "leave_years": _read_json_files_by_stem(base / "leave_years"),
+        "holiday_cache": _read_json_files_by_stem(base / "holiday_cache"),
+    }
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write_json(output, archive)
+    console.print(f"Exported fedleave data to {output}")
+
+
+def _write_import_file(path: Path, data: dict, *, overwrite: bool) -> None:
+    if path.exists() and not overwrite:
+        raise FileExistsError(f"Refusing to overwrite existing file: {path}")
+    if path.exists():
+        write_json(path, data, backup=True)
+    else:
+        atomic_write_json(path, data)
+
+
+@app.command("import-data")
+def import_data(
+    input: Path = typer.Option(..., help="Input JSON archive path."),
+    overwrite: bool = typer.Option(False, help="Overwrite existing files, creating backups first."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    """Import a JSON archive created by export-data."""
+    if not isinstance(overwrite, bool):
+        overwrite = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    if not input.exists():
+        console.print(f"[red]ERROR:[/red] Import archive not found: {input}")
+        raise typer.Exit(code=1)
+
+    try:
+        archive = load_json(input)
+    except json.JSONDecodeError as exc:
+        console.print(f"[red]ERROR:[/red] Invalid JSON archive: {exc}")
+        raise typer.Exit(code=3)
+
+    if archive.get("schema_version") != 1:
+        console.print("[red]ERROR:[/red] Unsupported import archive schema_version")
+        raise typer.Exit(code=2)
+    if not isinstance(archive.get("leave_years"), dict):
+        console.print("[red]ERROR:[/red] Import archive missing leave_years mapping")
+        raise typer.Exit(code=2)
+
+    base = get_default_data_dir(data_dir)
+    ensure_data_dir(base)
+
+    try:
+        config = archive.get("config")
+        if config is not None:
+            if not isinstance(config, dict):
+                raise ValueError("config must be an object")
+            _write_import_file(base / "config.json", config, overwrite=overwrite)
+
+        for year, leave_year in archive.get("leave_years", {}).items():
+            if not str(year).isdigit() or not isinstance(leave_year, dict):
+                raise ValueError(f"Invalid leave year entry: {year}")
+            _write_import_file(base / "leave_years" / f"{year}.json", leave_year, overwrite=overwrite)
+
+        holiday_cache = archive.get("holiday_cache", {})
+        if not isinstance(holiday_cache, dict):
+            raise ValueError("holiday_cache must be an object")
+        for name, cache in holiday_cache.items():
+            if "/" in str(name) or "\\" in str(name) or not isinstance(cache, dict):
+                raise ValueError(f"Invalid holiday cache entry: {name}")
+            _write_import_file(base / "holiday_cache" / f"{name}.json", cache, overwrite=overwrite)
+    except FileExistsError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    console.print(f"Imported fedleave data into {base}")
 
 
 @app.command()
@@ -546,173 +672,6 @@ def types(
 
 
 @app.command()
-def report(
-    year: int = typer.Option(..., help="Leave year."),
-    output: str = typer.Option("fedleave_report.odt", help="Output path (ODT or PDF)."),
-    data_dir: Path | None = typer.Option(None, help="Data directory override."),
-    chart: str | None = typer.Option(None, help="Path to existing chart PNG."),
-    template: str | None = typer.Option(None, help="Path to ODT template."),
-) -> None:
-    """Generate a report. If `--output` ends with `.pdf`, attempt to produce a PDF (requires LibreOffice).
-
-    The command checks for `odfpy` and LibreOffice and prints helpful install instructions when missing.
-    """
-    out_path = Path(output)
-    is_pdf = out_path.suffix.lower() == ".pdf"
-
-    # Ensure odfpy is installed
-    try:
-        import odf.opendocument  # noqa: F401
-    except Exception:
-        console.print("[red]ERROR:[/red] Missing Python dependency `odfpy`. Install with: `pip install odfpy`")
-        raise typer.Exit(code=2)
-
-    if is_pdf:
-        # generate a temporary ODT then convert
-        reports_dir = Path("reports")
-        reports_dir.mkdir(exist_ok=True)
-        with tempfile.NamedTemporaryFile(suffix=".odt", delete=False) as tf:
-            tmp_odt = Path(tf.name)
-
-        # generate ODT
-        reports.generate(year=year, data_dir=data_dir, chart=chart, output=str(tmp_odt), template=template)
-
-        # check for conversion
-        pdf_candidate = tmp_odt.with_suffix(".pdf")
-        if not pdf_candidate.exists():
-            lo = shutil.which("libreoffice") or shutil.which("soffice")
-            if not lo:
-                console.print("[red]ERROR:[/red] LibreOffice not found. Install it to enable PDF conversion." )
-                console.print("  Debian/Ubuntu: sudo apt-get install -y libreoffice-core libreoffice-writer")
-                console.print("  macOS: brew install --cask libreoffice")
-                console.print("  Windows: install LibreOffice from https://www.libreoffice.org/")
-                raise typer.Exit(code=2)
-            # attempt conversion using reports helper
-            try:
-                reports._convert_to_pdf(tmp_odt)
-            except Exception as exc:
-                console.print(f"[red]ERROR:[/red] PDF conversion failed: {exc}")
-                raise typer.Exit(code=4)
-
-        # move PDF to desired output
-        final_pdf = tmp_odt.with_suffix(".pdf")
-        try:
-            shutil.move(str(final_pdf), str(out_path))
-            console.print(f"Wrote PDF: {out_path}")
-        finally:
-            try:
-                tmp_odt.unlink()
-            except Exception:
-                pass
-    else:
-        # output ODT
-        reports.generate(year=year, data_dir=data_dir, chart=chart, output=str(out_path), template=template)
-
-    # create new leave year file
-    new_start_date = src.get("leave_year_end")
-    # naive: set new start as day after end
-    from datetime import datetime, timedelta
-    try:
-        end_date = datetime.fromisoformat(src.get("leave_year_end"))
-        new_start = (end_date + timedelta(days=1)).date().isoformat()
-    except Exception:
-        new_start = f"{to_year}-01-11"
-
-    new_leave_year = {
-        "schema_version": 1,
-        "leave_year": to_year,
-        "leave_year_start": new_start,
-        "leave_year_end": None,
-        "pay_period_count": src.get("pay_period_count", 26),
-        "annual_leave_accrual_hours": src.get("annual_leave_accrual_hours", 6.0),
-        "sick_leave_accrual_hours": src.get("sick_leave_accrual_hours", 4.0),
-        "starting_balances": {
-            "annual": carry_forward,
-            "sick": sick_balance,
-            "comp": 0.0,
-            "credit": 0.0,
-            "travel_comp": 0.0,
-            "time_off_award": 0.0,
-            "religious_comp": 0.0,
-            "restored_annual": 0.0,
-        },
-        "carryover_from_previous_year": {
-            "annual": carry_forward,
-            "sick": sick_balance,
-            "comp": 0.0,
-            "credit": 0.0,
-            "travel_comp": 0.0,
-            "time_off_award": 0.0,
-            "religious_comp": 0.0,
-            "restored_annual": 0.0,
-        },
-        "transactions": [],
-        "pay_periods": [],
-        "holidays": [],
-        "rollover_status": {
-            "rolled_from_previous_year": True,
-            "rolled_to_next_year": False,
-            "rollover_completed_at": None,
-        }
-    }
-
-    # populate pay periods for the new year
-    try:
-        pp_start = _date.fromisoformat(new_start)
-        new_leave_year["pay_periods"] = generate_pay_periods(pp_start, new_leave_year.get("pay_period_count", 26))
-    except Exception:
-        new_leave_year["pay_periods"] = []
-
-    # create starting-balance transactions for audit trail
-    existing_ids: list[str] = []
-    # annual
-    try:
-        from .ledger import create_transaction, add_transaction_to_leave_year
-
-        tx_annual = create_transaction(
-            date=new_leave_year["leave_year_start"],
-            category="annual",
-            direction="starting_balance",
-            hours=carry_forward,
-            description=f"Carryover from {from_year}",
-            status="reconciled",
-            source="rollover",
-            existing_ids=existing_ids,
-        )
-        add_transaction_to_leave_year(new_leave_year, tx_annual)
-        existing_ids.append(tx_annual.id)
-
-        tx_sick = create_transaction(
-            date=new_leave_year["leave_year_start"],
-            category="sick",
-            direction="starting_balance",
-            hours=sick_balance,
-            description=f"Carryover from {from_year}",
-            status="reconciled",
-            source="rollover",
-            existing_ids=existing_ids,
-        )
-        add_transaction_to_leave_year(new_leave_year, tx_sick)
-        existing_ids.append(tx_sick.id)
-    except Exception:
-        pass
-
-    # generate federal holidays for the new year and cache
-    try:
-        holidays_data = generate_federal_holidays(to_year, base)
-        new_leave_year["holidays"] = holidays_data.get("holidays", []) if isinstance(holidays_data, dict) else []
-    except Exception:
-        new_leave_year["holidays"] = []
-
-    # mark rollover completed timestamp
-    new_leave_year.setdefault("rollover_status", {})["rollover_completed_at"] = _datetime.now().isoformat()
-
-    target_path = base / "leave_years" / f"{to_year}.json"
-    write_json(target_path, new_leave_year)
-    console.print(f"Created new leave year file: {target_path}")
-
-
-@app.command()
 def holidays(
     action: str = typer.Option(..., help="Action: generate|list|import-ics"),
     year: int = typer.Option(..., help="Year for the holiday action."),
@@ -818,7 +777,7 @@ def validate(
                 console.print(f"  Failed to write fixes: {exc}")
 
     if any_issues:
-        raise typer.Exit(code=2)
+        raise SystemExit(2)
     console.print("Validation completed: no issues found")
 
 
@@ -858,11 +817,31 @@ def balance(
     use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if isinstance(as_of, OptionInfo):
+        as_of = None
+    if not isinstance(project, bool):
+        project = False
+    if isinstance(project_to, OptionInfo):
+        project_to = None
+    if not isinstance(use_or_lose, bool):
+        use_or_lose = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
     try:
         leave_year = load_leave_year(year, data_dir)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
+
+    accrual_through = as_of or _date.today().isoformat()
+    try:
+        added_accruals = ensure_automatic_accruals(leave_year, accrual_through)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+    if added_accruals:
+        write_json(get_leave_year_path(year, data_dir), leave_year)
 
     include_projected = project or use_or_lose
     balances = calculate_balances(
@@ -883,6 +862,9 @@ def balance(
     for category, amount in sorted(balances.items()):
         console.print(f"  {category}: {amount:.2f}")
 
+    if added_accruals:
+        console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {accrual_through}.")
+
     if use_or_lose:
         try:
             cfg = load_config(data_dir)
@@ -894,6 +876,57 @@ def balance(
         console.print(f"Carryover limit: {use_or_lose_data['carryover_limit']:.2f}")
         console.print(f"Projected annual carryover: {use_or_lose_data['annual_carryover']:.2f}")
         console.print(f"Projected use-or-lose: {use_or_lose_data['use_or_lose']:.2f}")
+
+
+@app.command(name="pay-period")
+def pay_period_summary(
+    year: int = typer.Option(..., help="Leave year."),
+    date: str = typer.Option(..., help="Date inside the pay period YYYY-MM-DD."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    try:
+        leave_year = load_leave_year(year, data_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    try:
+        pay_period = calculate_pay_period_activity(leave_year, date)["pay_period"]
+        accrual_through = pay_period.get("accrual_date") or pay_period.get("end_date")
+        added_accruals = ensure_automatic_accruals(leave_year, accrual_through)
+        if added_accruals:
+            write_json(get_leave_year_path(year, data_dir), leave_year)
+        activity = calculate_pay_period_activity(leave_year, date)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    pay_period = activity["pay_period"]
+    console.print(
+        f"Pay period {pay_period.get('pay_period_number')} "
+        f"({pay_period.get('start_date')} to {pay_period.get('end_date')})"
+    )
+    if added_accruals:
+        console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions for this pay period.")
+
+    categories = sorted({*activity["earned"], *activity["used"], *activity["worked"], *activity["net"]})
+    if not categories:
+        console.print("No leave or overtime activity recorded for this pay period.")
+        return
+
+    for category in categories:
+        earned = activity["earned"].get(category, 0.0)
+        used = activity["used"].get(category, 0.0)
+        worked = activity["worked"].get(category, 0.0)
+        net = activity["net"].get(category, 0.0)
+        if category == "overtime":
+            console.print(f"  {category}: worked={worked:.2f} net={net:.2f}")
+        else:
+            console.print(f"  {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
+
 
 @app.command(name="activity")
 def daily_activity(

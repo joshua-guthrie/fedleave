@@ -11,7 +11,6 @@ def ensure_data_dir(data_dir: Path) -> None:
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "leave_years").mkdir(exist_ok=True)
     (data_dir / "holiday_cache").mkdir(exist_ok=True)
-    (data_dir / "reports").mkdir(exist_ok=True)
     (data_dir / "backups").mkdir(exist_ok=True)
 
 

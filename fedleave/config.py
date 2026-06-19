@@ -99,14 +99,6 @@ class ReligiousCompRules(BaseModel):
     agency_policy_required: bool = True
 
 
-class ReportingConfig(BaseModel):
-    default_paper_size: str = "11x17"
-    default_orientation: str = "landscape"
-    libreoffice_command: str = "libreoffice"
-    chart_engine: str = "matplotlib"
-    chart_dpi: int = 300
-
-
 class Config(BaseModel):
     schema_version: int = 1
     user: UserConfig = Field(default_factory=UserConfig)
@@ -121,7 +113,6 @@ class Config(BaseModel):
         "time_off_award": TimeOffAwardRules().model_dump(),
         "religious_comp": ReligiousCompRules().model_dump(),
     })
-    reporting: ReportingConfig = Field(default_factory=ReportingConfig)
 
 
 class LeaveYear(BaseModel):
