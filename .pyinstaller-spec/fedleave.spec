@@ -5,7 +5,7 @@ a = Analysis(
     ['/home/jlguthri/bin/fedleave/.pyinstaller_entry.py'],
     pathex=[],
     binaries=[],
-    datas=[('/home/jlguthri/bin/fedleave/templates/report_template.odt', 'templates')],
+    datas=[],
     hiddenimports=['holidays', 'icalendar'],
     hookspath=[],
     hooksconfig={},
