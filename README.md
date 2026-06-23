@@ -8,6 +8,15 @@ The hope is that it is not only useful at the CLI, but could become the basis of
 
 Note:  In-case you're wondering... it was a 100% at home project.  None of it was done on company time!   It was also my first experiemnt into vibe coding.  So far, I'm impressed.
 
+It's a little program I'm using to serve as a back end to an AI agent and a dashboard and figured it may be useful to someone else.
+
+## Limitations
+I'm making no effort to track expiring leave, such as travel comp time, award leave, etc.  I've never had the problem in my personal live of having to worry about leave expiring ! :)
+
+The program is entirely single user.  I suppose it could be made into a multiple user system with seperate data files for each user, but that has never been my use case.  At your own peril.
+
+I would not be using this application for any thing critical.  For me, it's a fun little experiement.
+
 ## Setup
 
 ```bash
