@@ -131,6 +131,21 @@ Commands and common options:
 			fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
 			fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 
+	starting-balance
+		Set a leave year's starting balance for one category and keep audit history.
+
+		Syntax:
+			fedleave starting-balance set --year YEAR --category CATEGORY --hours HOURS --reason TEXT [--data-dir PATH]
+
+		Notes:
+			- The command updates `starting_balances[CATEGORY]` in the leave-year JSON.
+			- Each change appends a dated entry to `starting_balance_history` with the old value, new value, reason, and carryover decision.
+			- If `carryover_from_previous_year[CATEGORY]` still equals the old starting balance, it is updated to the new value too.
+			- Existing JSON backups are created before the leave-year file is rewritten.
+
+		Example:
+			fedleave starting-balance set --year 2026 --category annual --hours 193.6 --reason "Corrected imported starting balance"
+
 	export-data
 		Export config, leave year files, and holiday cache to a portable JSON archive.
 
