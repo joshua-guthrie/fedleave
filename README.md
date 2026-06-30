@@ -113,7 +113,7 @@ Commands and common options:
 		Add a transaction to a leave year ledger.
 
 		Syntax:
-			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--show-transaction-ids] [--data-dir PATH]
+			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids] [--data-dir PATH]
 
 		Defaults:
 			--status planned
@@ -123,6 +123,7 @@ Commands and common options:
 		Notes:
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
 			- `--authoritative` voids active transactions with the same date, category, and direction before adding the new transaction.
+			- `--json` emits the created transaction ID and any replaced transaction IDs.
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when needed.
 			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual.
 
@@ -195,7 +196,7 @@ Commands and common options:
 	Show leave balances for a year, optionally as of a given date, projected to year end, and/or with use-or-lose calculations.
 
 	Syntax:
-		fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--data-dir PATH]
+		fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--json] [--data-dir PATH]
 
 	Notes:
 		- `--year YEAR` reads the leave year file and computes balances from all recorded transactions.
@@ -204,33 +205,39 @@ Commands and common options:
 		- `--project` adds projected automatic annual and sick accruals for future pay periods through the leave year end (or via `--project-to`).
 		- `--project-to YYYY-MM-DD` projects accruals only through the specified date instead of year end.
 		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection even when `--project` is not passed.
+		- `--json` emits balances, use-or-lose values, and automatic accrual posting details.
 		- Federal employees earn annual and sick leave automatically each pay period; this tool posts or projects that accrual based on the leave year pay periods and configured accrual rates.
 
 	pay-period
 		Show earned, used, net leave, overtime worked, optional daily activity, and ending balances for the pay period containing a date.
 
 		Syntax:
-			fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--data-dir PATH]
+			fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--json] [--data-dir PATH]
 
 		Notes:
 			- Missing automatic annual and sick accrual transactions for the containing pay period are posted before totals are calculated.
 			- Overtime is shown as `worked`, which is the amount expected for that pay period's paycheck.
 			- `--daily` prints one row for every day in the pay period, including days with no activity.
+			- `--json` emits pay period metadata, activity totals, ending balances, and automatic accrual posting details.
 
 	pay-periods
 		Show earned, used, worked totals, and ending balances for every pay period in the leave year.
 
 		Syntax:
-			fedleave pay-periods --year YEAR [--data-dir PATH]
+			fedleave pay-periods --year YEAR [--json] [--data-dir PATH]
 
 		Notes:
 			- Missing automatic annual and sick accrual transactions are posted through the final pay period accrual date before totals are calculated.
+			- `--json` emits one structured summary per pay period.
 
 activity
 	Show earned, used, and net leave activity for one day.
 
 	Syntax:
-		fedleave activity --year YEAR --date YYYY-MM-DD [--data-dir PATH]
+		fedleave activity --year YEAR --date YYYY-MM-DD [--json] [--data-dir PATH]
+
+	Notes:
+		- `--json` emits earned, used, and net activity mappings for the date.
 Global notes:
 
 	Data directory:
@@ -254,7 +261,7 @@ For the full project specification and rules, see the project documentation or t
 
 Correction (audit-safe):
 
-	fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
+	fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--json] [--show-transaction-ids] --data-dir /path/to/data
 
 	Example:
 		fedleave correct --id 20260310-001 --hours 3 --reason "Only used 3 hours"
@@ -268,14 +275,18 @@ Alternatively, you can correct by transaction date and type (more human-friendly
 
 Void a transaction:
 
-	fedleave void --id TRANSACTION_ID --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
+	fedleave void --id TRANSACTION_ID --reason "TEXT" [--json] [--show-transaction-ids] --data-dir /path/to/data
 
 	Example:
 		fedleave void --id 20260310-002 --reason "Entered in error"
 
 Rollover preview/apply:
 
-	fedleave rollover --from-year 2026 --to-year 2027 --preview --data-dir /path/to/data
+	fedleave rollover --from-year 2026 --to-year 2027 --preview [--json] --data-dir /path/to/data
+
+Validation:
+
+	fedleave validate [--apply] [--json] --data-dir /path/to/data
 
 Holiday commands:
 

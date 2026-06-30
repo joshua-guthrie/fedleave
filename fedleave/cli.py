@@ -31,6 +31,11 @@ from datetime import date as _date, datetime as _datetime, timedelta as _timedel
 
 console = Console()
 
+
+def _print_json(data: dict | list) -> None:
+    typer.echo(json.dumps(data, indent=2))
+
+
 HELP_TEXT = """
 fedleave — Federal leave and time tracker
 
@@ -76,9 +81,10 @@ Command details and examples:
             --holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics \
             --data-dir ~/.local/share/fedleave
 
-    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--show-transaction-ids]
+    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids]
         Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
         --authoritative voids active transactions with the same date, category, and direction before adding the new transaction.
+        --json emits the created transaction ID and any replaced transaction IDs.
         Transaction IDs are hidden by default in human-readable output. Use --show-transaction-ids when needed.
         Valid categories: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual
 
@@ -99,15 +105,16 @@ Command details and examples:
         Set a leave year's starting balance for one category and record the prior value in starting_balance_history.
         If the matching carryover_from_previous_year value still equals the old starting balance, it is updated too.
 
-    fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--data-dir PATH]
+    fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--json] [--data-dir PATH]
         Show balances calculated from the ledger.
         --project includes projected future annual and sick leave accruals through year end or --project-to.
         --use-or-lose prints projected annual carryover and annual leave lost above the carryover limit.
+        --json emits balances, use-or-lose values, and automatic accrual posting details.
 
-    fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--data-dir PATH]
+    fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--json] [--data-dir PATH]
         Show leave earned/used, overtime worked, optional daily activity, and ending balances for the pay period containing the date.
 
-    fedleave pay-periods --year YEAR [--data-dir PATH]
+    fedleave pay-periods --year YEAR [--json] [--data-dir PATH]
         Show earned/used/worked totals and ending balances for every pay period in the leave year.
 
     fedleave export-data --output fedleave_backup.json [--data-dir PATH]
@@ -116,17 +123,17 @@ Command details and examples:
     fedleave import-data --input fedleave_backup.json [--overwrite] [--data-dir PATH]
         Import a JSON archive created by export-data. Existing files are preserved unless --overwrite is used.
 
-    fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--show-transaction-ids] [--data-dir PATH]
+    fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--json] [--show-transaction-ids] [--data-dir PATH]
         Perform an audit-safe correction: void the original transaction and create a replacement linked to it.
     Example:
         fedleave correct --id 20260310-001 --hours 3 --reason "Only used 3 hours"
 
-    fedleave void --id TRANSACTION_ID --reason "TEXT" [--show-transaction-ids] [--data-dir PATH]
+    fedleave void --id TRANSACTION_ID --reason "TEXT" [--json] [--show-transaction-ids] [--data-dir PATH]
         Mark a transaction as void while preserving its record.
     Example:
         fedleave void --id 20260310-002 --reason "Entered in error"
 
-    fedleave rollover --from-year YEAR --to-year YEAR [--preview] [--data-dir PATH]
+    fedleave rollover --from-year YEAR --to-year YEAR [--preview] [--json] [--data-dir PATH]
         Preview or apply end-of-year rollover logic (carryover, forfeitures, starting balances, holiday generation).
     Example:
         fedleave rollover --from-year 2026 --to-year 2027 --preview
@@ -139,6 +146,9 @@ Command details and examples:
     Examples:
         fedleave holidays generate --year 2026
         fedleave holidays import-ics --year 2026 --file opm-holidays.ics
+
+    fedleave validate [--apply] [--json] [--data-dir PATH]
+        Validate leave-year JSON files and optionally emit structured issue details.
 Notes on data directory:
     Default: ~/.local/share/fedleave
     Override per-command with `--data-dir /path/to/data`.
@@ -221,6 +231,7 @@ def add(
     status: str = typer.Option("planned", help="Transaction status."),
     source: str = typer.Option("manual", help="Transaction source."),
     authoritative: bool = typer.Option(False, help="Void existing same-date/category/direction transactions before adding this one."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     show_transaction_ids: bool = typer.Option(
         False,
         "--show-transaction-ids",
@@ -229,8 +240,16 @@ def add(
     ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if isinstance(status, OptionInfo):
+        status = "planned"
+    if isinstance(source, OptionInfo):
+        source = "manual"
+    if not isinstance(authoritative, bool):
+        authoritative = False
     if isinstance(show_transaction_ids, OptionInfo):
         show_transaction_ids = False
+    if not isinstance(json_output, bool):
+        json_output = False
 
     try:
         direction, hours = normalize_direction(earned, used, worked, adjusted)
@@ -291,6 +310,17 @@ def add(
 
     add_transaction_to_leave_year(leave_year, transaction)
     write_json(get_leave_year_path(year, data_dir), leave_year)
+    result = {
+        "action": "added",
+        "year": year,
+        "transaction_id": transaction.id,
+        "transaction": transaction.model_dump(),
+        "replaced_transaction_ids": replaced_ids,
+        "automatic_accruals_posted": 0,
+    }
+    if json_output:
+        _print_json(result)
+        return
     detail = f"transaction [bold]{transaction.id}[/bold]" if show_transaction_ids else "transaction"
     if replaced_ids:
         replaced_detail = f"; replaced {', '.join(replaced_ids)}" if show_transaction_ids else f"; replaced {len(replaced_ids)} existing transaction(s)"
@@ -604,6 +634,7 @@ def correct(
     search_date: str | None = typer.Option(None, help="Find transaction by this transaction date YYYY-MM-DD."),
     search_type: str | None = typer.Option(None, help="Find transaction by this transaction category/type."),
     preview: bool = typer.Option(False, help="Preview the correction without writing changes."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     show_transaction_ids: bool = typer.Option(
         False,
         "--show-transaction-ids",
@@ -632,6 +663,8 @@ def correct(
         search_type = None
     if isinstance(show_transaction_ids, OptionInfo):
         show_transaction_ids = False
+    if not isinstance(json_output, bool):
+        json_output = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
@@ -713,6 +746,22 @@ def correct(
         preview = False
 
     if preview:
+        if json_output:
+            _print_json(
+                {
+                    "action": "preview",
+                    "original_transaction_id": id,
+                    "replacement": {
+                        "date": date or orig["date"],
+                        "category": category or orig["category"],
+                        "direction": direction or orig["direction"],
+                        "hours": hours,
+                    },
+                    "would_void_transaction_ids": [id],
+                    "would_create_replacement": True,
+                }
+            )
+            return
         console.print("Preview: would void original transaction and create replacement with:")
         console.print(f"  date={date or orig['date']} category={category or orig['category']} direction={direction or orig['direction']} hours={hours}")
         return
@@ -758,6 +807,19 @@ def correct(
 
     add_transaction_to_leave_year(leave_year, replacement)
     write_json(get_leave_year_path(int(leave_year.get("leave_year", 0)), data_dir), leave_year)
+    if json_output:
+        _print_json(
+            {
+                "action": "corrected",
+                "year": int(leave_year.get("leave_year", 0)),
+                "original_transaction_id": id,
+                "voided_transaction_ids": [id],
+                "replacement_transaction_id": replacement.id,
+                "replacement_transaction": replacement.model_dump(),
+                "reason": reason,
+            }
+        )
+        return
     if show_transaction_ids:
         console.print(f"Corrected transaction {id}: created replacement {replacement.id}")
     else:
@@ -868,12 +930,20 @@ def rollover(
     from_year: int = typer.Option(..., help="Leave year to roll from."),
     to_year: int = typer.Option(..., help="Leave year to roll to."),
     preview: bool = typer.Option(False, help="Preview rollover without applying."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     """Preview or apply a leave year rollover.
 
     The basic implementation carries forward annual and sick balances and writes a new leave year JSON.
     """
+    if not isinstance(preview, bool):
+        preview = False
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
     base = get_default_data_dir(data_dir)
     try:
         src = load_leave_year(from_year, base)
@@ -897,13 +967,30 @@ def rollover(
 
     carry_forward = min(carryover_limit, annual_balance)
     forfeiture = max(0.0, annual_balance - carry_forward)
+    result = {
+        "action": "preview" if preview else "applied",
+        "from_year": from_year,
+        "to_year": to_year,
+        "annual_balance": annual_balance,
+        "carryover_limit": carryover_limit,
+        "carry_forward": carry_forward,
+        "forfeiture": forfeiture,
+        "sick_balance": sick_balance,
+        "created_file": None,
+        "created_transaction_ids": [],
+    }
 
-    console.print(f"Rollover preview from {from_year} to {to_year}:")
-    console.print(f"  annual_balance={annual_balance:.2f}")
-    console.print(f"  carryover_limit={carryover_limit:.2f}")
-    console.print(f"  carry_forward={carry_forward:.2f}")
-    console.print(f"  forfeiture={forfeiture:.2f}")
-    console.print(f"  sick_balance carried fully: {sick_balance:.2f}")
+    if json_output and preview:
+        _print_json(result)
+        return
+
+    if not json_output:
+        console.print(f"Rollover preview from {from_year} to {to_year}:")
+        console.print(f"  annual_balance={annual_balance:.2f}")
+        console.print(f"  carryover_limit={carryover_limit:.2f}")
+        console.print(f"  carry_forward={carry_forward:.2f}")
+        console.print(f"  forfeiture={forfeiture:.2f}")
+        console.print(f"  sick_balance carried fully: {sick_balance:.2f}")
 
     if preview:
         return
@@ -969,9 +1056,11 @@ def rollover(
             tx = _create_tx(date=new_start, category="annual", direction="starting_balance", hours=carry_forward, existing_ids=existing_ids)
             new_ly["transactions"].append(tx.model_dump())
             existing_ids.append(tx.id)
+            result["created_transaction_ids"].append(tx.id)
         if sick_balance and sick_balance > 0:
             tx2 = _create_tx(date=new_start, category="sick", direction="starting_balance", hours=sick_balance, existing_ids=existing_ids)
             new_ly["transactions"].append(tx2.model_dump())
+            result["created_transaction_ids"].append(tx2.id)
     except Exception:
         pass
 
@@ -979,7 +1068,11 @@ def rollover(
     year_path = base / "leave_years" / f"{to_year_int}.json"
     try:
         write_json(year_path, new_ly)
-        console.print(f"Created leave year file: {year_path}")
+        result["created_file"] = str(year_path)
+        if json_output:
+            _print_json(result)
+        else:
+            console.print(f"Created leave year file: {year_path}")
     except Exception as exc:
         console.print(f"[red]ERROR:[/red] Failed to write new leave year: {exc}")
         raise typer.Exit(code=4)
@@ -1074,12 +1167,20 @@ def holidays(
 def validate(
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
     apply: bool = typer.Option(False, help="Apply automatic fixes where possible."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Validate leave year JSON files in the data directory.
 
     With `--apply` the command will write back normalized dates for transactions when safe.
     """
     from .storage import write_json
+    if not isinstance(apply, bool):
+        apply = False
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
     base = get_default_data_dir(data_dir)
     year_dir = base / "leave_years"
     if not year_dir.exists():
@@ -1087,30 +1188,46 @@ def validate(
         raise typer.Exit(code=1)
 
     any_issues = False
+    results = []
     for pj in sorted(year_dir.iterdir()):
         if pj.suffix != ".json":
             continue
         ly = load_leave_year(int(pj.stem), data_dir)
         issues = validate_leave_year(ly)
         if not issues:
-            console.print(f"{pj.name}: OK")
+            results.append({"file": pj.name, "year": int(pj.stem), "ok": True, "issues": [], "applied": False})
+            if not json_output:
+                console.print(f"{pj.name}: OK")
             continue
 
         any_issues = True
-        console.print(f"{pj.name}: {len(issues)} issues found")
-        for iss in issues:
-            console.print(f"  - {iss.get('path')}: {iss.get('message')}")
+        result = {"file": pj.name, "year": int(pj.stem), "ok": False, "issues": issues, "applied": False}
+        if not json_output:
+            console.print(f"{pj.name}: {len(issues)} issues found")
+            for iss in issues:
+                console.print(f"  - {iss.get('path')}: {iss.get('message')}")
         # interactive prompt: apply suggested fixes for this file?
-        if apply or typer.confirm(f"Apply suggested fixes to {pj.name}?"):
+        should_apply = apply if json_output else apply or typer.confirm(f"Apply suggested fixes to {pj.name}?")
+        if should_apply:
             fixed = apply_fixes_to_leave_year(ly, issues)
             try:
                 write_json(pj, fixed)
-                console.print(f"  Applied fixes to {pj.name}")
+                result["applied"] = True
+                if not json_output:
+                    console.print(f"  Applied fixes to {pj.name}")
             except Exception as exc:
-                console.print(f"  Failed to write fixes: {exc}")
+                result["write_error"] = str(exc)
+                if not json_output:
+                    console.print(f"  Failed to write fixes: {exc}")
+        results.append(result)
 
     if any_issues:
+        if json_output:
+            _print_json({"ok": False, "results": results})
         raise SystemExit(2)
+    if json_output:
+        _print_json({"ok": True, "results": results})
+        return
     console.print("Validation completed: no issues found")
 
 
@@ -1118,6 +1235,7 @@ def validate(
 def void(
     id: str = typer.Option(..., help="Transaction ID to void (YYYYMMDD-NNN)."),
     reason: str = typer.Option("", help="Reason for voiding the transaction."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     show_transaction_ids: bool = typer.Option(
         False,
         "--show-transaction-ids",
@@ -1129,6 +1247,10 @@ def void(
     """Void a transaction while preserving the audit trail."""
     if isinstance(show_transaction_ids, OptionInfo):
         show_transaction_ids = False
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
 
     # find the transaction across leave years if needed
     base = get_leave_year_path(0, data_dir).parent
@@ -1141,6 +1263,18 @@ def void(
                     t["void"] = True
                     t["void_reason"] = reason or "Voided by user"
                     write_json(pj, ly)
+                    if json_output:
+                        _print_json(
+                            {
+                                "action": "voided",
+                                "year": int(pj.stem),
+                                "transaction_id": id,
+                                "voided_transaction_ids": [id],
+                                "reason": t["void_reason"],
+                                "file": str(pj),
+                            }
+                        )
+                        return
                     detail = f"transaction {id}" if show_transaction_ids else "transaction"
                     console.print(f"Voided {detail} in {pj.name}")
                     found = True
@@ -1158,6 +1292,7 @@ def balance(
     project: bool = typer.Option(False, help="Project future automatic annual and sick accrual to the projection date or year end."),
     project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD. Defaults to leave year end when --project is enabled."),
     use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     if isinstance(as_of, OptionInfo):
@@ -1168,6 +1303,8 @@ def balance(
         project_to = None
     if not isinstance(use_or_lose, bool):
         use_or_lose = False
+    if not isinstance(json_output, bool):
+        json_output = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
@@ -1193,11 +1330,33 @@ def balance(
         include_projected=include_projected,
         project_until=project_to,
     )
+    projection_label = project_to or leave_year.get("leave_year_end") or "year end"
+    use_or_lose_data = None
+    if use_or_lose:
+        try:
+            cfg = load_config(data_dir)
+        except FileNotFoundError:
+            cfg = None
+        use_or_lose_data = calculate_use_or_lose(leave_year, balances, cfg)
+
+    if json_output:
+        _print_json(
+            {
+                "year": year,
+                "as_of": as_of,
+                "projected": include_projected,
+                "project_to": projection_label if include_projected else None,
+                "balances": dict(sorted(balances.items())),
+                "automatic_accruals_posted": added_accruals,
+                "automatic_accruals_posted_through": accrual_through,
+                "use_or_lose": use_or_lose_data,
+            }
+        )
+        return
 
     if as_of:
         console.print(f"Balances for {year} as of {as_of}:")
     elif include_projected:
-        projection_label = project_to or leave_year.get("leave_year_end") or "year end"
         console.print(f"Projected balances for {year} as of {projection_label}:")
     else:
         console.print(f"Balances for {year}:")
@@ -1209,12 +1368,6 @@ def balance(
         console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {accrual_through}.")
 
     if use_or_lose:
-        try:
-            cfg = load_config(data_dir)
-        except FileNotFoundError:
-            cfg = None
-
-        use_or_lose_data = calculate_use_or_lose(leave_year, balances, cfg)
         console.print("")
         console.print(f"Carryover limit: {use_or_lose_data['carryover_limit']:.2f}")
         console.print(f"Projected annual carryover: {use_or_lose_data['annual_carryover']:.2f}")
@@ -1226,10 +1379,13 @@ def pay_period_summary(
     year: int = typer.Option(..., help="Leave year."),
     date: str = typer.Option(..., help="Date inside the pay period YYYY-MM-DD."),
     daily: bool = typer.Option(False, help="Show activity for each day in the pay period."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     if not isinstance(daily, bool):
         daily = False
+    if not isinstance(json_output, bool):
+        json_output = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
@@ -1252,6 +1408,31 @@ def pay_period_summary(
 
     pay_period = activity["pay_period"]
     ending_balances = calculate_balances(leave_year, until_date=pay_period.get("end_date"))
+    daily_activity_rows = []
+    if daily or json_output:
+        current = _date.fromisoformat(pay_period["start_date"])
+        end = _date.fromisoformat(pay_period["end_date"])
+        while current <= end:
+            day = current.isoformat()
+            day_activity = calculate_daily_activity(leave_year, day)
+            daily_activity_rows.append({"date": day, **day_activity})
+            current += _timedelta(days=1)
+
+    if json_output:
+        _print_json(
+            {
+                "year": year,
+                "date": date,
+                "pay_period": pay_period,
+                "activity": activity,
+                "daily_activity": daily_activity_rows if daily else None,
+                "ending_balances": dict(sorted(ending_balances.items())),
+                "automatic_accruals_posted": added_accruals,
+                "automatic_accruals_posted_through": accrual_through,
+            }
+        )
+        return
+
     console.print(
         f"Pay period {pay_period.get('pay_period_number')} "
         f"({pay_period.get('start_date')} to {pay_period.get('end_date')})"
@@ -1262,11 +1443,9 @@ def pay_period_summary(
     if daily:
         console.print("")
         console.print("Daily activity:")
-        current = _date.fromisoformat(pay_period["start_date"])
-        end = _date.fromisoformat(pay_period["end_date"])
-        while current <= end:
-            day = current.isoformat()
-            day_activity = calculate_daily_activity(leave_year, day)
+        for row in daily_activity_rows:
+            day = row["date"]
+            day_activity = {key: value for key, value in row.items() if key != "date"}
             day_categories = sorted({*day_activity["earned"], *day_activity["used"], *day_activity["net"]})
             if day_categories:
                 console.print(f"  {day}:")
@@ -1277,7 +1456,6 @@ def pay_period_summary(
                     console.print(f"    {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
             else:
                 console.print(f"  {day}: no activity")
-            current += _timedelta(days=1)
 
     categories = sorted({*activity["earned"], *activity["used"], *activity["worked"], *activity["net"]})
     if not categories:
@@ -1306,8 +1484,11 @@ def pay_period_summary(
 @app.command(name="pay-periods")
 def pay_periods_summary(
     year: int = typer.Option(..., help="Leave year."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if not isinstance(json_output, bool):
+        json_output = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
@@ -1331,13 +1512,24 @@ def pay_periods_summary(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
-    console.print(f"Pay period summary for {year}:")
-    if added_accruals:
-        console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {final_accrual_date}.")
+    summaries = []
+    if not json_output:
+        console.print(f"Pay period summary for {year}:")
+        if added_accruals:
+            console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {final_accrual_date}.")
 
     for pay_period in pay_periods:
         activity = calculate_pay_period_activity(leave_year, pay_period["start_date"])
         balances = calculate_balances(leave_year, until_date=pay_period["end_date"])
+        summaries.append(
+            {
+                "pay_period": pay_period,
+                "activity": activity,
+                "ending_balances": dict(sorted(balances.items())),
+            }
+        )
+        if json_output:
+            continue
         console.print(
             f"Pay period {pay_period.get('pay_period_number')} "
             f"({pay_period.get('start_date')} to {pay_period.get('end_date')})"
@@ -1359,13 +1551,30 @@ def pay_periods_summary(
         balance_text = ", ".join(f"{category}={amount:.2f}" for category, amount in nonzero_balances.items())
         console.print(f"  ending balances: {balance_text or 'none'}")
 
+    if json_output:
+        _print_json(
+            {
+                "year": year,
+                "pay_periods": summaries,
+                "automatic_accruals_posted": added_accruals,
+                "automatic_accruals_posted_through": final_accrual_date,
+            }
+        )
+        return
+
 
 @app.command(name="activity")
 def daily_activity(
     year: int = typer.Option(..., help="Leave year."),
     date: str = typer.Option(..., help="Date to query YYYY-MM-DD."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
     try:
         leave_year = load_leave_year(year, data_dir)
     except FileNotFoundError as exc:
@@ -1374,8 +1583,15 @@ def daily_activity(
 
     activity = calculate_daily_activity(leave_year, date)
     if not any(activity.values()):
+        if json_output:
+            _print_json({"year": year, "date": date, "activity": activity, "has_activity": False})
+            return
         console.print(f"No leave activity recorded on {date} for {year}.")
         raise typer.Exit(code=0)
+
+    if json_output:
+        _print_json({"year": year, "date": date, "activity": activity, "has_activity": True})
+        return
 
     console.print(f"Leave activity for {date} ({year}):")
     for category in sorted({*activity['earned'], *activity['used'], *activity['net']}):
