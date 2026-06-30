@@ -10,6 +10,7 @@ from .cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, s
 from .ledger import (
     TRANSACTION_CATEGORIES,
     TRANSACTION_DIRECTIONS,
+    TRANSACTION_STATUSES,
     add_transaction_to_leave_year,
     apply_fixes_to_leave_year,
     calculate_balances,
@@ -39,6 +40,7 @@ Usage:
 Primary commands:
     init        Initialize data directory and create leave year JSON
     add         Add a transaction to a leave year
+    reconcile   Add or update one reconciled transaction by date/category/direction
     list        List transactions for a leave year
     starting-balance
                 Set starting balances with audit history
@@ -84,6 +86,11 @@ Command details and examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+
+    fedleave reconcile --date YYYY-MM-DD --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
+        Infer the leave year from the date, then set the active transaction for that date/category/direction to the requested hours.
+        Adds a transaction when no active match exists. Updates exactly one active match and records reconcile_history.
+        If multiple active matches exist, rerun with --id to choose the transaction.
 
     fedleave list --year YEAR [--show-transaction-ids] [--data-dir PATH]
         List transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
@@ -290,6 +297,191 @@ def add(
         console.print(f"Added {detail} to {year}{replaced_detail}")
     else:
         console.print(f"Added {detail} to {year}")
+
+
+def _resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = None) -> tuple[int, dict]:
+    base = get_default_data_dir(data_dir)
+    year_dir = base / "leave_years"
+    if not year_dir.exists():
+        raise FileNotFoundError(f"Leave year directory not found: {year_dir}")
+
+    target = parse_iso_date(transaction_date)
+    for path in sorted(year_dir.iterdir()):
+        if not path.is_file() or path.suffix != ".json":
+            continue
+        leave_year = load_json(path)
+        try:
+            start = parse_iso_date(str(leave_year.get("leave_year_start", "")))
+            end = parse_iso_date(str(leave_year.get("leave_year_end", "")))
+        except ValueError:
+            continue
+        if start <= target <= end:
+            return int(leave_year.get("leave_year", path.stem)), leave_year
+
+    raise FileNotFoundError(f"No leave year contains date {transaction_date}")
+
+
+@app.command()
+def reconcile(
+    date: str = typer.Option(..., help="Transaction date YYYY-MM-DD."),
+    category: str = typer.Option(..., help="Leave category."),
+    direction: str = typer.Option(..., help="Transaction direction."),
+    hours: float = typer.Option(..., help="Reconciled hours."),
+    reason: str = typer.Option(..., help="Reason for the reconciliation."),
+    status: str = typer.Option("reconciled", help="Transaction status."),
+    source: str = typer.Option("clocking-report", help="Transaction source."),
+    id: str | None = typer.Option(None, help="Transaction ID to update when multiple active matches exist."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    """Add or update one transaction using payroll reconciliation semantics."""
+    if isinstance(id, OptionInfo):
+        id = None
+    if isinstance(status, OptionInfo):
+        status = "reconciled"
+    if isinstance(source, OptionInfo):
+        source = "clocking-report"
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    try:
+        date = parse_iso_date(date).isoformat()
+        reason = sanitize_text(reason, field_name="reason")
+        source = sanitize_text(source, field_name="source")
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    if not reason:
+        console.print("[red]ERROR:[/red] --reason is required.")
+        raise typer.Exit(code=2)
+    if category not in TRANSACTION_CATEGORIES:
+        console.print(
+            f"[red]ERROR:[/red] Invalid category: {category}. Valid categories: {', '.join(TRANSACTION_CATEGORIES)}."
+        )
+        raise typer.Exit(code=2)
+    if direction not in TRANSACTION_DIRECTIONS:
+        console.print(
+            f"[red]ERROR:[/red] Invalid direction: {direction}. Valid directions: {', '.join(TRANSACTION_DIRECTIONS)}."
+        )
+        raise typer.Exit(code=2)
+    if status not in TRANSACTION_STATUSES:
+        console.print(f"[red]ERROR:[/red] Invalid status: {status}. Valid statuses: {', '.join(TRANSACTION_STATUSES)}.")
+        raise typer.Exit(code=2)
+    if hours < 0:
+        console.print("[red]ERROR:[/red] --hours must be zero or positive.")
+        raise typer.Exit(code=2)
+
+    try:
+        year, leave_year = _resolve_leave_year_for_date(date, data_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=1)
+
+    transactions = leave_year.setdefault("transactions", [])
+    active_matches = [
+        transaction
+        for transaction in transactions
+        if not transaction.get("void")
+        and transaction.get("date") == date
+        and transaction.get("category") == category
+        and transaction.get("direction") == direction
+    ]
+
+    if id:
+        active_matches = [transaction for transaction in active_matches if transaction.get("id") == id]
+        if not active_matches:
+            console.print(f"[red]ERROR:[/red] Active matching transaction {id} not found")
+            raise typer.Exit(code=1)
+
+    if len(active_matches) > 1:
+        result = {
+            "action": "ambiguous",
+            "year": year,
+            "date": date,
+            "category": category,
+            "direction": direction,
+            "matching_transaction_ids": [transaction.get("id") for transaction in active_matches],
+            "message": "Multiple active matching transactions found; rerun with --id.",
+        }
+        if json_output:
+            console.print(json.dumps(result, indent=2))
+        else:
+            console.print("[red]ERROR:[/red] Multiple active matching transactions found; rerun with --id:")
+            for transaction in active_matches:
+                console.print(
+                    f"  {transaction.get('id')} {transaction.get('date')} {transaction.get('category')} {transaction.get('direction')} {transaction.get('hours')}"
+                )
+        raise typer.Exit(code=2)
+
+    if len(active_matches) == 1:
+        transaction = active_matches[0]
+        old_values = {
+            "hours": float(transaction.get("hours", 0.0)),
+            "status": transaction.get("status"),
+            "source": transaction.get("source"),
+            "description": transaction.get("description", ""),
+        }
+        transaction["hours"] = float(hours)
+        transaction["status"] = status
+        transaction["source"] = source
+        transaction["description"] = reason
+        transaction["updated_at"] = _datetime.now().isoformat()
+        transaction.setdefault("reconcile_history", []).append(
+            {
+                "updated_at": transaction["updated_at"],
+                "reason": reason,
+                "old": old_values,
+                "new": {
+                    "hours": float(hours),
+                    "status": status,
+                    "source": source,
+                    "description": reason,
+                },
+            }
+        )
+        action = "updated"
+        transaction_id = transaction.get("id")
+    else:
+        existing_ids = [transaction.get("id", "") for transaction in transactions]
+        try:
+            new_transaction = create_transaction(
+                date=date,
+                category=category,
+                direction=direction,
+                hours=hours,
+                description=reason,
+                status=status,
+                source=source,
+                existing_ids=existing_ids,
+            )
+        except ValueError as exc:
+            console.print(f"[red]ERROR:[/red] {exc}")
+            raise typer.Exit(code=2)
+        add_transaction_to_leave_year(leave_year, new_transaction)
+        action = "added"
+        transaction_id = new_transaction.id
+
+    write_json(get_leave_year_path(year, data_dir), leave_year)
+
+    result = {
+        "action": action,
+        "year": year,
+        "transaction_id": transaction_id,
+        "date": date,
+        "category": category,
+        "direction": direction,
+        "hours": float(hours),
+        "status": status,
+        "source": source,
+        "reason": reason,
+    }
+    if json_output:
+        console.print(json.dumps(result, indent=2))
+    else:
+        console.print(f"Reconciled {category} {direction} on {date}: {action} transaction {transaction_id} in {year}")
 
 
 def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:

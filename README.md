@@ -131,6 +131,26 @@ Commands and common options:
 			fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
 			fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 
+	reconcile
+		Add or update a transaction from a payroll, clocking, or recurring reconciliation source.
+
+		Syntax:
+			fedleave reconcile --date YYYY-MM-DD --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
+
+		Defaults:
+			--status reconciled
+			--source clocking-report
+
+		Notes:
+			- The leave year is inferred from the transaction date using each leave-year file's `leave_year_start` and `leave_year_end`.
+			- If no active transaction exists for the same date, category, and direction, a new transaction is added.
+			- If exactly one active match exists, it is updated in place and a `reconcile_history` entry records the previous hours, status, source, and description.
+			- If multiple active matches exist, the command exits without writing and prints the matching IDs; rerun with `--id TRANSACTION_ID` to choose one.
+			- `--json` emits a machine-readable result for automation.
+
+		Example:
+			fedleave reconcile --date 2026-03-10 --category credit --direction earned --hours 1.5 --status reconciled --source clocking-report --reason "March clocking report"
+
 	starting-balance
 		Set a leave year's starting balance for one category and keep audit history.
 
