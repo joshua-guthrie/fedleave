@@ -71,15 +71,19 @@ Command details and examples:
             --holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics \
             --data-dir ~/.local/share/fedleave
 
-    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative]
+    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--show-transaction-ids]
         Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
         --authoritative voids active transactions with the same date, category, and direction before adding the new transaction.
+        Transaction IDs are hidden by default in human-readable output. Use --show-transaction-ids when needed.
         Valid categories: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual
 
     Examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+
+    fedleave list --year YEAR [--show-transaction-ids] [--data-dir PATH]
+        List transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
 
     fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--data-dir PATH]
         Show leave earned/used, overtime worked, optional daily activity, and ending balances for the pay period containing the date.
@@ -93,12 +97,12 @@ Command details and examples:
     fedleave import-data --input fedleave_backup.json [--overwrite] [--data-dir PATH]
         Import a JSON archive created by export-data. Existing files are preserved unless --overwrite is used.
 
-    fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--data-dir PATH]
+    fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--show-transaction-ids] [--data-dir PATH]
         Perform an audit-safe correction: void the original transaction and create a replacement linked to it.
     Example:
         fedleave correct --id 20260310-001 --hours 3 --reason "Only used 3 hours"
 
-    fedleave void --id TRANSACTION_ID --reason "TEXT" [--data-dir PATH]
+    fedleave void --id TRANSACTION_ID --reason "TEXT" [--show-transaction-ids] [--data-dir PATH]
         Mark a transaction as void while preserving its record.
     Example:
         fedleave void --id 20260310-002 --reason "Entered in error"
@@ -197,8 +201,17 @@ def add(
     status: str = typer.Option("planned", help="Transaction status."),
     source: str = typer.Option("manual", help="Transaction source."),
     authoritative: bool = typer.Option(False, help="Void existing same-date/category/direction transactions before adding this one."),
+    show_transaction_ids: bool = typer.Option(
+        False,
+        "--show-transaction-ids",
+        "--ShowTransactionIDs",
+        help="Show transaction IDs in human-readable output.",
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if isinstance(show_transaction_ids, OptionInfo):
+        show_transaction_ids = False
+
     try:
         direction, hours = normalize_direction(earned, used, worked, adjusted)
     except ValueError as exc:
@@ -258,10 +271,12 @@ def add(
 
     add_transaction_to_leave_year(leave_year, transaction)
     write_json(get_leave_year_path(year, data_dir), leave_year)
+    detail = f"transaction [bold]{transaction.id}[/bold]" if show_transaction_ids else "transaction"
     if replaced_ids:
-        console.print(f"Added transaction [bold]{transaction.id}[/bold] to {year}; replaced {', '.join(replaced_ids)}")
+        replaced_detail = f"; replaced {', '.join(replaced_ids)}" if show_transaction_ids else f"; replaced {len(replaced_ids)} existing transaction(s)"
+        console.print(f"Added {detail} to {year}{replaced_detail}")
     else:
-        console.print(f"Added transaction [bold]{transaction.id}[/bold] to {year}")
+        console.print(f"Added {detail} to {year}")
 
 
 def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
@@ -384,6 +399,12 @@ def correct(
     search_date: str | None = typer.Option(None, help="Find transaction by this transaction date YYYY-MM-DD."),
     search_type: str | None = typer.Option(None, help="Find transaction by this transaction category/type."),
     preview: bool = typer.Option(False, help="Preview the correction without writing changes."),
+    show_transaction_ids: bool = typer.Option(
+        False,
+        "--show-transaction-ids",
+        "--ShowTransactionIDs",
+        help="Show transaction IDs in human-readable output.",
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     """Audit-safe correction: void the original transaction and create a replacement.
@@ -404,6 +425,8 @@ def correct(
         search_date = None
     if isinstance(search_type, OptionInfo):
         search_type = None
+    if isinstance(show_transaction_ids, OptionInfo):
+        show_transaction_ids = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
@@ -530,13 +553,25 @@ def correct(
 
     add_transaction_to_leave_year(leave_year, replacement)
     write_json(get_leave_year_path(int(leave_year.get("leave_year", 0)), data_dir), leave_year)
-    console.print(f"Corrected {id}: created replacement {replacement.id}")
+    if show_transaction_ids:
+        console.print(f"Corrected transaction {id}: created replacement {replacement.id}")
+    else:
+        console.print("Corrected transaction and created replacement")
 
 @app.command(name="list")
 def list_transactions(
     year: int = typer.Option(..., help="Leave year."),
+    show_transaction_ids: bool = typer.Option(
+        False,
+        "--show-transaction-ids",
+        "--ShowTransactionIDs",
+        help="Show transaction IDs in human-readable output.",
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if isinstance(show_transaction_ids, OptionInfo):
+        show_transaction_ids = False
+
     try:
         leave_year = load_leave_year(year, data_dir)
     except FileNotFoundError as exc:
@@ -549,8 +584,9 @@ def list_transactions(
         raise typer.Exit(code=0)
 
     for transaction in sorted(transactions, key=lambda item: item["id"]):
+        transaction_id = f"{transaction['id']} " if show_transaction_ids else ""
         console.print(
-            f"{transaction['id']} {transaction['date']} {transaction['category']} {transaction['direction']} {transaction['hours']} {transaction['status']} {transaction['description']}"
+            f"{transaction_id}{transaction['date']} {transaction['category']} {transaction['direction']} {transaction['hours']} {transaction['status']} {transaction['description']}"
         )
 
 
@@ -809,9 +845,18 @@ def validate(
 def void(
     id: str = typer.Option(..., help="Transaction ID to void (YYYYMMDD-NNN)."),
     reason: str = typer.Option("", help="Reason for voiding the transaction."),
+    show_transaction_ids: bool = typer.Option(
+        False,
+        "--show-transaction-ids",
+        "--ShowTransactionIDs",
+        help="Show transaction IDs in human-readable output.",
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     """Void a transaction while preserving the audit trail."""
+    if isinstance(show_transaction_ids, OptionInfo):
+        show_transaction_ids = False
+
     # find the transaction across leave years if needed
     base = get_leave_year_path(0, data_dir).parent
     found = False
@@ -823,7 +868,8 @@ def void(
                     t["void"] = True
                     t["void_reason"] = reason or "Voided by user"
                     write_json(pj, ly)
-                    console.print(f"Voided transaction {id} in {pj.name}")
+                    detail = f"transaction {id}" if show_transaction_ids else "transaction"
+                    console.print(f"Voided {detail} in {pj.name}")
                     found = True
                     break
         if found:

@@ -113,7 +113,7 @@ Commands and common options:
 		Add a transaction to a leave year ledger.
 
 		Syntax:
-			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--data-dir PATH]
+			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--show-transaction-ids] [--data-dir PATH]
 
 		Defaults:
 			--status planned
@@ -123,6 +123,7 @@ Commands and common options:
 		Notes:
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
 			- `--authoritative` voids active transactions with the same date, category, and direction before adding the new transaction.
+			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when needed.
 			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual.
 
 		Examples:
@@ -150,7 +151,10 @@ Commands and common options:
 		List transactions for a leave year.
 
 		Syntax:
-			fedleave list --year YEAR [--data-dir PATH]
+			fedleave list --year YEAR [--show-transaction-ids] [--data-dir PATH]
+
+		Notes:
+			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction, voiding, or audit work.
 
 	balance
 	Show leave balances for a year, optionally as of a given date, projected to year end, and/or with use-or-lose calculations.
@@ -215,21 +219,21 @@ For the full project specification and rules, see the project documentation or t
 
 Correction (audit-safe):
 
-	fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" --data-dir /path/to/data
+	fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
 
 	Example:
 		fedleave correct --id 20260310-001 --hours 3 --reason "Only used 3 hours"
 
 Alternatively, you can correct by transaction date and type (more human-friendly):
 
-	fedleave correct --search-date YYYY-MM-DD --search-type CATEGORY --hours HOURS --reason "TEXT" --data-dir /path/to/data
+	fedleave correct --search-date YYYY-MM-DD --search-type CATEGORY --hours HOURS --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
 
 	Example:
 		fedleave correct --search-date 2026-06-01 --search-type annual --hours 3 --reason "Adjust entry" --data-dir ./.data
 
 Void a transaction:
 
-	fedleave void --id TRANSACTION_ID --reason "TEXT" --data-dir /path/to/data
+	fedleave void --id TRANSACTION_ID --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
 
 	Example:
 		fedleave void --id 20260310-002 --reason "Entered in error"
@@ -326,4 +330,3 @@ Reason for Python-first approach:
 		- Federal holiday handling
 		- CLI syntax
 		- Testing
-
