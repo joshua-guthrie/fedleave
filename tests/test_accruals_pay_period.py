@@ -83,6 +83,19 @@ def test_balance_command_posts_accruals_as_of_date(tmp_path: Path):
     assert len(auto_accruals) == 2
 
 
+def test_balance_command_reports_projected_use_or_lose(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+
+    balance(year=2026, project=True, use_or_lose=True, data_dir=data_dir)
+
+    output = capsys.readouterr().out
+    assert "Projected balances for 2026 as of 2027-01-09:" in output
+    assert "Carryover limit: 240.00" in output
+    assert "Projected annual carryover: 166.00" in output
+    assert "Projected use-or-lose: 0.00" in output
+
+
 def test_pay_period_command_posts_and_reports_period(tmp_path: Path):
     data_dir = tmp_path / "data"
     leave_year = _init_data_dir(data_dir)

@@ -15,6 +15,7 @@ from .ledger import (
     calculate_balances,
     calculate_daily_activity,
     calculate_pay_period_activity,
+    calculate_use_or_lose,
     create_transaction,
     ensure_automatic_accruals,
     normalize_direction,
@@ -84,6 +85,11 @@ Command details and examples:
 
     fedleave list --year YEAR [--show-transaction-ids] [--data-dir PATH]
         List transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
+
+    fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--data-dir PATH]
+        Show balances calculated from the ledger.
+        --project includes projected future annual and sick leave accruals through year end or --project-to.
+        --use-or-lose prints projected annual carryover and annual leave lost above the carryover limit.
 
     fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--data-dir PATH]
         Show leave earned/used, overtime worked, optional daily activity, and ending balances for the pay period containing the date.

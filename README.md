@@ -168,7 +168,7 @@ Commands and common options:
 		- Missing automatic annual and sick leave accrual transactions are posted through `--as-of`, or through today when `--as-of` is omitted.
 		- `--project` adds projected automatic annual and sick accruals for future pay periods through the leave year end (or via `--project-to`).
 		- `--project-to YYYY-MM-DD` projects accruals only through the specified date instead of year end.
-		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit.
+		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection even when `--project` is not passed.
 		- Federal employees earn annual and sick leave automatically each pay period; this tool posts or projects that accrual based on the leave year pay periods and configured accrual rates.
 
 	pay-period
