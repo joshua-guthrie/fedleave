@@ -180,6 +180,9 @@ def get_default_data_dir() -> Path:
     if xdg_data_home:
         return Path(xdg_data_home) / "fedleave"
 
+    home = os.getenv("HOME")
+    if home:
+        return Path(home) / ".local" / "share" / "fedleave"
     return Path.home() / ".local" / "share" / "fedleave"
 
 
