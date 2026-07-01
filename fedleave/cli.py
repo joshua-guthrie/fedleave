@@ -150,7 +150,7 @@ Command details and examples:
     fedleave validate [--apply] [--json] [--data-dir PATH]
         Validate leave-year JSON files and optionally emit structured issue details.
 Notes on data directory:
-    Default: ~/.local/share/fedleave
+    Default: ~/.local/share/fedleave on Linux, `%LOCALAPPDATA%\\fedleave` on Windows
     Override per-command with `--data-dir /path/to/data`.
 
 Safety and backups:

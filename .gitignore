@@ -6,6 +6,16 @@ __pycache__/
 
 # Virtual environment
 .venv/
+pyvenv.cfg
+bin/
+lib/
+lib64/
+.pyinstaller-venv/
+.pyinstaller-build/
+.pyinstaller-spec/
+.dist/
+dist/
+build/
 
 # Local data
 .data/

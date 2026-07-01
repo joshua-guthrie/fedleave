@@ -11,7 +11,7 @@ Note:  In-case you're wondering... it was a 100% at home project.  None of it wa
 It's a little program I'm using to serve as a back end to an AI agent and a dashboard and figured it may be useful to someone else.
 
 ## Limitations
-I'm making no effort to track expiring leave, such as travel comp time, award leave, etc.  I've never had the problem in my personal live of having to worry about leave expiring ! :)
+I'm making no effort to track expiring leave, such as travel comp time, award leave, etc.  I've never had the problem in my personal life of having to worry about leave expiring ! :)
 
 The program is entirely single user.  I suppose it could be made into a multiple user system with seperate data files for each user, but that has never been my use case.  At your own peril.
 
@@ -19,9 +19,20 @@ I would not be using this application for any thing critical.  For me, it's a fu
 
 ## Setup
 
+Linux / macOS:
+
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+```
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pip install -e .
 ```
@@ -241,10 +252,7 @@ activity
 Global notes:
 
 	Data directory:
-		Default: `~/.local/share/fedleave`
-		Use `--data-dir /path` to override on a per-command basis.
-
-	Safety:
+	Default: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\\fedleave` on Windows.
 		- The application creates timestamped backups of JSON files before modifying them.
 		- All writes are atomic using temporary file replacement.
 
@@ -1158,12 +1166,24 @@ source .build-venv/bin/activate
 pip install --upgrade pip
 ```
 
-2. Build using the Makefile (or run the script directly):
+2. Build using the Makefile or the platform-appropriate script:
+
+Linux / macOS:
 
 ```bash
 make build
 # or:
 ./scripts/build_pyinstaller.sh
+```
+
+Windows PowerShell:
+
+```powershell
+python -m venv .build-venv
+.\.build-venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install pyinstaller
+pwsh .\scripts\build_pyinstaller.ps1
 ```
 
 3. Output:
@@ -1174,5 +1194,5 @@ Notes and caveats:
 
 - PyInstaller build installs PyInstaller and your package into a temporary venv under `.pyinstaller-venv`.
 - The produced binary is not cross-platform; build on the OS you intend to run on.
-- If you want me to run the build here, I can — it will take several minutes and produce `dist/fedleave`.
+
 
