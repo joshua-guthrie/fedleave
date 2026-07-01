@@ -76,17 +76,21 @@ def test_find_fedleave_app_ignores_package_directory(tmp_path, monkeypatch, modu
     module = importlib.import_module(module_name)
 
     app_path = tmp_path / app_name
+    python_path = tmp_path / "python"
     package_dir = tmp_path / "fedleave"
     path_fedleave = tmp_path / "bin" / "fedleave"
     app_path.write_text("#!/bin/sh\n")
+    python_path.write_text("#!/bin/sh\n")
     package_dir.mkdir()
     path_fedleave.parent.mkdir()
     path_fedleave.write_text("#!/bin/sh\n")
     app_path.chmod(0o755)
+    python_path.chmod(0o755)
     package_dir.chmod(0o755)
     path_fedleave.chmod(0o755)
 
     monkeypatch.setattr(sys, "argv", [str(app_path)])
+    monkeypatch.setattr(sys, "executable", str(python_path))
     monkeypatch.setattr(module, "__file__", str(tmp_path / "annual_leave_chart" / "chart.py"))
     monkeypatch.setattr(module.shutil, "which", lambda name: str(path_fedleave))
 
