@@ -141,7 +141,7 @@ def get_default_data_dir(data_dir: Path | None = None) -> Path:
     if data_dir is not None:
         return data_dir
 
-    if sys.platform.startswith("win") or os.name == "nt":
+    if sys.platform.startswith("win"):
         local_appdata = os.getenv("LOCALAPPDATA")
         if local_appdata:
             return Path(local_appdata) / "fedleave"

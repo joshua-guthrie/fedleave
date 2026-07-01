@@ -74,7 +74,9 @@ def find_fedleave_app() -> Path:
     def _is_executable(candidate: Path) -> bool:
         if not candidate.is_file():
             return False
-        return os.access(candidate, os.X_OK) or candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
+        if sys.platform.startswith("win"):
+            return candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
+        return os.access(candidate, os.X_OK)
 
     script_dir = Path(__file__).resolve().parent.parent
     candidate_dirs: list[Path] = []
@@ -103,7 +105,8 @@ def find_fedleave_app() -> Path:
         if resolved_dir in seen_dirs:
             continue
         seen_dirs.add(resolved_dir)
-        for candidate_name in ("fedleave", "fedleave.exe"):
+        candidate_names = ("fedleave.exe", "fedleave.bat", "fedleave.cmd") if sys.platform.startswith("win") else ("fedleave",)
+        for candidate_name in candidate_names:
             candidate = resolved_dir / candidate_name
             if _is_executable(candidate):
                 return candidate
@@ -162,7 +165,7 @@ def run_fedleave(args: list[str]) -> Any:
 
 def get_default_data_dir() -> Path:
     """Return the same platform-specific default data directory used by fedleave."""
-    if sys.platform.startswith("win") or os.name == "nt":
+    if sys.platform.startswith("win"):
         local_appdata = os.getenv("LOCALAPPDATA")
         if local_appdata:
             return Path(local_appdata) / "fedleave"

@@ -52,7 +52,8 @@ def test_find_fedleave_app_uses_sibling_executable(tmp_path, monkeypatch, module
     module = importlib.import_module(module_name)
 
     app_path = tmp_path / app_name
-    fedleave_path = tmp_path / "fedleave"
+    fedleave_name = "fedleave.exe" if sys.platform.startswith("win") else "fedleave"
+    fedleave_path = tmp_path / fedleave_name
     app_path.write_text("#!/bin/sh\n")
     fedleave_path.write_text("#!/bin/sh\n")
     app_path.chmod(0o755)
@@ -78,7 +79,8 @@ def test_find_fedleave_app_ignores_package_directory(tmp_path, monkeypatch, modu
     app_path = tmp_path / app_name
     python_path = tmp_path / "python"
     package_dir = tmp_path / "fedleave"
-    path_fedleave = tmp_path / "bin" / "fedleave"
+    path_fedleave_name = "fedleave.exe" if sys.platform.startswith("win") else "fedleave"
+    path_fedleave = tmp_path / "bin" / path_fedleave_name
     app_path.write_text("#!/bin/sh\n")
     python_path.write_text("#!/bin/sh\n")
     package_dir.mkdir()
@@ -113,7 +115,7 @@ def test_run_fedleave_uses_subcommand_arguments(monkeypatch, module_name):
 
     module.run_fedleave(["balance", "--year", "2026", "--json", "--project"])
 
-    assert captured["cmd"] == ["/tmp/fedleave", "balance", "--year", "2026", "--json", "--project"]
+    assert captured["cmd"] == [str(Path("/tmp/fedleave")), "balance", "--year", "2026", "--json", "--project"]
 
 
 @pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])
