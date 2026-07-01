@@ -84,6 +84,40 @@ Validate and normalize stored JSON data:
 fedleave validate --data-dir ~/.local/share/fedleave --apply
 ```
 
+## Companion Application: AnnualLeaveChartForTheYear
+
+A companion application that generates a PNG chart of annual leave balances throughout the leave year. It polls data from the `fedleave` application and renders a visual representation with:
+
+- Annual leave balance line chart
+- Pay period markers on the X-axis
+- Use-or-lose threshold line (240 hours)
+- Grid lines for easy reading
+- Smooth curve interpolation
+
+### Usage
+
+```bash
+AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png
+AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png --resolution 2.0
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution FACTOR`: Image scale factor to adjust dimensions (default: 1.0, e.g., use 2.0 for double resolution)
+- `--data-dir PATH`: Optional fedleave data directory
+
+### Requirements
+
+The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the `dist/` directory alongside this application (when built from source)
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
 ## CLI Detailed Help
 
 This section provides complete usage examples and command syntax for the `fedleave` CLI.

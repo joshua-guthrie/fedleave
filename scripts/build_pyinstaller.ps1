@@ -38,4 +38,32 @@ $PYINSTALLER_ARGS = @(
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @PYINSTALLER_ARGS
 
+# Build AnnualLeaveChartForTheYear companion application
+$CHART_ENTRY = Join-Path $HERE ".pyinstaller_chart_entry.py"
+@"
+from annual_leave_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $CHART_ENTRY -Encoding utf8
+
+$CHART_ARGS = @(
+    if ($OneFile) { '--onefile' }
+    '--name', 'AnnualLeaveChartForTheYear'
+    '--console'
+    '--hidden-import', 'PIL'
+    '--hidden-import', 'PIL.Image'
+    '--hidden-import', 'PIL.ImageDraw'
+    '--hidden-import', 'PIL.ImageFont'
+    '--hidden-import', 'numpy'
+    '--distpath', "$DIST_DIR"
+    '--workpath', "$HERE\.pyinstaller-build"
+    '--specpath', "$HERE\.pyinstaller-spec"
+    '-F', "$CHART_ENTRY"
+)
+
+& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @CHART_ARGS
+
 Write-Host "Build complete. Binaries in $DIST_DIR"
+Write-Host "  - fedleave"
+Write-Host "  - AnnualLeaveChartForTheYear"

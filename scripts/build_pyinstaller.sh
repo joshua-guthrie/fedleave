@@ -53,4 +53,28 @@ pyinstaller $ONEFILE \
   --specpath "$HERE/.pyinstaller-spec" \
   -F "$ENTRY"
 
+# Build AnnualLeaveChartForTheYear companion application
+CHART_ENTRY="$HERE/.pyinstaller_chart_entry.py"
+cat > "$CHART_ENTRY" <<'PY'
+from annual_leave_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+pyinstaller $ONEFILE \
+  --name AnnualLeaveChartForTheYear \
+  --console \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy \
+  --distpath "$DIST_DIR" \
+  --workpath "$HERE/.pyinstaller-build" \
+  --specpath "$HERE/.pyinstaller-spec" \
+  -F "$CHART_ENTRY"
+
 echo "Build complete. Binaries in $DIST_DIR"
+echo "  - fedleave"
+echo "  - AnnualLeaveChartForTheYear"

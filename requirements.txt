@@ -6,3 +6,5 @@ icalendar
 rich
 pytest
 pyinstaller
+Pillow
+numpy
