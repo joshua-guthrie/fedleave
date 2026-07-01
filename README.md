@@ -52,8 +52,8 @@ fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --ann
 Record leave usage and overtime as it happens:
 
 ```bash
-fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
-fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3 --description "Release support"
+fedleave add --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
+fedleave add --date 2026-03-12 --category overtime --worked 3 --description "Release support"
 fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 ```
 
@@ -124,7 +124,7 @@ Commands and common options:
 		Add a transaction to a leave year ledger.
 
 		Syntax:
-			fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids] [--data-dir PATH]
+			fedleave add [--year YEAR] --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids] [--data-dir PATH]
 
 		Defaults:
 			--status planned
@@ -132,6 +132,7 @@ Commands and common options:
 			--data-dir ~/.local/share/fedleave
 
 		Notes:
+			- `--year` is optional; if omitted, the leave year is inferred from the transaction date using each leave-year file's `leave_year_start` and `leave_year_end`.
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
 			- `--authoritative` voids active transactions with the same date, category, and direction before adding the new transaction.
 			- `--json` emits the created transaction ID and any replaced transaction IDs.
@@ -139,8 +140,8 @@ Commands and common options:
 			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual.
 
 		Examples:
-			fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
-			fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+			fedleave add --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
+			fedleave add --date 2026-03-12 --category overtime --worked 3
 			fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 
 	reconcile
