@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -67,7 +68,7 @@ class ChartDimensions:
 
 def find_fedleave_app() -> Path:
     """
-    Find the fedleave application in the same directory or in PATH.
+    Find the fedleave application in the same directory as the chart executable or in PATH.
     
     Returns:
         Path to fedleave executable
@@ -75,26 +76,47 @@ def find_fedleave_app() -> Path:
     Raises:
         SystemExit: If fedleave cannot be found with helpful error message
     """
-    # Check same directory as this script
-    script_dir = Path(__file__).parent.parent
-    fedleave_in_dir = script_dir / "fedleave"
-    if fedleave_in_dir.exists() and os.access(fedleave_in_dir, os.X_OK):
-        return fedleave_in_dir
-    
-    # Check dist directory (for packaged builds)
-    if script_dir.name == "annual_leave_chart":
-        parent_dir = script_dir.parent
-        dist_dir = parent_dir / "dist"
-        fedleave_in_dist = dist_dir / "fedleave"
-        if fedleave_in_dist.exists() and os.access(fedleave_in_dist, os.X_OK):
-            return fedleave_in_dist
-    
-    # Check PATH
+    def _is_executable(candidate: Path) -> bool:
+        if not candidate.is_file():
+            return False
+        return os.access(candidate, os.X_OK) or candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
+
+    script_dir = Path(__file__).resolve().parent.parent
+    candidate_dirs: list[Path] = []
+
+    argv0 = Path(sys.argv[0]).expanduser()
+    if not argv0.is_absolute():
+        argv0 = (Path.cwd() / argv0).resolve()
+    else:
+        argv0 = argv0.resolve()
+    if argv0.exists():
+        candidate_dirs.append(argv0 if argv0.is_dir() else argv0.parent)
+
+    executable_path = Path(sys.executable).expanduser()
+    if not executable_path.is_absolute():
+        executable_path = (Path.cwd() / executable_path).resolve()
+    else:
+        executable_path = executable_path.resolve()
+    if executable_path.exists():
+        candidate_dirs.append(executable_path.parent)
+
+    candidate_dirs.extend([script_dir, script_dir / "dist", script_dir / "fedleave", script_dir.parent / "dist"])
+
+    seen_dirs: set[Path] = set()
+    for base_dir in candidate_dirs:
+        resolved_dir = base_dir.resolve() if base_dir.exists() else base_dir
+        if resolved_dir in seen_dirs:
+            continue
+        seen_dirs.add(resolved_dir)
+        for candidate_name in ("fedleave", "fedleave.exe"):
+            candidate = resolved_dir / candidate_name
+            if _is_executable(candidate):
+                return candidate
+
     fedleave_in_path = shutil.which("fedleave")
     if fedleave_in_path:
         return Path(fedleave_in_path)
-    
-    # Not found - provide helpful error
+
     raise SystemExit(
         f"""
         
@@ -127,7 +149,7 @@ def run_fedleave(args: list[str]) -> Any:
     """
     fedleave = find_fedleave_app()
     result = subprocess.run(
-        [str(fedleave), "--json", *args],
+        [str(fedleave), *args],
         text=True,
         capture_output=True,
         check=False,
@@ -143,6 +165,58 @@ def run_fedleave(args: list[str]) -> Any:
         raise SystemExit(f"Failed to parse fedleave output as JSON: {e}\nOutput: {result.stdout}")
 
 
+def get_default_data_dir() -> Path:
+    """Return the same platform-specific default data directory used by fedleave."""
+    if sys.platform.startswith("win") or os.name == "nt":
+        local_appdata = os.getenv("LOCALAPPDATA")
+        if local_appdata:
+            return Path(local_appdata) / "fedleave"
+        return Path.home() / "AppData" / "Local" / "fedleave"
+
+    xdg_data_home = os.getenv("XDG_DATA_HOME")
+    if xdg_data_home:
+        return Path(xdg_data_home) / "fedleave"
+
+    return Path.home() / ".local" / "share" / "fedleave"
+
+
+def infer_leave_year(data_dir: Path) -> int:
+    """Infer the current leave year from the data directory."""
+    leave_year_dir = data_dir / "leave_years"
+    year_files = sorted(leave_year_dir.glob("*.json"))
+    if not year_files:
+        raise SystemExit(
+            f"No leave-year files found in {leave_year_dir}. "
+            "Run `fedleave init` first or specify --data-dir PATH."
+        )
+
+    today = date.today()
+    valid_years: list[int] = []
+    for year_file in year_files:
+        try:
+            year = int(year_file.stem)
+            leave_year = json.loads(year_file.read_text())
+            valid_years.append(year)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+
+        try:
+            start = date.fromisoformat(str(leave_year["leave_year_start"]))
+            end = date.fromisoformat(str(leave_year["leave_year_end"]))
+        except (KeyError, ValueError):
+            continue
+        if start <= today <= end:
+            return year
+
+    if valid_years:
+        return max(valid_years)
+
+    raise SystemExit(
+        f"No readable leave-year files found in {leave_year_dir}. "
+        "Run `fedleave init` first or specify --data-dir PATH."
+    )
+
+
 def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, Any]:
     """
     Get leave year snapshot data using fedleave.
@@ -154,13 +228,20 @@ def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, An
     Returns:
         Dictionary with leave_year_start, leave_year_end, transactions, starting_balances, etc.
     """
-    # Use fedleave balance command to get structured data
+    data_dir = data_dir or get_default_data_dir()
+
+    # Let fedleave validate the year and post any automatic accruals before reading the ledger.
     args = ["balance", "--year", str(year), "--json", "--project"]
-    if data_dir:
-        args.extend(["--data-dir", str(data_dir)])
-    
-    result = run_fedleave(args)
-    return result
+    args.extend(["--data-dir", str(data_dir)])
+    run_fedleave(args)
+
+    year_file = data_dir / "leave_years" / f"{year}.json"
+    try:
+        return json.loads(year_file.read_text())
+    except FileNotFoundError:
+        raise SystemExit(f"Leave-year file not found: {year_file}")
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Failed to parse leave-year file as JSON: {e}\nFile: {year_file}")
 
 
 def decimal_hours(value: Any) -> Decimal:
@@ -173,6 +254,16 @@ def format_hours(value: Decimal) -> str:
     if value == value.to_integral():
         return str(value.quantize(Decimal("1")))
     return format(value.normalize(), "f")
+
+
+def pay_period_end_date(period_data: Any) -> date:
+    """Return a pay period's end date from supported fedleave schemas."""
+    if isinstance(period_data, dict):
+        end_value = period_data.get("end_date") or period_data.get("end")
+        if not end_value:
+            raise SystemExit(f"Pay period is missing end_date: {period_data}")
+        return date.fromisoformat(str(end_value))
+    return period_data
 
 
 def load_font(size: int, bold: bool = False, scale: float = 1.0) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -227,16 +318,13 @@ def annual_balance_points(year: int, data_dir: Path | None = None) -> tuple[list
         end = date.fromisoformat(snapshot["leave_year_end"])
         for index in range(26):
             period_end = min(start + timedelta(days=index * 14 + 13), end)
-            pay_periods.append({"end": period_end.isoformat()})
+            pay_periods.append({"end_date": period_end.isoformat()})
     
     # Calculate balance at each pay period end
     tx_index = 0
     points: list[tuple[date, Decimal]] = []
     for period_data in pay_periods:
-        if isinstance(period_data, dict):
-            period_end = date.fromisoformat(period_data["end"])
-        else:
-            period_end = period_data
+        period_end = pay_period_end_date(period_data)
         
         while tx_index < len(txs) and date.fromisoformat(txs[tx_index]["date"]) <= period_end:
             tx = txs[tx_index]
@@ -432,20 +520,11 @@ def main() -> None:
             f"Error: Resolution must be a positive number of pixels. Got: {args.resolution}"
         )
 
-    data_dir = Path(args.data_dir).expanduser() if args.data_dir else None
+    data_dir = Path(args.data_dir).expanduser() if args.data_dir else get_default_data_dir()
 
     # If year not provided, try to determine current year
     if args.year is None:
-        try:
-            # Run fedleave balance to get a year (it will fail if no leave year)
-            result = run_fedleave(["balance", "--year", "2026", "--json"])
-            # If that worked, use 2026 as default, otherwise user must specify
-            args.year = 2026
-        except SystemExit:
-            # No default year found - user must specify
-            raise SystemExit(
-                "Unable to determine current leave year. Please specify --year YYYY"
-            )
+        args.year = infer_leave_year(data_dir)
 
     points, snapshot = annual_balance_points(args.year, data_dir)
     output = output_path.resolve()

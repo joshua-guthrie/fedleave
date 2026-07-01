@@ -51,7 +51,7 @@ pyinstaller $ONEFILE \
   --distpath "$DIST_DIR" \
   --workpath "$HERE/.pyinstaller-build" \
   --specpath "$HERE/.pyinstaller-spec" \
-  -F "$ENTRY"
+  "$ENTRY"
 
 # Build AnnualLeaveChartForTheYear companion application
 CHART_ENTRY="$HERE/.pyinstaller_chart_entry.py"
@@ -73,7 +73,7 @@ pyinstaller $ONEFILE \
   --distpath "$DIST_DIR" \
   --workpath "$HERE/.pyinstaller-build" \
   --specpath "$HERE/.pyinstaller-spec" \
-  -F "$CHART_ENTRY"
+  "$CHART_ENTRY"
 
 # Build SickLeaveChartForTheYear companion application
 SICK_CHART_ENTRY="$HERE/.pyinstaller_sick_chart_entry.py"
@@ -95,7 +95,7 @@ pyinstaller $ONEFILE \
   --distpath "$DIST_DIR" \
   --workpath "$HERE/.pyinstaller-build" \
   --specpath "$HERE/.pyinstaller-spec" \
-  -F "$SICK_CHART_ENTRY"
+  "$SICK_CHART_ENTRY"
 
 echo "Build complete. Binaries in $DIST_DIR"
 echo "  - fedleave"

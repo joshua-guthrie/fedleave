@@ -31,3 +31,58 @@ jobs:
       - name: Run tests
         run: |
           pytest -q
+
+  build:
+    name: pyinstaller build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Build Linux executables
+        if: runner.os != 'Windows'
+        run: ./scripts/build_pyinstaller.sh
+
+      - name: Smoke test Linux executables
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATA_DIR="$(mktemp -d)"
+          ./dist/fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir "$DATA_DIR"
+          ./dist/AnnualLeaveChartForTheYear --outputFile "$DATA_DIR/annual.png" --data-dir "$DATA_DIR"
+          ./dist/SickLeaveChartForTheYear --outputFile "$DATA_DIR/sick.png" --data-dir "$DATA_DIR"
+          test -s "$DATA_DIR/annual.png"
+          test -s "$DATA_DIR/sick.png"
+
+      - name: Build Windows executables
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\scripts\build_pyinstaller.ps1
+
+      - name: Smoke test Windows executables
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $DataDir = Join-Path $env:RUNNER_TEMP "fedleave-data"
+          New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
+          .\dist\fedleave.exe init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir $DataDir
+          .\dist\AnnualLeaveChartForTheYear.exe --outputFile (Join-Path $DataDir "annual.png") --data-dir $DataDir
+          .\dist\SickLeaveChartForTheYear.exe --outputFile (Join-Path $DataDir "sick.png") --data-dir $DataDir
+          if (-not (Test-Path (Join-Path $DataDir "annual.png"))) { throw "Annual chart was not created" }
+          if (-not (Test-Path (Join-Path $DataDir "sick.png"))) { throw "Sick chart was not created" }
+
+      - name: Upload executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: fedleave-${{ runner.os }}
+          path: dist/*

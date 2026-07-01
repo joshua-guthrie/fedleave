@@ -11,13 +11,15 @@ license = "MIT"
 
 [project.scripts]
 fedleave = "fedleave.__main__:main"
+AnnualLeaveChartForTheYear = "annual_leave_chart.__main__:main"
+SickLeaveChartForTheYear = "sick_leave_chart.__main__:main"
 
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["fedleave"]
+include = ["fedleave", "annual_leave_chart", "sick_leave_chart"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

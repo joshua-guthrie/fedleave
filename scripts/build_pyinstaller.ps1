@@ -8,7 +8,8 @@ $ErrorActionPreference = 'Stop'
 
 $HERE = Resolve-Path "$PSScriptRoot\.."
 $VENV_DIR = Join-Path $HERE ".pyinstaller-venv"
-$DIST_DIR = Resolve-Path -Path $Dist
+$DIST_DIR = [System.IO.Path]::GetFullPath($Dist)
+New-Item -ItemType Directory -Force -Path $DIST_DIR | Out-Null
 
 Write-Host "Building fedleave with PyInstaller (venv: $VENV_DIR)"
 python -m venv "$VENV_DIR"
@@ -33,7 +34,7 @@ $PYINSTALLER_ARGS = @(
     '--distpath', "$DIST_DIR"
     '--workpath', "$HERE\.pyinstaller-build"
     '--specpath', "$HERE\.pyinstaller-spec"
-    '-F', "$ENTRY"
+    "$ENTRY"
 )
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @PYINSTALLER_ARGS
@@ -59,7 +60,7 @@ $CHART_ARGS = @(
     '--distpath', "$DIST_DIR"
     '--workpath', "$HERE\.pyinstaller-build"
     '--specpath', "$HERE\.pyinstaller-spec"
-    '-F', "$CHART_ENTRY"
+    "$CHART_ENTRY"
 )
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @CHART_ARGS
@@ -85,7 +86,7 @@ $SICK_CHART_ARGS = @(
     '--distpath', "$DIST_DIR"
     '--workpath', "$HERE\.pyinstaller-build"
     '--specpath', "$HERE\.pyinstaller-spec"
-    '-F', "$SICK_CHART_ENTRY"
+    "$SICK_CHART_ENTRY"
 )
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @SICK_CHART_ARGS

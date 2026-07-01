@@ -106,7 +106,7 @@ AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png --resolution 3220
 - `--year YYYY`: Leave year (required if no current leave year can be inferred)
 - `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
 - `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
-- `--data-dir PATH`: Optional fedleave data directory
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
 
 ### Requirements
 
@@ -141,7 +141,7 @@ SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png --resolution 32
 - `--year YYYY`: Leave year (required if no current leave year can be inferred)
 - `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
 - `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
-- `--data-dir PATH`: Optional fedleave data directory
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
 
 ### Requirements
 
@@ -1258,11 +1258,15 @@ pwsh .\scripts\build_pyinstaller.ps1
 
 3. Output:
 
-- The built executable will appear in `dist/fedleave` (Linux) and is platform-specific. Build on the target platform or use an appropriate builder.
+- The built executables will appear in `dist/` and are platform-specific. Build on the target platform or use an appropriate builder.
+- On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
+
+```bash
+chmod +x ./dist/fedleave ./dist/AnnualLeaveChartForTheYear ./dist/SickLeaveChartForTheYear
+```
 
 Notes and caveats:
 
 - PyInstaller build installs PyInstaller and your package into a temporary venv under `.pyinstaller-venv`.
 - The produced binary is not cross-platform; build on the OS you intend to run on.
-
 
