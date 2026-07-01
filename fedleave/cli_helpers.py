@@ -24,6 +24,28 @@ def load_leave_year(year: int, data_dir: Path | None = None) -> dict[str, Any]:
     return load_json(path)
 
 
+def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = None) -> tuple[int, dict[str, Any]]:
+    base = get_default_data_dir(data_dir)
+    year_dir = base / "leave_years"
+    if not year_dir.exists():
+        raise FileNotFoundError(f"Leave year directory not found: {year_dir}")
+
+    target = parse_iso_date(transaction_date)
+    for path in sorted(year_dir.iterdir()):
+        if not path.is_file() or path.suffix != ".json":
+            continue
+        leave_year = load_json(path)
+        try:
+            start = parse_iso_date(str(leave_year.get("leave_year_start", "")))
+            end = parse_iso_date(str(leave_year.get("leave_year_end", "")))
+        except ValueError:
+            continue
+        if start <= target <= end:
+            return int(leave_year.get("leave_year", path.stem)), leave_year
+
+    raise FileNotFoundError(f"No leave year contains date {transaction_date}")
+
+
 def normalize_iso_date(date_str: str) -> str:
     match = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", date_str.strip())
     if not match:

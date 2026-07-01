@@ -6,7 +6,7 @@ from typer.models import OptionInfo
 import typer
 from rich.console import Console
 
-from .cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, sanitize_text
+from .cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, resolve_leave_year_for_date, sanitize_text
 from .ledger import (
     TRANSACTION_CATEGORIES,
     TRANSACTION_DIRECTIONS,
@@ -220,7 +220,7 @@ def init(
 
 @app.command()
 def add(
-    year: int = typer.Option(..., help="Leave year."),
+    year: int | None = typer.Option(None, help="Leave year."),
     date: str = typer.Option(..., help="Transaction date YYYY-MM-DD."),
     category: str = typer.Option(..., help="Leave category."),
     earned: float | None = typer.Option(None, help="Hours earned."),
@@ -273,7 +273,10 @@ def add(
         raise typer.Exit(code=2)
 
     try:
-        leave_year = load_leave_year(year, data_dir)
+        if year is None:
+            year, leave_year = resolve_leave_year_for_date(date, data_dir)
+        else:
+            leave_year = load_leave_year(year, data_dir)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -327,28 +330,6 @@ def add(
         console.print(f"Added {detail} to {year}{replaced_detail}")
     else:
         console.print(f"Added {detail} to {year}")
-
-
-def _resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = None) -> tuple[int, dict]:
-    base = get_default_data_dir(data_dir)
-    year_dir = base / "leave_years"
-    if not year_dir.exists():
-        raise FileNotFoundError(f"Leave year directory not found: {year_dir}")
-
-    target = parse_iso_date(transaction_date)
-    for path in sorted(year_dir.iterdir()):
-        if not path.is_file() or path.suffix != ".json":
-            continue
-        leave_year = load_json(path)
-        try:
-            start = parse_iso_date(str(leave_year.get("leave_year_start", "")))
-            end = parse_iso_date(str(leave_year.get("leave_year_end", "")))
-        except ValueError:
-            continue
-        if start <= target <= end:
-            return int(leave_year.get("leave_year", path.stem)), leave_year
-
-    raise FileNotFoundError(f"No leave year contains date {transaction_date}")
 
 
 @app.command()
@@ -405,7 +386,7 @@ def reconcile(
         raise typer.Exit(code=2)
 
     try:
-        year, leave_year = _resolve_leave_year_for_date(date, data_dir)
+        year, leave_year = resolve_leave_year_for_date(date, data_dir)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -672,16 +653,15 @@ def correct(
     if not id:
         if search_date and search_type:
             try:
-                # infer year from the provided transaction date
-                target_year = int(search_date.split("-")[0])
-            except Exception:
+                search_date = parse_iso_date(search_date).isoformat()
+            except ValueError:
                 console.print("[red]ERROR:[/red] Invalid search date; use YYYY-MM-DD")
                 raise typer.Exit(code=2)
 
             try:
-                ly = load_leave_year(target_year, data_dir)
-            except FileNotFoundError:
-                console.print(f"[red]ERROR:[/red] Leave year for {target_year} not found")
+                _, ly = resolve_leave_year_for_date(search_date, data_dir)
+            except FileNotFoundError as exc:
+                console.print(f"[red]ERROR:[/red] {exc}")
                 raise typer.Exit(code=1)
 
             matches = [t for t in ly.get("transactions", []) if t.get("date") == search_date and t.get("category") == search_type and not t.get("void")]
