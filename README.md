@@ -118,6 +118,41 @@ The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
+## Companion Application: SickLeaveChartForTheYear
+
+A companion application that generates a PNG chart of sick leave balances throughout the leave year. Like AnnualLeaveChartForTheYear, it polls data from the `fedleave` application and renders a visual representation with:
+
+- Sick leave balance line chart
+- Pay period markers on the X-axis
+- Smooth curve interpolation
+- **Dynamic Y-axis**: Range is 0 to the maximum balance rounded up to the nearest 100 hours
+
+For example, if the maximum sick leave balance is 605 hours, the Y-axis will scale to 0-700.
+
+### Usage
+
+```bash
+SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png
+SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory
+
+### Requirements
+
+The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the `dist/` directory alongside this application (when built from source)
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
 ## CLI Detailed Help
 
 This section provides complete usage examples and command syntax for the `fedleave` CLI.

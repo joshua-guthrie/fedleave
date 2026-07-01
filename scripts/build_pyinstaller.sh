@@ -75,6 +75,29 @@ pyinstaller $ONEFILE \
   --specpath "$HERE/.pyinstaller-spec" \
   -F "$CHART_ENTRY"
 
+# Build SickLeaveChartForTheYear companion application
+SICK_CHART_ENTRY="$HERE/.pyinstaller_sick_chart_entry.py"
+cat > "$SICK_CHART_ENTRY" <<'PY'
+from sick_leave_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+pyinstaller $ONEFILE \
+  --name SickLeaveChartForTheYear \
+  --console \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy \
+  --distpath "$DIST_DIR" \
+  --workpath "$HERE/.pyinstaller-build" \
+  --specpath "$HERE/.pyinstaller-spec" \
+  -F "$SICK_CHART_ENTRY"
+
 echo "Build complete. Binaries in $DIST_DIR"
 echo "  - fedleave"
 echo "  - AnnualLeaveChartForTheYear"
+echo "  - SickLeaveChartForTheYear"

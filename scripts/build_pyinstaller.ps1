@@ -64,6 +64,33 @@ $CHART_ARGS = @(
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @CHART_ARGS
 
+# Build SickLeaveChartForTheYear companion application
+$SICK_CHART_ENTRY = Join-Path $HERE ".pyinstaller_sick_chart_entry.py"
+@"
+from sick_leave_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $SICK_CHART_ENTRY -Encoding utf8
+
+$SICK_CHART_ARGS = @(
+    if ($OneFile) { '--onefile' }
+    '--name', 'SickLeaveChartForTheYear'
+    '--console'
+    '--hidden-import', 'PIL'
+    '--hidden-import', 'PIL.Image'
+    '--hidden-import', 'PIL.ImageDraw'
+    '--hidden-import', 'PIL.ImageFont'
+    '--hidden-import', 'numpy'
+    '--distpath', "$DIST_DIR"
+    '--workpath', "$HERE\.pyinstaller-build"
+    '--specpath', "$HERE\.pyinstaller-spec"
+    '-F', "$SICK_CHART_ENTRY"
+)
+
+& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @SICK_CHART_ARGS
+
 Write-Host "Build complete. Binaries in $DIST_DIR"
 Write-Host "  - fedleave"
 Write-Host "  - AnnualLeaveChartForTheYear"
+Write-Host "  - SickLeaveChartForTheYear"
