@@ -17,9 +17,10 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 
-# Chart rendering constants
-WIDTH = 1610
-HEIGHT = 1180
+# Chart rendering constants (base dimensions)
+BASE_WIDTH = 1610
+BASE_HEIGHT = 1180
+BASE_ASPECT_RATIO = BASE_HEIGHT / BASE_WIDTH
 PLOT_LEFT = 78
 PLOT_TOP = 122
 PLOT_RIGHT = 1580
@@ -41,12 +42,19 @@ FEDLEAVE_REPO_URL = "https://github.com/joshua-guthrie/fedleave"
 
 
 class ChartDimensions:
-    """Chart dimensions scaled by resolution factor."""
+    """Chart dimensions scaled to specific pixel width."""
     
-    def __init__(self, scale: float = 1.0):
-        self.scale = scale
-        self.width = int(WIDTH * scale)
-        self.height = int(HEIGHT * scale)
+    def __init__(self, width_pixels: int = BASE_WIDTH):
+        """
+        Initialize chart dimensions based on target width in pixels.
+        Height is calculated maintaining aspect ratio.
+        
+        Args:
+            width_pixels: Target image width in pixels (default: 1610)
+        """
+        self.width = width_pixels
+        self.height = int(width_pixels * BASE_ASPECT_RATIO)
+        scale = width_pixels / BASE_WIDTH
         self.plot_left = int(PLOT_LEFT * scale)
         self.plot_top = int(PLOT_TOP * scale)
         self.plot_right = int(PLOT_RIGHT * scale)
@@ -54,6 +62,7 @@ class ChartDimensions:
         self.y_min = Y_MIN
         self.y_max = Y_MAX
         self.use_or_lose_hours = USE_OR_LOSE_HOURS
+        self.scale = scale
 
 
 def find_fedleave_app() -> Path:
@@ -400,7 +409,10 @@ def main() -> None:
     )
     parser.add_argument("--outputFile", required=True, help="Output PNG file path")
     parser.add_argument(
-        "--resolution", type=float, default=1.0, help="Image scale factor (default: 1.0)"
+        "--resolution",
+        type=int,
+        default=BASE_WIDTH,
+        help=f"Image width in pixels (default: {BASE_WIDTH}). Height is scaled maintaining aspect ratio.",
     )
     parser.add_argument(
         "--data-dir", help="fedleave data directory (default: ~/.local/share/fedleave)"
@@ -412,6 +424,12 @@ def main() -> None:
     if not output_path.suffix.lower() == ".png":
         raise SystemExit(
             f"Error: Output file must have .png extension. Got: {output_path}"
+        )
+
+    # Validate resolution is positive
+    if args.resolution <= 0:
+        raise SystemExit(
+            f"Error: Resolution must be a positive number of pixels. Got: {args.resolution}"
         )
 
     data_dir = Path(args.data_dir).expanduser() if args.data_dir else None
@@ -431,7 +449,7 @@ def main() -> None:
 
     points, snapshot = annual_balance_points(args.year, data_dir)
     output = output_path.resolve()
-    dims = ChartDimensions(scale=args.resolution)
+    dims = ChartDimensions(width_pixels=args.resolution)
     render(points, output, dims)
     
     print(
@@ -445,7 +463,7 @@ def main() -> None:
                 "leave_year_start": snapshot.get("leave_year_start"),
                 "leave_year_end": snapshot.get("leave_year_end"),
                 "point_count": len(points),
-                "resolution_scale": args.resolution,
+                "resolution_pixels": args.resolution,
                 "image_dimensions": {
                     "width": dims.width,
                     "height": dims.height,

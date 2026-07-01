@@ -98,14 +98,14 @@ A companion application that generates a PNG chart of annual leave balances thro
 
 ```bash
 AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png
-AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png --resolution 2.0
+AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png --resolution 3220
 ```
 
 ### Options
 
 - `--year YYYY`: Leave year (required if no current leave year can be inferred)
 - `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
-- `--resolution FACTOR`: Image scale factor to adjust dimensions (default: 1.0, e.g., use 2.0 for double resolution)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
 - `--data-dir PATH`: Optional fedleave data directory
 
 ### Requirements
