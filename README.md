@@ -71,6 +71,7 @@ Check what was earned, used, and worked during the pay period containing a date:
 fedleave pay-period --year 2026 --date 2026-06-01
 fedleave pay-period --year 2026 --date 2026-06-01 --daily
 fedleave pay-periods --year 2026
+fedleave month --year 2026 --month 6 --json
 ```
 
 Export or restore data:
@@ -314,6 +315,18 @@ Commands and common options:
 			- Missing automatic annual and sick accrual transactions are posted through the final pay period accrual date before totals are calculated.
 			- `--json` emits one structured summary per pay period.
 
+	month
+		Show calendar days, leave entries, holidays, display lines, and pay-period totals for one month.
+
+		Syntax:
+			fedleave month --year YEAR --month MONTH [--json] [--data-dir PATH]
+
+		Notes:
+			- `--month` is a number from 1 to 12.
+			- The output covers full Sunday-to-Saturday calendar weeks around the display month.
+			- Missing automatic annual and sick accrual transactions are posted through the calendar range before totals are calculated.
+			- `--json` emits month bounds, calendar bounds, daily entries, display lines, holiday names, pay-period totals, and automatic accrual posting details.
+
 activity
 	Show earned, used, and net leave activity for one day.
 
@@ -365,6 +378,7 @@ Commands with native JSON output:
 - `balance`
 - `pay-period`
 - `pay-periods`
+- `month`
 - `activity`
 - `validate`
 - `rollover`

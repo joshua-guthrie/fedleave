@@ -29,6 +29,7 @@ Primary commands:
     balance     Show balances calculated from the ledger
     pay-period  Show earned, used, overtime totals, and balances for a pay period
     pay-periods Show earned, used, overtime totals, and balances for every pay period
+    month       Show calendar-day leave entries and pay periods for a month
     export-data Export config, leave years, and holiday cache to a JSON archive
     import-data Import a JSON archive created by export-data
     correct     Audit-safe correction of transactions
@@ -93,6 +94,9 @@ Command details and examples:
 
     fedleave pay-periods --year YEAR [--json] [--data-dir PATH]
         Show earned/used/worked totals and ending balances for every pay period in the leave year.
+
+    fedleave month --year YEAR --month MONTH [--json] [--data-dir PATH]
+        Show calendar days, leave entries, holidays, display lines, and pay-period totals for one month.
 
     fedleave export-data --output fedleave_backup.json [--data-dir PATH]
         Export config, leave year files, and holiday cache to a portable JSON archive.

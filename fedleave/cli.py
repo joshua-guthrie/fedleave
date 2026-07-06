@@ -8,7 +8,7 @@ from .commands.transactions import add, correct, list_transactions, reconcile, t
 from .commands.starting_balance import starting_balance_set
 from .commands.rollover import rollover
 from .commands.holidays import holidays
-from .commands.balances import balance, daily_activity, pay_period_summary, pay_periods_summary
+from .commands.balances import balance, daily_activity, month, pay_period_summary, pay_periods_summary
 
 app.add_typer(starting_balance_app, name="starting-balance")
 
