@@ -41,6 +41,8 @@ pip install -e .
 
 Run `fedleave --help` after installation.
 
+Date options accept either an ISO date such as `2026-03-10` or the keyword `today`.
+
 ## Typical workflow
 
 Initialize a leave year. The leave year start date should be the first day of pay period 1 for that leave year. Annual leave accrual is configured per pay period; sick leave accrues at 4 hours per pay period.
@@ -167,7 +169,7 @@ Commands and common options:
 		Initialize the data directory and create a leave year JSON file.
 
 		Syntax:
-			fedleave init --year YEAR --leave-year-start YYYY-MM-DD [--annual-accrual FLOAT] [--annual-start FLOAT] [--sick-start FLOAT] [--comp-start FLOAT] [--credit-start FLOAT] [--travel-comp-start FLOAT] [--holiday-source python_holidays|opm_ics] [--holiday-ics-url URL] [--data-dir PATH]
+			fedleave init --year YEAR --leave-year-start YYYY-MM-DD|today [--annual-accrual FLOAT] [--annual-start FLOAT] [--sick-start FLOAT] [--comp-start FLOAT] [--credit-start FLOAT] [--travel-comp-start FLOAT] [--holiday-source python_holidays|opm_ics] [--holiday-ics-url URL] [--data-dir PATH]
 
 		Defaults:
 			--annual-accrual 6.0
@@ -193,7 +195,7 @@ Commands and common options:
 		Add a transaction to a leave year ledger.
 
 		Syntax:
-			fedleave add [--year YEAR] --date YYYY-MM-DD --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids] [--data-dir PATH]
+			fedleave add [--year YEAR] --date YYYY-MM-DD|today --category CATEGORY (--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS) [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids] [--data-dir PATH]
 
 		Defaults:
 			--status planned
@@ -202,6 +204,7 @@ Commands and common options:
 
 		Notes:
 			- `--year` is optional; if omitted, the leave year is inferred from the transaction date using each leave-year file's `leave_year_start` and `leave_year_end`.
+			- `--date` accepts `today` as shorthand for the current local date.
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
 			- `--authoritative` voids active transactions with the same date, category, and direction before adding the new transaction.
 			- `--json` emits the created transaction ID and any replaced transaction IDs.
@@ -217,7 +220,7 @@ Commands and common options:
 		Add or update a transaction from a payroll, clocking, or recurring reconciliation source.
 
 		Syntax:
-			fedleave reconcile --date YYYY-MM-DD --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
+			fedleave reconcile --date YYYY-MM-DD|today --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
 
 		Defaults:
 			--status reconciled
@@ -277,14 +280,14 @@ Commands and common options:
 	Show leave balances for a year, optionally as of a given date, projected to year end, and/or with use-or-lose calculations.
 
 	Syntax:
-		fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--json] [--data-dir PATH]
+		fedleave balance --year YEAR [--as-of YYYY-MM-DD|today] [--project] [--project-to YYYY-MM-DD|today] [--use-or-lose] [--json] [--data-dir PATH]
 
 	Notes:
 		- `--year YEAR` reads the leave year file and computes balances from all recorded transactions.
-		- `--as-of YYYY-MM-DD` computes balances using only transactions on or before that date.
+		- `--as-of YYYY-MM-DD|today` computes balances using only transactions on or before that date.
 		- Missing automatic annual and sick leave accrual transactions are posted through `--as-of`, or through today when `--as-of` is omitted.
 		- `--project` adds projected automatic annual and sick accruals for future pay periods through the leave year end (or via `--project-to`).
-		- `--project-to YYYY-MM-DD` projects accruals only through the specified date instead of year end.
+		- `--project-to YYYY-MM-DD|today` projects accruals only through the specified date instead of year end.
 		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection even when `--project` is not passed.
 		- `--json` emits balances, use-or-lose values, and automatic accrual posting details.
 		- Federal employees earn annual and sick leave automatically each pay period; this tool posts or projects that accrual based on the leave year pay periods and configured accrual rates.
@@ -293,7 +296,7 @@ Commands and common options:
 		Show earned, used, net leave, overtime worked, optional daily activity, and ending balances for the pay period containing a date.
 
 		Syntax:
-			fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--json] [--data-dir PATH]
+			fedleave pay-period --year YEAR --date YYYY-MM-DD|today [--daily] [--json] [--data-dir PATH]
 
 		Notes:
 			- Missing automatic annual and sick accrual transactions for the containing pay period are posted before totals are calculated.
@@ -315,7 +318,7 @@ activity
 	Show earned, used, and net leave activity for one day.
 
 	Syntax:
-		fedleave activity --year YEAR --date YYYY-MM-DD [--json] [--data-dir PATH]
+		fedleave activity --year YEAR --date YYYY-MM-DD|today [--json] [--data-dir PATH]
 
 	Notes:
 		- `--json` emits earned, used, and net activity mappings for the date.
@@ -350,7 +353,7 @@ General rules:
 - Commands that modify data still create backups and perform atomic writes exactly as they do in human-readable mode.
 - Field names are stable for automation. New fields may be added in later versions, so consumers should ignore unknown fields.
 - Hour values are JSON numbers and represent decimal hours.
-- Date values are ISO `YYYY-MM-DD` strings. Timestamps are ISO date-time strings as produced by Python.
+- Date values are ISO `YYYY-MM-DD` strings. CLI date options also accept `today` as shorthand for the current local date. Timestamps are ISO date-time strings as produced by Python.
 - Category and direction values use the same names as the CLI: for example `annual`, `sick`, `credit`, `earned`, `used`, `worked`, and `starting_balance`.
 
 Commands with native JSON output:
@@ -1168,7 +1171,7 @@ Correction (audit-safe):
 
 Alternatively, you can correct by transaction date and type (more human-friendly):
 
-	fedleave correct --search-date YYYY-MM-DD --search-type CATEGORY --hours HOURS --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
+	fedleave correct --search-date YYYY-MM-DD|today --search-type CATEGORY --hours HOURS --reason "TEXT" [--show-transaction-ids] --data-dir /path/to/data
 
 	Example:
 		fedleave correct --search-date 2026-06-01 --search-type annual --hours 3 --reason "Adjust entry" --data-dir ./.data
@@ -1269,4 +1272,3 @@ Notes and caveats:
 
 - PyInstaller build installs PyInstaller and your package into a temporary venv under `.pyinstaller-venv`.
 - The produced binary is not cross-platform; build on the OS you intend to run on.
-

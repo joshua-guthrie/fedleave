@@ -62,7 +62,7 @@ Primary commands:
 
 Command details and examples:
 
-    fedleave init --year YEAR --leave-year-start YYYY-MM-DD [options]
+    fedleave init --year YEAR --leave-year-start YYYY-MM-DD|today [options]
         --annual-accrual FLOAT       Annual leave accrual hours per pay period (default 6)
         --annual-start FLOAT         Starting annual leave hours
         --sick-start FLOAT           Starting sick leave hours
@@ -81,7 +81,7 @@ Command details and examples:
             --holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics \
             --data-dir ~/.local/share/fedleave
 
-    fedleave add --year YEAR --date YYYY-MM-DD --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids]
+    fedleave add --year YEAR --date YYYY-MM-DD|today --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids]
         Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
         --authoritative voids active transactions with the same date, category, and direction before adding the new transaction.
         --json emits the created transaction ID and any replaced transaction IDs.
@@ -93,7 +93,7 @@ Command details and examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
 
-    fedleave reconcile --date YYYY-MM-DD --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
+    fedleave reconcile --date YYYY-MM-DD|today --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
         Infer the leave year from the date, then set the active transaction for that date/category/direction to the requested hours.
         Adds a transaction when no active match exists. Updates exactly one active match and records reconcile_history.
         If multiple active matches exist, rerun with --id to choose the transaction.
@@ -105,13 +105,13 @@ Command details and examples:
         Set a leave year's starting balance for one category and record the prior value in starting_balance_history.
         If the matching carryover_from_previous_year value still equals the old starting balance, it is updated too.
 
-    fedleave balance --year YEAR [--as-of YYYY-MM-DD] [--project] [--project-to YYYY-MM-DD] [--use-or-lose] [--json] [--data-dir PATH]
+    fedleave balance --year YEAR [--as-of YYYY-MM-DD|today] [--project] [--project-to YYYY-MM-DD|today] [--use-or-lose] [--json] [--data-dir PATH]
         Show balances calculated from the ledger.
         --project includes projected future annual and sick leave accruals through year end or --project-to.
         --use-or-lose prints projected annual carryover and annual leave lost above the carryover limit.
         --json emits balances, use-or-lose values, and automatic accrual posting details.
 
-    fedleave pay-period --year YEAR --date YYYY-MM-DD [--daily] [--json] [--data-dir PATH]
+    fedleave pay-period --year YEAR --date YYYY-MM-DD|today [--daily] [--json] [--data-dir PATH]
         Show leave earned/used, overtime worked, optional daily activity, and ending balances for the pay period containing the date.
 
     fedleave pay-periods --year YEAR [--json] [--data-dir PATH]
@@ -174,7 +174,7 @@ starting_balance_app = typer.Typer(help="Manage leave year starting balances.")
 @app.command()
 def init(
     year: int = typer.Option(..., help="Leave year."),
-    leave_year_start: str = typer.Option(..., help="Leave year start date YYYY-MM-DD."),
+    leave_year_start: str = typer.Option(..., help="Leave year start date YYYY-MM-DD or today."),
     annual_accrual: float = typer.Option(6.0, help="Annual leave accrual hours per pay period."),
     annual_start: float = typer.Option(0.0, help="Starting annual leave hours."),
     sick_start: float = typer.Option(0.0, help="Starting sick leave hours."),
@@ -194,7 +194,7 @@ def init(
     from .config import init_config
     # validate leave_year_start early to avoid creating bad state
     try:
-        parse_iso_date(leave_year_start)
+        leave_year_start = parse_iso_date(leave_year_start).isoformat()
     except ValueError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
@@ -221,7 +221,7 @@ def init(
 @app.command()
 def add(
     year: int | None = typer.Option(None, help="Leave year."),
-    date: str = typer.Option(..., help="Transaction date YYYY-MM-DD."),
+    date: str = typer.Option(..., help="Transaction date YYYY-MM-DD or today."),
     category: str = typer.Option(..., help="Leave category."),
     earned: float | None = typer.Option(None, help="Hours earned."),
     used: float | None = typer.Option(None, help="Hours used."),
@@ -334,7 +334,7 @@ def add(
 
 @app.command()
 def reconcile(
-    date: str = typer.Option(..., help="Transaction date YYYY-MM-DD."),
+    date: str = typer.Option(..., help="Transaction date YYYY-MM-DD or today."),
     category: str = typer.Option(..., help="Leave category."),
     direction: str = typer.Option(..., help="Transaction direction."),
     hours: float = typer.Option(..., help="Reconciled hours."),
@@ -608,11 +608,11 @@ def correct(
     id: str | None = typer.Option(None, help="Transaction ID to correct (YYYYMMDD-NNN)."),
     hours: float = typer.Option(..., help="Corrected hours to record."),
     reason: str = typer.Option(..., help="Reason for correction."),
-    date: str | None = typer.Option(None, help="Optional date for replacement transaction YYYY-MM-DD."),
+    date: str | None = typer.Option(None, help="Optional date for replacement transaction YYYY-MM-DD or today."),
     category: str | None = typer.Option(None, help="Optional category for replacement transaction."),
     direction: str | None = typer.Option(None, help="Optional direction for replacement transaction (earned/used/worked/adjusted)."),
     # human-friendly lookup: find transaction by date and type/category
-    search_date: str | None = typer.Option(None, help="Find transaction by this transaction date YYYY-MM-DD."),
+    search_date: str | None = typer.Option(None, help="Find transaction by this transaction date YYYY-MM-DD or today."),
     search_type: str | None = typer.Option(None, help="Find transaction by this transaction category/type."),
     preview: bool = typer.Option(False, help="Preview the correction without writing changes."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
@@ -654,8 +654,8 @@ def correct(
         if search_date and search_type:
             try:
                 search_date = parse_iso_date(search_date).isoformat()
-            except ValueError:
-                console.print("[red]ERROR:[/red] Invalid search date; use YYYY-MM-DD")
+            except ValueError as exc:
+                console.print(f"[red]ERROR:[/red] {exc}")
                 raise typer.Exit(code=2)
 
             try:
@@ -725,6 +725,13 @@ def correct(
     if not isinstance(preview, bool):
         preview = False
 
+    if date:
+        try:
+            date = parse_iso_date(date).isoformat()
+        except ValueError as exc:
+            console.print(f"[red]ERROR:[/red] {exc}")
+            raise typer.Exit(code=2)
+
     if preview:
         if json_output:
             _print_json(
@@ -750,14 +757,7 @@ def correct(
     orig["void"] = True
     orig["void_reason"] = f"Correction: {reason}"
 
-    # validate optional replacement date and sanitize reason before creating replacement
-    if date:
-        try:
-            date = parse_iso_date(date).isoformat()
-        except ValueError as exc:
-            console.print(f"[red]ERROR:[/red] {exc}")
-            raise typer.Exit(code=2)
-
+    # Sanitize reason before creating replacement.
     try:
         reason = sanitize_text(reason, field_name="reason")
     except ValueError as exc:
@@ -1268,9 +1268,9 @@ def void(
 @app.command()
 def balance(
     year: int = typer.Option(..., help="Leave year."),
-    as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD."),
+    as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD or today."),
     project: bool = typer.Option(False, help="Project future automatic annual and sick accrual to the projection date or year end."),
-    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD. Defaults to leave year end when --project is enabled."),
+    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD or today. Defaults to leave year end when --project is enabled."),
     use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
@@ -1293,6 +1293,15 @@ def balance(
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
+
+    try:
+        if as_of:
+            as_of = parse_iso_date(as_of).isoformat()
+        if project_to:
+            project_to = parse_iso_date(project_to).isoformat()
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
 
     accrual_through = as_of or _date.today().isoformat()
     try:
@@ -1357,7 +1366,7 @@ def balance(
 @app.command(name="pay-period")
 def pay_period_summary(
     year: int = typer.Option(..., help="Leave year."),
-    date: str = typer.Option(..., help="Date inside the pay period YYYY-MM-DD."),
+    date: str = typer.Option(..., help="Date inside the pay period YYYY-MM-DD or today."),
     daily: bool = typer.Option(False, help="Show activity for each day in the pay period."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
@@ -1376,6 +1385,7 @@ def pay_period_summary(
         raise typer.Exit(code=1)
 
     try:
+        date = parse_iso_date(date).isoformat()
         pay_period = calculate_pay_period_activity(leave_year, date)["pay_period"]
         accrual_through = pay_period.get("accrual_date") or pay_period.get("end_date")
         added_accruals = ensure_automatic_accruals(leave_year, accrual_through)
@@ -1546,7 +1556,7 @@ def pay_periods_summary(
 @app.command(name="activity")
 def daily_activity(
     year: int = typer.Option(..., help="Leave year."),
-    date: str = typer.Option(..., help="Date to query YYYY-MM-DD."),
+    date: str = typer.Option(..., help="Date to query YYYY-MM-DD or today."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
@@ -1560,6 +1570,12 @@ def daily_activity(
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
+
+    try:
+        date = parse_iso_date(date).isoformat()
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
 
     activity = calculate_daily_activity(leave_year, date)
     if not any(activity.values()):

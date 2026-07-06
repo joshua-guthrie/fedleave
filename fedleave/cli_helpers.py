@@ -55,12 +55,15 @@ def normalize_iso_date(date_str: str) -> str:
 
 
 def parse_iso_date(date_str: str) -> date:
+    if date_str.strip().lower() == "today":
+        return date.today()
+
     normalized = normalize_iso_date(date_str)
     try:
         return date.fromisoformat(normalized)
     except Exception as exc:
         raise ValueError(
-            f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11."
+            f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11, or today."
         ) from exc
 
 
