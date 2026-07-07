@@ -201,7 +201,7 @@ def _is_executable(candidate: Path) -> bool:
     if not candidate.is_file():
         return False
     if sys.platform.startswith("win"):
-        return candidate.suffix.lower() in {".exe", ".bat", ".cmd"} or candidate.name.lower() == "fedleave"
+        return candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
     return os.access(candidate, os.X_OK)
 
 
@@ -225,7 +225,7 @@ def find_fedleave(explicit: Path | None = None) -> Path:
     here = Path(__file__).resolve().parent.parent
     candidate_dirs.extend([here, here / "dist", here.parent / "dist"])
 
-    names = ("fedleave.exe", "fedleave") if sys.platform.startswith("win") else ("fedleave",)
+    names = ("fedleave.exe",) if sys.platform.startswith("win") else ("fedleave",)
     seen: set[Path] = set()
     for directory in candidate_dirs:
         if directory in seen:

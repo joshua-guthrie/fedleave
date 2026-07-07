@@ -10,6 +10,7 @@ from fedleave_month_report_graphic.report import (
     Options,
     OutputError,
     ReportData,
+    _is_executable,
     parse_args,
     parse_month,
     render_svg,
@@ -111,6 +112,17 @@ def test_parse_args_rejects_existing_output_without_overwrite(tmp_path):
 
     with pytest.raises(OutputError):
         parse_args(["--outputFile", str(output)])
+
+
+def test_windows_executable_detection_rejects_extensionless_binary(monkeypatch, tmp_path):
+    monkeypatch.setattr("fedleave_month_report_graphic.report.sys.platform", "win32")
+    linux_binary_name = tmp_path / "fedleave"
+    windows_binary_name = tmp_path / "fedleave.exe"
+    linux_binary_name.write_bytes(b"not a windows executable")
+    windows_binary_name.write_bytes(b"fake exe")
+
+    assert _is_executable(linux_binary_name) is False
+    assert _is_executable(windows_binary_name) is True
 
 
 def test_render_svg_omits_private_transaction_fields_and_zero_values():
