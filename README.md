@@ -1276,6 +1276,7 @@ pwsh .\scripts\build_pyinstaller.ps1
 3. Output:
 
 - The built executables will appear in `dist/` and are platform-specific. Build on the target platform or use an appropriate builder.
+- On Windows, the PowerShell build script verifies these files exist directly in `dist/`: `fedleave.exe`, `AnnualLeaveChartForTheYear.exe`, and `SickLeaveChartForTheYear.exe`.
 - On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
 
 ```bash

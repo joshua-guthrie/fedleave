@@ -11,6 +11,42 @@ $VENV_DIR = Join-Path $HERE ".pyinstaller-venv"
 $DIST_DIR = [System.IO.Path]::GetFullPath($Dist)
 New-Item -ItemType Directory -Force -Path $DIST_DIR | Out-Null
 
+function Move-BuildOutputToDist {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AppName
+    )
+
+    $expectedExe = Join-Path $DIST_DIR "$AppName.exe"
+    if (Test-Path $expectedExe) {
+        return
+    }
+
+    $nestedExe = Join-Path (Join-Path $DIST_DIR $AppName) "$AppName.exe"
+    if (Test-Path $nestedExe) {
+        $nestedDir = Join-Path $DIST_DIR $AppName
+        Get-ChildItem -Force -Path $nestedDir | ForEach-Object {
+            if ($_.FullName -ne $nestedExe) {
+                Move-Item -Force -Path $_.FullName -Destination (Join-Path $DIST_DIR $_.Name)
+            }
+        }
+        Move-Item -Force -Path $nestedExe -Destination $expectedExe
+        Remove-Item -Force -Recurse -Path $nestedDir
+    }
+}
+
+function Assert-DistExecutable {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AppName
+    )
+
+    $expectedExe = Join-Path $DIST_DIR "$AppName.exe"
+    if (-not (Test-Path $expectedExe)) {
+        throw "Expected Windows executable was not created in dist: $expectedExe"
+    }
+}
+
 Write-Host "Building fedleave with PyInstaller (venv: $VENV_DIR)"
 python -m venv "$VENV_DIR"
 & "$VENV_DIR\Scripts\python.exe" -m pip install --upgrade pip
@@ -38,6 +74,7 @@ $PYINSTALLER_ARGS = @(
 )
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @PYINSTALLER_ARGS
+Move-BuildOutputToDist -AppName "fedleave"
 
 # Build AnnualLeaveChartForTheYear companion application
 $CHART_ENTRY = Join-Path $HERE ".pyinstaller_chart_entry.py"
@@ -64,6 +101,7 @@ $CHART_ARGS = @(
 )
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @CHART_ARGS
+Move-BuildOutputToDist -AppName "AnnualLeaveChartForTheYear"
 
 # Build SickLeaveChartForTheYear companion application
 $SICK_CHART_ENTRY = Join-Path $HERE ".pyinstaller_sick_chart_entry.py"
@@ -90,8 +128,13 @@ $SICK_CHART_ARGS = @(
 )
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @SICK_CHART_ARGS
+Move-BuildOutputToDist -AppName "SickLeaveChartForTheYear"
+
+Assert-DistExecutable -AppName "fedleave"
+Assert-DistExecutable -AppName "AnnualLeaveChartForTheYear"
+Assert-DistExecutable -AppName "SickLeaveChartForTheYear"
 
 Write-Host "Build complete. Binaries in $DIST_DIR"
-Write-Host "  - fedleave"
-Write-Host "  - AnnualLeaveChartForTheYear"
-Write-Host "  - SickLeaveChartForTheYear"
+Write-Host "  - fedleave.exe"
+Write-Host "  - AnnualLeaveChartForTheYear.exe"
+Write-Host "  - SickLeaveChartForTheYear.exe"
