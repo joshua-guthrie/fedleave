@@ -97,7 +97,29 @@ pyinstaller $ONEFILE \
   --specpath "$HERE/.pyinstaller-spec" \
   "$SICK_CHART_ENTRY"
 
+# Build fedleaveMonthReportGraphic companion application
+MONTH_REPORT_ENTRY="$HERE/.pyinstaller_month_report_entry.py"
+cat > "$MONTH_REPORT_ENTRY" <<'PY'
+from fedleave_month_report_graphic.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+pyinstaller $ONEFILE \
+  --name fedleaveMonthReportGraphic \
+  --console \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --distpath "$DIST_DIR" \
+  --workpath "$HERE/.pyinstaller-build" \
+  --specpath "$HERE/.pyinstaller-spec" \
+  "$MONTH_REPORT_ENTRY"
+
 echo "Build complete. Binaries in $DIST_DIR"
 echo "  - fedleave"
 echo "  - AnnualLeaveChartForTheYear"
 echo "  - SickLeaveChartForTheYear"
+echo "  - fedleaveMonthReportGraphic"

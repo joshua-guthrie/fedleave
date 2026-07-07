@@ -156,6 +156,51 @@ The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of t
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
+## Companion Application: fedleaveMonthReportGraphic
+
+A companion application that generates a landscape 16:9 graphical month report. It treats `fedleave` as the data source, calls the public CLI commands, and does not read leave-year data files directly. PNG is the primary output format and SVG is also supported.
+
+The report includes:
+
+- Calendar grid with leave entries, holidays, inferred pay days, pay-period-end markers, and today marker
+- Pay-period summary for periods touching the displayed month
+- As-of-today balance table
+- Leave category abbreviation table
+
+Transaction IDs, descriptions, sources, statuses, and data file paths are intentionally omitted from the report.
+
+### Usage
+
+```bash
+fedleaveMonthReportGraphic --year 2026 --month July --outputFile july-report.png
+fedleaveMonthReportGraphic --year 2026 --month 7 --outputFile july-report.svg
+fedleaveMonthReportGraphic --outputFile current-month.png --resolution 3840
+```
+
+If both `--year` and `--month` are omitted, the current local year and month are used. If either one is provided, both are required.
+
+### Options
+
+- `--outputFile PATH`: Output file path (required; must end with `.png` or `.svg`)
+- `--year YYYY`: Calendar year to report
+- `--month MONTH`: Month number (`1` through `12`) or full English month name such as `July`
+- `--resolution PIXELS`: Output image width in pixels; height is 16:9 landscape (default: 1920, minimum: 800, maximum: 7680)
+- `--data-dir PATH`: Optional `fedleave` data directory override
+- `--fedleave PATH`: Explicit path to the `fedleave` executable
+- `--overwrite`: Replace an existing output file
+- `--verbose`: Print diagnostic information after rendering
+- `--quiet`: Suppress non-error output
+
+### Requirements
+
+The `fedleaveMonthReportGraphic` application requires `fedleave` to be available in one of these locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the `dist/` directory alongside this application when built from source
+
+If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
+
 ## CLI Detailed Help
 
 This section provides complete usage examples and command syntax for the `fedleave` CLI.
@@ -1276,11 +1321,11 @@ pwsh .\scripts\build_pyinstaller.ps1
 3. Output:
 
 - The built executables will appear in `dist/` and are platform-specific. Build on the target platform or use an appropriate builder.
-- On Windows, the PowerShell build script verifies these files exist directly in `dist/`: `fedleave.exe`, `AnnualLeaveChartForTheYear.exe`, and `SickLeaveChartForTheYear.exe`.
+- On Windows, the PowerShell build script verifies these files exist directly in `dist/`: `fedleave.exe`, `AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear.exe`, and `fedleaveMonthReportGraphic.exe`.
 - On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
 
 ```bash
-chmod +x ./dist/fedleave ./dist/AnnualLeaveChartForTheYear ./dist/SickLeaveChartForTheYear
+chmod +x ./dist/fedleave ./dist/AnnualLeaveChartForTheYear ./dist/SickLeaveChartForTheYear ./dist/fedleaveMonthReportGraphic
 ```
 
 Notes and caveats:

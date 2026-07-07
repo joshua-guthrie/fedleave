@@ -13,13 +13,14 @@ license = "MIT"
 fedleave = "fedleave.__main__:main"
 AnnualLeaveChartForTheYear = "annual_leave_chart.__main__:main"
 SickLeaveChartForTheYear = "sick_leave_chart.__main__:main"
+fedleaveMonthReportGraphic = "fedleave_month_report_graphic.__main__:main"
 
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["fedleave", "annual_leave_chart", "sick_leave_chart"]
+include = ["fedleave", "annual_leave_chart", "sick_leave_chart", "fedleave_month_report_graphic"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

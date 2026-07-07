@@ -130,11 +130,39 @@ $SICK_CHART_ARGS = @(
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @SICK_CHART_ARGS
 Move-BuildOutputToDist -AppName "SickLeaveChartForTheYear"
 
+# Build fedleaveMonthReportGraphic companion application
+$MONTH_REPORT_ENTRY = Join-Path $HERE ".pyinstaller_month_report_entry.py"
+@"
+from fedleave_month_report_graphic.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $MONTH_REPORT_ENTRY -Encoding utf8
+
+$MONTH_REPORT_ARGS = @(
+    if ($OneFile) { '--onefile' }
+    '--name', 'fedleaveMonthReportGraphic'
+    '--console'
+    '--hidden-import', 'PIL'
+    '--hidden-import', 'PIL.Image'
+    '--hidden-import', 'PIL.ImageDraw'
+    '--hidden-import', 'PIL.ImageFont'
+    '--distpath', "$DIST_DIR"
+    '--workpath', "$HERE\.pyinstaller-build"
+    '--specpath', "$HERE\.pyinstaller-spec"
+    "$MONTH_REPORT_ENTRY"
+)
+
+& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @MONTH_REPORT_ARGS
+Move-BuildOutputToDist -AppName "fedleaveMonthReportGraphic"
+
 Assert-DistExecutable -AppName "fedleave"
 Assert-DistExecutable -AppName "AnnualLeaveChartForTheYear"
 Assert-DistExecutable -AppName "SickLeaveChartForTheYear"
+Assert-DistExecutable -AppName "fedleaveMonthReportGraphic"
 
 Write-Host "Build complete. Binaries in $DIST_DIR"
 Write-Host "  - fedleave.exe"
 Write-Host "  - AnnualLeaveChartForTheYear.exe"
 Write-Host "  - SickLeaveChartForTheYear.exe"
+Write-Host "  - fedleaveMonthReportGraphic.exe"

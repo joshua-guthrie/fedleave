@@ -55,3 +55,22 @@ def test_companion_chart_apps_generate_pngs_from_source(tmp_path):
         assert payload["year"] == 2026
         assert payload["point_count"] == 26
         assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+    month_png = tmp_path / "month.png"
+    result = _run(
+        [
+            sys.executable,
+            "-m",
+            "fedleave_month_report_graphic",
+            "--year",
+            "2026",
+            "--month",
+            "July",
+            "--outputFile",
+            str(month_png),
+            "--data-dir",
+            str(data_dir),
+        ]
+    )
+    assert "Created output:" in result.stdout
+    assert month_png.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
