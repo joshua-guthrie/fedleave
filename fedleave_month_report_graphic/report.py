@@ -583,9 +583,13 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
 
 
 def load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        windows_fonts / ("arialbd.ttf" if bold else "arial.ttf"),
+        windows_fonts / ("segoeuib.ttf" if bold else "segoeui.ttf"),
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
     ]
     for candidate in candidates:
         if Path(candidate).exists():

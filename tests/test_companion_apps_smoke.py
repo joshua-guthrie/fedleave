@@ -5,7 +5,13 @@ import sys
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, text=True, capture_output=True, check=True, **kwargs)
+    result = subprocess.run(cmd, text=True, capture_output=True, check=False, **kwargs)
+    if result.returncode != 0:
+        raise AssertionError(
+            "Command failed with exit code "
+            f"{result.returncode}: {cmd}\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+        )
+    return result
 
 
 def test_companion_chart_apps_generate_pngs_from_source(tmp_path):
