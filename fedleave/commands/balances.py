@@ -148,6 +148,10 @@ def _pay_periods_for_range(
     return rows
 
 
+def _dates_from_pay_periods(pay_periods: list[dict], field: str) -> set[str]:
+    return {str(period.get(field)) for period in pay_periods if period.get(field)}
+
+
 @app.command()
 def balance(
     year: int = typer.Option(..., help="Leave year."),
@@ -474,6 +478,24 @@ def month(
 
     holidays = _holiday_names_by_date(year, data_dir)
     transactions = _transactions_by_date(leave_year, calendar_start, calendar_end)
+    pay_period_rows = _pay_periods_for_range(
+        leave_year,
+        calendar_start,
+        calendar_end,
+        month_start,
+        month_end,
+    )
+    all_pay_dates = _dates_from_pay_periods(pay_period_rows, "pay_date")
+    pay_dates = set()
+    for pay_date in all_pay_dates:
+        try:
+            parsed_pay_date = parse_iso_date(pay_date)
+        except ValueError:
+            continue
+        if calendar_start <= parsed_pay_date <= calendar_end:
+            pay_dates.add(pay_date)
+    pay_period_end_dates = _dates_from_pay_periods(pay_period_rows, "end")
+    today = _date.today()
 
     days = []
     current = calendar_start
@@ -485,21 +507,49 @@ def month(
                 "date": date_key,
                 "in_display_month": month_start <= current <= month_end,
                 "holiday_name": holidays.get(date_key),
+                "is_today": current == today,
+                "is_payday": date_key in pay_dates,
+                "is_pay_period_end": date_key in pay_period_end_dates,
                 "entries": entries,
                 "display_lines": [_display_line(entry) for entry in entries],
             }
         )
         current += _timedelta(days=1)
 
+    today_balance = calculate_balances(leave_year, until_date=today.isoformat())
+    projected_balances = calculate_balances(
+        leave_year,
+        until_date=today.isoformat(),
+        include_projected=True,
+        project_until=leave_year.get("leave_year_end"),
+    )
+    try:
+        cfg = load_config(data_dir)
+    except FileNotFoundError:
+        cfg = None
+    use_or_lose = calculate_use_or_lose(leave_year, projected_balances, cfg)
+
     result = {
         "year": year,
         "month": month,
+        "today": today.isoformat(),
         "month_start": month_start.isoformat(),
         "month_end": month_end.isoformat(),
         "calendar_start": calendar_start.isoformat(),
         "calendar_end": calendar_end.isoformat(),
         "days": days,
-        "pay_periods": _pay_periods_for_range(leave_year, calendar_start, calendar_end, month_start, month_end),
+        "pay_periods": pay_period_rows,
+        "pay_dates": sorted(pay_dates),
+        "pay_period_end_dates": sorted(pay_period_end_dates),
+        "balance_as_of_today": {
+            "as_of": today.isoformat(),
+            "balances": dict(sorted(today_balance.items())),
+        },
+        "projected_balance": {
+            "project_to": leave_year.get("leave_year_end"),
+            "balances": dict(sorted(projected_balances.items())),
+            "use_or_lose": use_or_lose,
+        },
         "automatic_accruals_posted": added_accruals,
         "automatic_accruals_posted_through": calendar_end.isoformat(),
     }
@@ -512,11 +562,23 @@ def month(
     if added_accruals:
         console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {calendar_end}.")
     for day in days:
-        if not day["in_display_month"] and not day["entries"] and not day["holiday_name"]:
+        if (
+            not day["in_display_month"]
+            and not day["entries"]
+            and not day["holiday_name"]
+            and not day["is_payday"]
+            and not day["is_pay_period_end"]
+        ):
             continue
         details = list(day["display_lines"])
         if day["holiday_name"]:
             details.append(str(day["holiday_name"]))
+        if day["is_payday"]:
+            details.append("Pay day")
+        if day["is_pay_period_end"]:
+            details.append("Pay period end")
+        if day["is_today"]:
+            details.append("Today")
         console.print(f"  {day['date']}: {', '.join(details) if details else 'no activity'}")
 
 

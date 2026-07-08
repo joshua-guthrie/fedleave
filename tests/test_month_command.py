@@ -66,6 +66,7 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
 
     assert result["year"] == 2026
     assert result["month"] == 7
+    assert "today" in result
     assert result["month_start"] == "2026-07-01"
     assert result["month_end"] == "2026-07-31"
     assert result["calendar_start"] == "2026-06-28"
@@ -75,6 +76,7 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
     july_first = next(day for day in result["days"] if day["date"] == "2026-07-01")
     assert july_first["in_display_month"] is True
     assert "holiday_name" in july_first
+    assert {"is_today", "is_payday", "is_pay_period_end"} <= set(july_first)
     assert july_first["entries"] == [
         {
             "id": "20260701-001",
@@ -99,6 +101,16 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
 
     assert len(result["days"]) == 35
     assert any(day["date"] == "2026-06-28" and not day["in_display_month"] for day in result["days"])
+    assert next(day for day in result["days"] if day["date"] == "2026-07-17")["is_payday"] is True
+    assert next(day for day in result["days"] if day["date"] == "2026-07-31")["is_payday"] is True
+    assert next(day for day in result["days"] if day["date"] == "2026-07-24")["is_payday"] is False
+    assert next(day for day in result["days"] if day["date"] == "2026-07-11")["is_pay_period_end"] is True
+    assert result["pay_dates"] == ["2026-07-17", "2026-07-31"]
+    assert "balance_as_of_today" in result
+    assert "balances" in result["balance_as_of_today"]
+    assert "projected_balance" in result
+    assert "balances" in result["projected_balance"]
+    assert "use_or_lose" in result["projected_balance"]
     assert any(period["touches_display_month"] for period in result["pay_periods"])
     assert all({"number", "start", "end", "pay_date", "totals"} <= set(period) for period in result["pay_periods"])
     assert any(period["end"] == "2026-07-11" and period["pay_date"] == "2026-07-17" for period in result["pay_periods"])

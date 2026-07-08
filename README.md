@@ -374,7 +374,7 @@ Commands and common options:
 			- `--month` is a number from 1 to 12.
 			- The output covers full Sunday-to-Saturday calendar weeks around the display month.
 			- Missing automatic annual and sick accrual transactions are posted through the calendar range before totals are calculated.
-			- `--json` emits month bounds, calendar bounds, daily entries, display lines, holiday names, pay-period totals, and automatic accrual posting details.
+			- `--json` emits month bounds, calendar bounds, daily entries, display lines, holiday names, pay days, pay-period-end dates, pay-period totals, current balances, projected balances, use-or-lose values, and automatic accrual posting details.
 
 activity
 	Show earned, used, and net leave activity for one day.
@@ -976,6 +976,92 @@ Fields:
 - `pay_periods[].ending_balances`: Balance map through that pay period's end date.
 - `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the summary.
 - `automatic_accruals_posted_through`: Final pay period accrual date or end date.
+
+### `month --json`
+
+Command:
+
+```bash
+fedleave month --year 2026 --month 7 --json
+```
+
+Selected output:
+
+```json
+{
+  "year": 2026,
+  "month": 7,
+  "today": "2026-07-07",
+  "month_start": "2026-07-01",
+  "month_end": "2026-07-31",
+  "calendar_start": "2026-06-28",
+  "calendar_end": "2026-08-01",
+  "days": [
+    {
+      "date": "2026-07-17",
+      "in_display_month": true,
+      "holiday_name": null,
+      "is_today": false,
+      "is_payday": true,
+      "is_pay_period_end": false,
+      "entries": [],
+      "display_lines": []
+    }
+  ],
+  "pay_periods": [
+    {
+      "number": 14,
+      "start": "2026-07-12",
+      "end": "2026-07-25",
+      "pay_date": "2026-07-31",
+      "touches_display_month": true,
+      "totals": {}
+    }
+  ],
+  "pay_dates": ["2026-07-17", "2026-07-31"],
+  "pay_period_end_dates": ["2026-07-11", "2026-07-25"],
+  "balance_as_of_today": {
+    "as_of": "2026-07-07",
+    "balances": {
+      "annual": 80.0,
+      "sick": 64.0
+    }
+  },
+  "projected_balance": {
+    "project_to": "2027-01-09",
+    "balances": {
+      "annual": 152.0,
+      "sick": 112.0
+    },
+    "use_or_lose": {
+      "carryover_limit": 240.0,
+      "annual_carryover": 152.0,
+      "use_or_lose": 0.0
+    }
+  }
+}
+```
+
+Fields:
+
+- `year`: Requested leave year.
+- `month`: Requested calendar month number.
+- `today`: Local date when the command ran.
+- `month_start` / `month_end`: First and last date in the requested month.
+- `calendar_start` / `calendar_end`: Sunday-to-Saturday display range around the requested month.
+- `days`: One object per calendar day in the display range.
+- `days[].is_payday`: `true` on pay dates. By default, pay dates are Fridays in the week where the pay period does not end.
+- `days[].is_pay_period_end`: `true` on pay period ending dates.
+- `days[].is_today`: `true` on the local date when the command ran.
+- `pay_periods`: Pay periods touching the calendar display range, including `pay_date` and period totals.
+- `pay_dates`: Pay dates in the calendar display range.
+- `pay_period_end_dates`: Pay period ending dates in the calendar display range.
+- `balance_as_of_today`: Balance-map payload for today.
+- `projected_balance`: Year-end projected balance payload, including use-or-lose values.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the month.
+- `automatic_accruals_posted_through`: Calendar display end date used for automatic accrual posting.
+
+The `fedleaveMonthReportGraphic` companion application consumes this payload directly. For compatibility with older `fedleave` executables, it can still calculate balances with separate `balance --json` calls when the enriched balance fields are missing.
 
 ### `activity --json`
 

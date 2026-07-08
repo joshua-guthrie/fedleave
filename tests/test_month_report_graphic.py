@@ -12,6 +12,7 @@ from fedleave_month_report_graphic.report import (
     PAYDAY_STROKE,
     ReportData,
     _is_executable,
+    load_report_data,
     parse_args,
     parse_month,
     render_svg,
@@ -150,6 +151,35 @@ def test_render_svg_uses_backend_pay_dates_not_every_friday():
     without_payday = render_svg(data_without_payday, 1920)
 
     assert with_payday.count(f'stroke="{PAYDAY_STROKE}"') == without_payday.count(f'stroke="{PAYDAY_STROKE}"') + 1
+
+
+def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
+    calls = []
+    month_payload = _report_data().month_json
+    month_payload["balance_as_of_today"] = {"as_of": "2026-07-01", "balances": {"annual": 124.0}}
+    month_payload["projected_balance"] = {
+        "project_to": "2027-01-09",
+        "balances": {"annual": 180.0},
+        "use_or_lose": {"use_or_lose": 0.0},
+    }
+
+    monkeypatch.setattr("fedleave_month_report_graphic.report.find_fedleave", lambda explicit=None: tmp_path / "fedleave")
+
+    def fake_run_fedleave(_fedleave, args):
+        calls.append(args)
+        if args[0] == "month":
+            return month_payload
+        raise AssertionError(f"Unexpected extra fedleave call: {args}")
+
+    monkeypatch.setattr("fedleave_month_report_graphic.report.run_fedleave", fake_run_fedleave)
+
+    _fedleave, data = load_report_data(
+        Options(tmp_path / "month.png", 2026, 7, 1920, None, None, False, False, False)
+    )
+
+    assert [call[0] for call in calls] == ["month"]
+    assert data.balance_json["balances"]["annual"] == 124.0
+    assert data.projected_json["balances"]["annual"] == 180.0
 
 
 def test_write_output_creates_svg_and_png(tmp_path):

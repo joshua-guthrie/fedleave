@@ -280,21 +280,20 @@ def load_report_data(options: Options) -> tuple[Path, ReportData]:
         fedleave,
         ["month", "--year", str(options.year), "--month", str(options.month), "--json", *common],
     )
-    balance_json = run_fedleave(
-        fedleave,
-        ["balance", "--year", str(options.year), "--as-of", "today", "--json", *common],
-    )
-    projected_json = run_fedleave(
-        fedleave,
-        ["balance", "--year", str(options.year), "--project", "--use-or-lose", "--json", *common],
-    )
-    try:
-        pay_periods_json = run_fedleave(
+    balance_json = month_json.get("balance_as_of_today")
+    if not isinstance(balance_json, dict) or "balances" not in balance_json:
+        balance_json = run_fedleave(
             fedleave,
-            ["pay-periods", "--year", str(options.year), "--json", *common],
+            ["balance", "--year", str(options.year), "--as-of", "today", "--json", *common],
         )
-    except MonthReportError:
-        pay_periods_json = None
+
+    projected_json = month_json.get("projected_balance")
+    if not isinstance(projected_json, dict) or "balances" not in projected_json:
+        projected_json = run_fedleave(
+            fedleave,
+            ["balance", "--year", str(options.year), "--project", "--use-or-lose", "--json", *common],
+        )
+    pay_periods_json = None
 
     return fedleave, ReportData(
         month_json=month_json,
@@ -394,11 +393,16 @@ def _six_week_days(month_json: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _pay_period_end_dates(month_json: dict[str, Any]) -> set[str]:
-    return {str(period.get("end")) for period in month_json.get("pay_periods", []) if period.get("end")}
+    from_days = {str(day.get("date")) for day in month_json.get("days", []) if day.get("is_pay_period_end")}
+    from_periods = {str(period.get("end")) for period in month_json.get("pay_periods", []) if period.get("end")}
+    return from_days | from_periods
 
 
 def _pay_dates(month_json: dict[str, Any]) -> set[str]:
-    return {str(period.get("pay_date")) for period in month_json.get("pay_periods", []) if period.get("pay_date")}
+    from_days = {str(day.get("date")) for day in month_json.get("days", []) if day.get("is_payday")}
+    from_periods = {str(period.get("pay_date")) for period in month_json.get("pay_periods", []) if period.get("pay_date")}
+    from_top_level = {str(pay_date) for pay_date in month_json.get("pay_dates", []) if pay_date}
+    return from_days | from_periods | from_top_level
 
 
 def render_svg(data: ReportData, width: int) -> str:
