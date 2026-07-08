@@ -17,6 +17,7 @@ from ..ledger import (
     calculate_use_or_lose,
     ensure_automatic_accruals,
 )
+from ..payperiods import normalize_pay_period, pay_period_pay_date
 from ..storage import load_json
 from ..storage import write_json
 
@@ -139,6 +140,7 @@ def _pay_periods_for_range(
                 "number": pay_period.get("pay_period_number"),
                 "start": period_start.isoformat(),
                 "end": period_end.isoformat(),
+                "pay_date": pay_period_pay_date(pay_period),
                 "touches_display_month": not (period_end < month_start or period_start > month_end),
                 "totals": totals,
             }
@@ -290,12 +292,14 @@ def pay_period_summary(
             current += _timedelta(days=1)
 
     if json_output:
+        activity_output = dict(activity)
+        activity_output["pay_period"] = normalize_pay_period(activity["pay_period"])
         _print_json(
             {
                 "year": year,
                 "date": date,
-                "pay_period": pay_period,
-                "activity": activity,
+                "pay_period": normalize_pay_period(pay_period),
+                "activity": activity_output,
                 "daily_activity": daily_activity_rows if daily else None,
                 "ending_balances": dict(sorted(ending_balances.items())),
                 "automatic_accruals_posted": added_accruals,
@@ -391,11 +395,13 @@ def pay_periods_summary(
 
     for pay_period in pay_periods:
         activity = calculate_pay_period_activity(leave_year, pay_period["start_date"])
+        activity_output = dict(activity)
+        activity_output["pay_period"] = normalize_pay_period(activity["pay_period"])
         balances = calculate_balances(leave_year, until_date=pay_period["end_date"])
         summaries.append(
             {
-                "pay_period": pay_period,
-                "activity": activity,
+                "pay_period": normalize_pay_period(pay_period),
+                "activity": activity_output,
                 "ending_balances": dict(sorted(balances.items())),
             }
         )

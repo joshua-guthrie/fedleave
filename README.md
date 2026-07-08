@@ -162,7 +162,7 @@ A companion application that generates a landscape 16:9 graphical month report. 
 
 The report includes:
 
-- Calendar grid with leave entries, holidays, inferred pay days, pay-period-end markers, and today marker
+- Calendar grid with leave entries, holidays, pay days, pay-period-end markers, and today marker
 - Pay-period summary for periods touching the displayed month
 - As-of-today balance table
 - Leave category abbreviation table
@@ -200,6 +200,10 @@ The `fedleaveMonthReportGraphic` application requires `fedleave` to be available
 3. In the `dist/` directory alongside this application when built from source
 
 If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
+
+### Pay Days
+
+New leave-year files store a `pay_date` on each pay period. Existing leave-year files remain supported; when `pay_date` is missing, fedleave infers it as six days after the pay period end date, which matches the every-other-Friday pay date for the standard Sunday-through-Saturday biweekly pay periods generated from the OPM leave-year schedule. OPM notes that some agency payroll systems use different pay-period schedules, so manually edited or imported data may provide explicit `pay_date` values when needed.
 
 ## CLI Detailed Help
 
@@ -930,6 +934,7 @@ Success output:
         "pay_period_number": 1,
         "start_date": "2026-01-11",
         "end_date": "2026-01-24",
+        "pay_date": "2026-01-30",
         "accrual_date": "2026-01-24"
       },
       "activity": {
@@ -937,6 +942,7 @@ Success output:
           "pay_period_number": 1,
           "start_date": "2026-01-11",
           "end_date": "2026-01-24",
+          "pay_date": "2026-01-30",
           "accrual_date": "2026-01-24"
         },
         "earned": {
@@ -965,7 +971,7 @@ Fields:
 
 - `year`: Requested leave year.
 - `pay_periods`: List of pay period summaries in leave-year order.
-- `pay_periods[].pay_period`: Pay period object.
+- `pay_periods[].pay_period`: Pay period object, including `pay_date`. Older data files that do not contain `pay_date` are normalized in command output.
 - `pay_periods[].activity`: Activity object for that pay period.
 - `pay_periods[].ending_balances`: Balance map through that pay period's end date.
 - `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the summary.

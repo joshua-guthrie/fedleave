@@ -9,6 +9,7 @@ from fedleave_month_report_graphic.report import (
     ArgumentError,
     Options,
     OutputError,
+    PAYDAY_STROKE,
     ReportData,
     _is_executable,
     parse_args,
@@ -63,6 +64,7 @@ def _report_data() -> ReportData:
                     "number": 14,
                     "start": "2026-06-28",
                     "end": "2026-07-11",
+                    "pay_date": "2026-07-17",
                     "totals": {
                         "annual": {"earned": 6.0, "used": 2.0, "worked": 0.0, "net": 4.0},
                         "credit": {"earned": 0.0, "used": 0.0, "worked": 0.0, "net": 0.0},
@@ -137,6 +139,17 @@ def test_render_svg_omits_private_transaction_fields_and_zero_values():
     assert "planned" not in svg
     assert "Zero-value detail" not in svg
     assert not re.search(r">\+?0(?:\.0+)?<", svg)
+
+
+def test_render_svg_uses_backend_pay_dates_not_every_friday():
+    data = _report_data()
+    with_payday = render_svg(data, 1920)
+
+    data_without_payday = _report_data()
+    data_without_payday.month_json["pay_periods"][0].pop("pay_date")
+    without_payday = render_svg(data_without_payday, 1920)
+
+    assert with_payday.count(f'stroke="{PAYDAY_STROKE}"') == without_payday.count(f'stroke="{PAYDAY_STROKE}"') + 1
 
 
 def test_write_output_creates_svg_and_png(tmp_path):

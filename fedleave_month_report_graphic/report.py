@@ -372,6 +372,8 @@ def _six_week_days(month_json: dict[str, Any]) -> list[dict[str, Any]]:
     if not days:
         return []
     mapped = _day_map(days)
+    year = int(month_json.get("year", date.fromisoformat(str(days[0]["date"])).year))
+    month = int(month_json.get("month", date.fromisoformat(str(days[0]["date"])).month))
     start = date.fromisoformat(str(days[0]["date"]))
     while len(days) < 42:
         next_date = start.fromordinal(start.toordinal() + len(days))
@@ -381,7 +383,7 @@ def _six_week_days(month_json: dict[str, Any]) -> list[dict[str, Any]]:
                 key,
                 {
                     "date": key,
-                    "in_display_month": False,
+                    "in_display_month": next_date.year == year and next_date.month == month,
                     "holiday_name": None,
                     "entries": [],
                     "display_lines": [],
@@ -395,8 +397,8 @@ def _pay_period_end_dates(month_json: dict[str, Any]) -> set[str]:
     return {str(period.get("end")) for period in month_json.get("pay_periods", []) if period.get("end")}
 
 
-def _is_payday(day: date) -> bool:
-    return day.weekday() == 4
+def _pay_dates(month_json: dict[str, Any]) -> set[str]:
+    return {str(period.get("pay_date")) for period in month_json.get("pay_periods", []) if period.get("pay_date")}
 
 
 def render_svg(data: ReportData, width: int) -> str:
@@ -438,6 +440,7 @@ def _render_calendar_svg(month_json: dict[str, Any], today: date) -> list[str]:
     cell_h = (h - header_h) / 6
     days = _six_week_days(month_json)
     pp_end_dates = _pay_period_end_dates(month_json)
+    pay_dates = _pay_dates(month_json)
     parts = [
         _svg_text(28, 78, "Calendar", 22, weight=700),
         f'<rect x="{x0}" y="{y0}" width="{w}" height="{h}" fill="{WHITE}" stroke="{BORDER}" stroke-width="2" rx="6"/>',
@@ -455,7 +458,7 @@ def _render_calendar_svg(month_json: dict[str, Any], today: date) -> list[str]:
         in_month = bool(day.get("in_display_month"))
         is_today = day_date == today
         is_holiday = bool(day.get("holiday_name"))
-        is_payday = _is_payday(day_date) and in_month
+        is_payday = str(day.get("date")) in pay_dates and in_month
         is_pp_end = str(day.get("date")) in pp_end_dates
 
         fill = WHITE if in_month else OUTSIDE
@@ -633,6 +636,7 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
         rect((x, y0, x + cell_w, y0 + 34), fill=HEADER)
         text(x + cell_w / 2, y0 + 17, name, font_obj=bold, anchor="mm")
     pp_end_dates = _pay_period_end_dates(month_json)
+    pay_dates = _pay_dates(month_json)
     for index, day in enumerate(_six_week_days(month_json)):
         row, col = divmod(index, 7)
         x, y = x0 + col * cell_w, y0 + 34 + row * cell_h
@@ -642,7 +646,7 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
         outline, line_w = GRID, 1
         if in_month and col in {0, 6}:
             fill = WEEKEND
-        if _is_payday(day_date) and in_month:
+        if str(day["date"]) in pay_dates and in_month:
             fill, outline, line_w = PAYDAY_FILL, PAYDAY_STROKE, 3
         if day.get("holiday_name"):
             fill, outline, line_w = HOLIDAY_FILL, HOLIDAY_STROKE, 3

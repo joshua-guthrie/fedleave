@@ -100,4 +100,5 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
     assert len(result["days"]) == 35
     assert any(day["date"] == "2026-06-28" and not day["in_display_month"] for day in result["days"])
     assert any(period["touches_display_month"] for period in result["pay_periods"])
-    assert all({"number", "start", "end", "totals"} <= set(period) for period in result["pay_periods"])
+    assert all({"number", "start", "end", "pay_date", "totals"} <= set(period) for period in result["pay_periods"])
+    assert any(period["end"] == "2026-07-11" and period["pay_date"] == "2026-07-17" for period in result["pay_periods"])
