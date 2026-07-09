@@ -211,6 +211,27 @@ def test_render_svg_shows_year_end_use_or_lose_when_annual_exceeds_carryover():
     assert ">60<" in svg
 
 
+def test_render_svg_shows_decimal_use_or_lose_from_issue_30_backup():
+    data = _report_data()
+    data.balance_json = {"balances": {"annual": 180.35, "sick": 589.85}}
+    data.projected_json = {
+        "project_to": "2027-01-09",
+        "balances": {"annual": 292.35, "sick": 693.85},
+        "use_or_lose": {
+            "carryover_limit": 240.0,
+            "annual_carryover": 240.0,
+            "use_or_lose": 52.35,
+        },
+    }
+
+    svg = render_svg(data, 1920)
+
+    assert ">End of Year Use or Loose<" in svg
+    assert ">180.35<" in svg
+    assert ">52.35<" in svg
+    assert ">0<" not in svg
+
+
 def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
     calls = []
     month_payload = _report_data().month_json
