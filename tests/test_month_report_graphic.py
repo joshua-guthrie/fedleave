@@ -5,8 +5,10 @@ from datetime import date, datetime
 
 import pytest
 
+from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave_month_report_graphic.report import (
     ArgumentError,
+    CATEGORY_LABELS,
     Options,
     OutputError,
     PAYDAY_STROKE,
@@ -69,6 +71,11 @@ def _report_data() -> ReportData:
                     "totals": {
                         "annual": {"earned": 6.0, "used": 2.0, "worked": 0.0, "net": 4.0},
                         "credit": {"earned": 0.0, "used": 0.0, "worked": 0.0, "net": 0.0},
+                    },
+                    "ending_balances": {
+                        "annual": 14.0,
+                        "sick": 20.0,
+                        "credit": 3.0,
                     },
                 }
             ],
@@ -151,6 +158,23 @@ def test_render_svg_uses_backend_pay_dates_not_every_friday():
     without_payday = render_svg(data_without_payday, 1920)
 
     assert with_payday.count(f'stroke="{PAYDAY_STROKE}"') == without_payday.count(f'stroke="{PAYDAY_STROKE}"') + 1
+
+
+def test_render_svg_applies_issue_28_cosmetic_layout():
+    svg = render_svg(_report_data(), 1920)
+
+    assert ">Markers<" not in svg
+    assert ">Projected<" not in svg
+    assert ">Type<" in svg
+    assert ">Earned<" in svg
+    assert ">Used<" in svg
+    assert ">Balance<" in svg
+    assert ">14<" in svg
+    assert ">Wrk<" not in svg
+    assert ">Net<" not in svg
+    for category in TRANSACTION_CATEGORIES:
+        assert f">{CATEGORY_LABELS[category][0]}<" in svg
+        assert f">{CATEGORY_LABELS[category][1]}<" in svg
 
 
 def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):

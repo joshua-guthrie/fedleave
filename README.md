@@ -8,7 +8,11 @@ The hope is that it is not only useful at the CLI, but could become the basis of
 
 Note:  In-case you're wondering... it was a 100% at home project.  None of it was done on company time!   It was also my first experiemnt into vibe coding.  So far, I'm impressed.
 
+This program was 100% vibe coded.  No humans were harmed in writing this software.  However, the load on the data centers might have raised the global temp a few degrees.
+
 It's a little program I'm using to serve as a back end to an AI agent and a dashboard and figured it may be useful to someone else.
+
+
 
 ## Limitations
 I'm making no effort to track expiring leave, such as travel comp time, award leave, etc.  I've never had the problem in my personal life of having to worry about leave expiring ! :)
@@ -97,6 +101,10 @@ A companion application that generates a PNG chart of annual leave balances thro
 - Grid lines for easy reading
 - Smooth curve interpolation
 
+Sample output:
+
+![Annual leave chart sample](examples/annual-leave-chart-sample.png)
+
 ### Usage
 
 ```bash
@@ -132,6 +140,10 @@ A companion application that generates a PNG chart of sick leave balances throug
 
 For example, if the maximum sick leave balance is 605 hours, the Y-axis will scale to 0-700.
 
+Sample output:
+
+![Sick leave chart sample](examples/sick-leave-chart-sample.png)
+
 ### Usage
 
 ```bash
@@ -163,11 +175,15 @@ A companion application that generates a landscape 16:9 graphical month report. 
 The report includes:
 
 - Calendar grid with leave entries, holidays, pay days, pay-period-end markers, and today marker
-- Pay-period summary for periods touching the displayed month
-- As-of-today balance table
-- Leave category abbreviation table
+- Pay-period table for periods touching the displayed month, including earned, used, and ending balance columns
+- As-of-today balance table with use-or-lose values
+- Leave category abbreviation table covering all supported leave types
 
 Transaction IDs, descriptions, sources, statuses, and data file paths are intentionally omitted from the report.
+
+Sample output:
+
+![Month report graphic sample](examples/month-report-sample.png)
 
 ### Usage
 

@@ -143,6 +143,9 @@ def _pay_periods_for_range(
                 "pay_date": pay_period_pay_date(pay_period),
                 "touches_display_month": not (period_end < month_start or period_start > month_end),
                 "totals": totals,
+                "ending_balances": dict(
+                    sorted(calculate_balances(leave_year, until_date=period_end.isoformat()).items())
+                ),
             }
         )
     return rows

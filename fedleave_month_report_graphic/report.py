@@ -17,6 +17,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from fedleave.ledger import TRANSACTION_CATEGORIES
+
 from . import __version__
 
 
@@ -527,6 +529,22 @@ def _render_table_svg(x: float, y: float, headers: list[str], rows: list[list[st
     return parts
 
 
+def _pay_period_rows(period: dict[str, Any], *, max_rows: int = 8) -> list[list[str]]:
+    totals = period.get("totals", {})
+    balances = period.get("ending_balances", {})
+    categories = sorted({*totals.keys(), *balances.keys()})
+    rows: list[list[str]] = []
+    for category in categories:
+        period_totals = totals.get(category, {})
+        earned = _fmt(period_totals.get("earned"))
+        used = _fmt(period_totals.get("used"))
+        balance = _fmt(balances.get(category))
+        if not any([earned, used, balance]):
+            continue
+        rows.append([CATEGORY_LABELS.get(category, (category, category))[1], earned, used, balance])
+    return rows[:max_rows]
+
+
 def _render_side_panel_svg(data: ReportData) -> list[str]:
     parts = [
         _svg_text(1224, 78, "Pay Period", 22, weight=700),
@@ -536,38 +554,47 @@ def _render_side_panel_svg(data: ReportData) -> list[str]:
     for period in data.month_json.get("pay_periods", [])[:4]:
         title = f"PP {period.get('number')}   {period.get('start')} - {period.get('end')}"
         parts.append(_svg_text(1234, y, title, 16, weight=700))
-        rows = []
-        for category, totals in sorted(period.get("totals", {}).items()):
-            earned = _fmt(totals.get("earned"), signed=True)
-            used_value = float(totals.get("used", 0.0) or 0.0)
-            used = _fmt(-used_value, signed=True) if used_value else ""
-            worked = _fmt(totals.get("worked"), signed=True)
-            net = _fmt(totals.get("net"), signed=True)
-            if not any([earned, used, worked, net]):
-                continue
-            rows.append([CATEGORY_LABELS.get(category, (category, category))[1], earned, used, worked, net, ""])
-        parts.extend(_render_table_svg(1234, y + 8, ["Type", "+", "-", "Wrk", "Net", "Bal"], rows, [106, 44, 44, 46, 52, 58]))
-        y += 46 + 22 * max(1, len(rows)) + 22
+        rows = _pay_period_rows(period)
+        parts.extend(
+            _render_table_svg(
+                1234,
+                y + 8,
+                ["Type", "Earned", "Used", "Balance"],
+                rows,
+                [184, 72, 72, 86],
+                row_h=19,
+                font_size=11,
+            )
+        )
+        y += 44 + 19 * max(1, len(rows)) + 14
 
-    parts.append(_svg_text(1616, 122, "Markers", 16, weight=700))
     marker_rows = [["Holiday", "Orange"], ["Pay Day", "Blue"], ["Pay Period End", "Green"], ["Today", "Gold"]]
-    parts.extend(_render_table_svg(1616, 130, ["Marker", "Meaning"], marker_rows, [110, 120], font_size=12))
+    parts.extend(_render_table_svg(1660, 622, ["Marker", "Meaning"], marker_rows, [110, 110], row_h=19, font_size=11))
     return parts
 
 
 def _balance_rows(data: ReportData) -> list[list[str]]:
     balances = data.balance_json.get("balances", {})
-    projected = data.projected_json.get("balances", {})
     use_or_lose = data.projected_json.get("use_or_lose") or {}
     rows = []
     for category, value in sorted(balances.items()):
         balance = _fmt(value)
-        project = _fmt(projected.get(category))
         lose = _fmt(use_or_lose.get("use_or_lose")) if category == "annual" else ""
-        if not any([balance, project, lose]):
+        if not any([balance, lose]):
             continue
-        rows.append([CATEGORY_LABELS.get(category, (category, category))[1], balance, "", "", "", project, lose])
-    return rows[:9]
+        rows.append([CATEGORY_LABELS.get(category, (category, category))[1], balance, lose])
+    return rows[:10]
+
+
+def _abbreviation_columns() -> list[list[list[str]]]:
+    rows = [
+        [
+            CATEGORY_LABELS.get(category, (category, category))[0],
+            CATEGORY_LABELS.get(category, (category, category))[1],
+        ]
+        for category in TRANSACTION_CATEGORIES
+    ]
+    return [rows[index:index + 6] for index in range(0, len(rows), 6)]
 
 
 def _render_bottom_svg(data: ReportData) -> list[str]:
@@ -575,17 +602,14 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
         _svg_text(28, 780, "As of Today", 22, weight=700),
         f'<rect x="28" y="790" width="1180" height="250" fill="{WHITE}" stroke="{BORDER}" stroke-width="2" rx="6"/>',
     ]
-    parts.extend(_render_table_svg(42, 808, ["Category", "Balance", "Earned YTD", "Used YTD", "Adjusted YTD", "Projected", "Use/Lose"], _balance_rows(data), [170, 90, 110, 100, 120, 110, 100], row_h=21, font_size=12))
+    parts.extend(_render_table_svg(42, 808, ["Category", "Balance", "Use/Lose"], _balance_rows(data), [220, 110, 110], row_h=21, font_size=12))
 
     parts.extend([
         _svg_text(1224, 780, "Abbreviations", 22, weight=700),
         f'<rect x="1224" y="790" width="668" height="250" fill="{WHITE}" stroke="{BORDER}" stroke-width="2" rx="6"/>',
     ])
-    abbr_rows = [[abbr, label] for _cat, (abbr, label) in CATEGORY_LABELS.items()]
-    left_rows = abbr_rows[:9]
-    right_rows = abbr_rows[9:]
-    parts.extend(_render_table_svg(1238, 808, ["Abbr", "Category"], left_rows, [58, 210], row_h=20, font_size=12))
-    parts.extend(_render_table_svg(1530, 808, ["Abbr", "Category"], right_rows, [58, 210], row_h=20, font_size=12))
+    for index, rows in enumerate(_abbreviation_columns()):
+        parts.extend(_render_table_svg(1238 + index * 216, 808, ["Abbr", "Category"], rows, [48, 154], row_h=20, font_size=11))
     return parts
 
 
@@ -674,8 +698,7 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
 
     text(1224, 64, "Pay Period", font_obj=bold)
     rect((1224, 88, 1892, 738), outline=BORDER, width_px=2)
-    text(1616, 106, "Markers", font_obj=bold)
-    marker_y = 128
+    marker_y = 646
     for label, fill, outline in [
         ("Holiday", HOLIDAY_FILL, HOLIDAY_STROKE),
         ("Pay Day", PAYDAY_FILL, PAYDAY_STROKE),
@@ -690,35 +713,40 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
     for period in month_json.get("pay_periods", [])[:4]:
         text(1234, y, f"PP {period.get('number')}   {period.get('start')} - {period.get('end')}", font_obj=bold)
         y += 24
-        for category, totals in sorted(period.get("totals", {}).items()):
-            values = [_fmt(totals.get("earned"), signed=True), _fmt(-float(totals.get("used", 0) or 0), signed=True), _fmt(totals.get("worked"), signed=True), _fmt(totals.get("net"), signed=True)]
-            if any(values):
-                text(1240, y, CATEGORY_LABELS.get(category, (category, category))[1])
-                text(1578, y, "  ".join(v for v in values if v), anchor="ra")
-                y += 19
+        text(1240, y, "Type", font_obj=bold)
+        text(1512, y, "Earned", font_obj=bold, anchor="ra")
+        text(1588, y, "Used", font_obj=bold, anchor="ra")
+        text(1678, y, "Balance", font_obj=bold, anchor="ra")
+        y += 18
+        for row in _pay_period_rows(period, max_rows=7):
+            text(1240, y, row[0])
+            text(1512, y, row[1], anchor="ra")
+            text(1588, y, row[2], anchor="ra")
+            text(1678, y, row[3], anchor="ra")
+            y += 17
         y += 14
     text(28, 764, "As of Today", font_obj=bold)
     rect((28, 790, 1208, 1040), outline=BORDER, width_px=2)
     text(42, 802, "Category", font_obj=bold)
     text(480, 802, "Balance", font_obj=bold, anchor="ra")
-    text(720, 802, "Projected", font_obj=bold, anchor="ra")
-    text(860, 802, "Use/Lose", font_obj=bold, anchor="ra")
+    text(640, 802, "Use/Lose", font_obj=bold, anchor="ra")
     yy = 816
     for row in _balance_rows(data):
         text(42, yy, row[0])
         text(480, yy, row[1], anchor="ra")
-        text(720, yy, row[5], anchor="ra")
-        text(860, yy, row[6], anchor="ra")
+        text(640, yy, row[2], anchor="ra")
         yy += 19
     text(1224, 764, "Abbreviations", font_obj=bold)
     rect((1224, 790, 1892, 1040), outline=BORDER, width_px=2)
-    text(1240, 802, "Abbr", font_obj=bold)
-    text(1300, 802, "Category", font_obj=bold)
-    yy = 816
-    for abbr, label in list(CATEGORY_LABELS.values())[:12]:
-        text(1240, yy, abbr, font_obj=bold)
-        text(1300, yy, label)
-        yy += 18
+    for column, rows in enumerate(_abbreviation_columns()):
+        x = 1240 + column * 216
+        text(x, 802, "Abbr", font_obj=bold)
+        text(x + 52, 802, "Category", font_obj=bold)
+        yy = 816
+        for abbr, label in rows:
+            text(x, yy, abbr, font_obj=bold)
+            text(x + 52, yy, label)
+            yy += 18
 
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, format="PNG")
