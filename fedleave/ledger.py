@@ -222,6 +222,8 @@ def calculate_balances(
         transaction_cutoff = projection_end
 
     for transaction in leave_year.get("transactions", []):
+        if transaction.get("void"):
+            continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if transaction_cutoff is not None and tx_date > transaction_cutoff:
             is_projectable_accrual = (

@@ -9,6 +9,7 @@ from fedleave.cli import (
     balance,
     correct,
     daily_activity,
+    list_transactions,
     pay_period_summary,
     pay_periods_summary,
     rollover,
@@ -75,6 +76,47 @@ def test_add_balance_and_activity_emit_json(tmp_path: Path, capsys):
     daily_activity(year=2026, date="2026-03-10", json_output=True, data_dir=data_dir)
     activity = _json_output(capsys)
     assert activity["has_activity"] is True
+    assert activity["activity"]["used"]["annual"] == 4.0
+
+
+def test_json_outputs_ignore_voided_transactions(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    year_file = _init_data_dir(data_dir)
+    leave_year = json.loads(year_file.read_text(encoding="utf-8"))
+    active = create_transaction(
+        date="2026-03-10",
+        category="annual",
+        direction="used",
+        hours=4.0,
+        existing_ids=[],
+    )
+    voided = create_transaction(
+        date="2026-03-10",
+        category="annual",
+        direction="used",
+        hours=8.0,
+        existing_ids=[active.id],
+    )
+    voided.void = True
+    voided.void_reason = "Superseded"
+    add_transaction_to_leave_year(leave_year, active)
+    add_transaction_to_leave_year(leave_year, voided)
+    write_json(year_file, leave_year)
+    capsys.readouterr()
+
+    list_transactions(year=2026, json_output=True, data_dir=data_dir)
+    listed = _json_output(capsys)
+    listed_ids = {transaction["id"] for transaction in listed["transactions"]}
+    assert active.id in listed_ids
+    assert voided.id not in listed_ids
+    assert all(not transaction.get("void") for transaction in listed["transactions"])
+
+    balance(year=2026, as_of="2026-03-10", json_output=True, data_dir=data_dir)
+    balances = _json_output(capsys)
+    assert balances["balances"]["annual"] == 30.0
+
+    daily_activity(year=2026, date="2026-03-10", json_output=True, data_dir=data_dir)
+    activity = _json_output(capsys)
     assert activity["activity"]["used"]["annual"] == 4.0
 
 

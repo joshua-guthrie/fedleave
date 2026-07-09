@@ -84,8 +84,8 @@ Command details and examples:
         Adds a transaction when no active match exists. Updates exactly one active match and records reconcile_history.
         If multiple active matches exist, rerun with --id to choose the transaction.
 
-    fedleave list --year YEAR [--show-transaction-ids] [--data-dir PATH]
-        List transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
+    fedleave list --year YEAR [--json] [--show-transaction-ids] [--data-dir PATH]
+        List active transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
 
     fedleave starting-balance set --year YEAR --category CATEGORY --hours HOURS --reason TEXT [--data-dir PATH]
         Set a leave year's starting balance for one category and record the prior value in starting_balance_history.

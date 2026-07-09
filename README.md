@@ -352,13 +352,14 @@ Commands and common options:
 			- Use `--overwrite` to replace existing files; overwritten files are backed up first.
 
 	list
-		List transactions for a leave year.
+		List active transactions for a leave year.
 
 		Syntax:
-			fedleave list --year YEAR [--show-transaction-ids] [--data-dir PATH]
+			fedleave list --year YEAR [--json] [--show-transaction-ids] [--data-dir PATH]
 
 		Notes:
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction, voiding, or audit work.
+			- `--json` emits active transactions only. Voided transactions remain in the data file for audit history but are omitted from command JSON output.
 
 	balance
 	Show leave balances for a year, optionally as of a given date, projected to a future date, and/or with use-or-lose calculations.

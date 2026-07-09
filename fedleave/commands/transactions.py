@@ -507,10 +507,15 @@ def list_transactions(
         "--ShowTransactionIDs",
         help="Show transaction IDs in human-readable output.",
     ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     if isinstance(show_transaction_ids, OptionInfo):
         show_transaction_ids = False
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
 
     try:
         leave_year = load_leave_year(year, data_dir)
@@ -518,12 +523,20 @@ def list_transactions(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
 
-    transactions = leave_year.get("transactions", [])
+    transactions = [transaction for transaction in leave_year.get("transactions", []) if not transaction.get("void")]
     if not transactions:
+        if json_output:
+            _print_json({"year": year, "transactions": []})
+            return
         console.print(f"No transactions found for {year}.")
         raise typer.Exit(code=0)
 
-    for transaction in sorted(transactions, key=lambda item: item["id"]):
+    transactions = sorted(transactions, key=lambda item: item["id"])
+    if json_output:
+        _print_json({"year": year, "transactions": transactions})
+        return
+
+    for transaction in transactions:
         transaction_id = f"{transaction['id']} " if show_transaction_ids else ""
         console.print(
             f"{transaction_id}{transaction['date']} {transaction['category']} {transaction['direction']} {transaction['hours']} {transaction['status']} {transaction['description']}"
