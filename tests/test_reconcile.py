@@ -34,6 +34,10 @@ def _load(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _non_accrual_transactions(leave_year: dict) -> list[dict]:
+    return [tx for tx in leave_year["transactions"] if tx.get("source") != "auto_accrual"]
+
+
 def test_reconcile_adds_transaction_and_infers_leave_year(tmp_path: Path, capsys):
     data_dir = tmp_path / "data"
     year_file = _init_data_dir(data_dir)
@@ -48,7 +52,7 @@ def test_reconcile_adds_transaction_and_infers_leave_year(tmp_path: Path, capsys
     )
 
     leave_year = _load(year_file)
-    transactions = leave_year["transactions"]
+    transactions = _non_accrual_transactions(leave_year)
     assert len(transactions) == 1
     assert transactions[0]["date"] == "2026-03-10"
     assert transactions[0]["category"] == "credit"
@@ -90,7 +94,7 @@ def test_reconcile_updates_single_match_and_records_history(tmp_path: Path):
     )
 
     updated = _load(year_file)
-    transactions = updated["transactions"]
+    transactions = _non_accrual_transactions(updated)
     assert len(transactions) == 1
     assert transactions[0]["id"] == transaction.id
     assert transactions[0]["hours"] == 1.5
@@ -142,7 +146,8 @@ def test_reconcile_blocks_multiple_active_matches(tmp_path: Path):
 
     assert excinfo.value.exit_code == 2
     unchanged = _load(year_file)
-    assert [transaction["hours"] for transaction in unchanged["transactions"]] == [1.0, 2.0]
+    transactions = _non_accrual_transactions(unchanged)
+    assert [transaction["hours"] for transaction in transactions] == [1.0, 2.0]
 
 
 def test_reconcile_updates_selected_match_and_can_emit_json(tmp_path: Path, capsys):
@@ -185,5 +190,6 @@ def test_reconcile_updates_selected_match_and_can_emit_json(tmp_path: Path, caps
     assert output["year"] == 2026
 
     updated = _load(year_file)
-    assert updated["transactions"][0]["hours"] == 1.0
-    assert updated["transactions"][1]["hours"] == 1.5
+    transactions = _non_accrual_transactions(updated)
+    assert transactions[0]["hours"] == 1.0
+    assert transactions[1]["hours"] == 1.5

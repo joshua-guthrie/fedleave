@@ -210,10 +210,29 @@ def calculate_balances(
         totals[category] = float(amount)
 
     cutoff = _parse_iso_date(until_date) if until_date is not None else None
+    projection_end = None
+    if include_projected:
+        if project_until is not None:
+            projection_end = _parse_iso_date(project_until)
+        else:
+            projection_end = _parse_iso_date(leave_year.get("leave_year_end", ""))
+
+    transaction_cutoff = cutoff
+    if transaction_cutoff is None and include_projected:
+        transaction_cutoff = projection_end
+
     for transaction in leave_year.get("transactions", []):
         tx_date = _parse_iso_date(transaction.get("date", ""))
-        if cutoff is not None and tx_date > cutoff:
-            continue
+        if transaction_cutoff is not None and tx_date > transaction_cutoff:
+            is_projectable_accrual = (
+                include_projected
+                and cutoff is not None
+                and projection_end is not None
+                and transaction.get("source") == "auto_accrual"
+                and tx_date <= projection_end
+            )
+            if not is_projectable_accrual:
+                continue
 
         category = transaction["category"]
         direction = transaction["direction"]
@@ -229,11 +248,6 @@ def calculate_balances(
             totals[category] += hours
 
     if include_projected:
-        if project_until is not None:
-            projection_end = _parse_iso_date(project_until)
-        else:
-            projection_end = _parse_iso_date(leave_year.get("leave_year_end", ""))
-
         pay_periods = leave_year.get("pay_periods", [])
         annual_accrual = float(leave_year.get("annual_leave_accrual_hours", 0.0))
         sick_accrual = float(leave_year.get("sick_leave_accrual_hours", 0.0))

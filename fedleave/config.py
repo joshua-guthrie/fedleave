@@ -16,6 +16,7 @@ from rich.console import Console
 from .storage import ensure_data_dir, atomic_write_json
 from .payperiods import generate_pay_periods
 from .holidays import DEFAULT_OPM_ICS_URL, generate_federal_holidays
+from .ledger import ensure_automatic_accruals
 
 console = Console()
 
@@ -211,12 +212,14 @@ def init_config(
         carryover_from_previous_year=starting_balances.copy(),
         pay_periods=pay_periods,
     )
+    leave_year_data = leave_year.model_dump()
+    ensure_automatic_accruals(leave_year_data, leave_year_end)
 
     atomic_write_json(config_path, config.model_dump(), overwrite=False)
     year_path = data_dir / "leave_years"
     year_path.mkdir(exist_ok=True)
     year_file = year_path / f"{year}.json"
-    atomic_write_json(year_file, leave_year.model_dump(), overwrite=False)
+    atomic_write_json(year_file, leave_year_data, overwrite=False)
 
     holiday_cache = generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
     atomic_write_json(data_dir / "holiday_cache" / f"federal_holidays_{year}.json", holiday_cache, overwrite=True)

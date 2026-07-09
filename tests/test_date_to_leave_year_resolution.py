@@ -44,9 +44,10 @@ def test_add_inferrs_leave_year_from_date(tmp_path: Path):
     )
 
     leave_year = json.loads((data_dir / "leave_years" / "2026.json").read_text())
-    assert len(leave_year["transactions"]) == 1
-    assert leave_year["transactions"][0]["date"] == "2026-03-10"
-    assert leave_year["transactions"][0]["hours"] == 1.5
+    transactions = [tx for tx in leave_year["transactions"] if tx.get("source") == "manual"]
+    assert len(transactions) == 1
+    assert transactions[0]["date"] == "2026-03-10"
+    assert transactions[0]["hours"] == 1.5
 
 
 def test_correct_infers_leave_year_from_search_date(tmp_path: Path):

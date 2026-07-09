@@ -159,8 +159,8 @@ def _dates_from_pay_periods(pay_periods: list[dict], field: str) -> set[str]:
 def balance(
     year: int = typer.Option(..., help="Leave year."),
     as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD or today."),
-    project: bool = typer.Option(False, help="Project future automatic annual and sick accrual to the projection date or year end."),
-    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD or today. Defaults to leave year end when --project is enabled."),
+    project: bool = typer.Option(False, help="Deprecated compatibility flag; projection is enabled by --project-to or --use-or-lose."),
+    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD or today. Defaults to leave year end when projection is enabled."),
     use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
@@ -202,10 +202,13 @@ def balance(
     if added_accruals:
         write_json(get_leave_year_path(year, data_dir), leave_year)
 
-    include_projected = project or use_or_lose
+    include_projected = project or use_or_lose or project_to is not None
+    balance_until = as_of
+    if balance_until is None and not include_projected:
+        balance_until = _date.today().isoformat()
     balances = calculate_balances(
         leave_year,
-        until_date=as_of,
+        until_date=balance_until,
         include_projected=include_projected,
         project_until=project_to,
     )

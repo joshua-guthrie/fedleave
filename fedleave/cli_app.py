@@ -85,7 +85,8 @@ Command details and examples:
 
     fedleave balance --year YEAR [--as-of YYYY-MM-DD|today] [--project] [--project-to YYYY-MM-DD|today] [--use-or-lose] [--json] [--data-dir PATH]
         Show balances calculated from the ledger.
-        --project includes projected future annual and sick leave accruals through year end or --project-to.
+        --project-to projects future annual and sick leave accruals through a custom date.
+        --project is retained for compatibility with existing scripts.
         --use-or-lose prints projected annual carryover and annual leave lost above the carryover limit.
         --json emits balances, use-or-lose values, and automatic accrual posting details.
 

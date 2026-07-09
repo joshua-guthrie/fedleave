@@ -42,5 +42,6 @@ def test_rollover_preview_and_apply(tmp_path: Path):
     new_file = data_dir / "leave_years" / "2027.json"
     assert new_file.exists()
     new_ly = __import__('json').loads(new_file.read_text())
-    # carried annual should be <= 240 and equal to remaining annual (100-20)
-    assert abs(new_ly['starting_balances']['annual'] - 80.0) < 1e-6
+    # carried annual includes init-seeded accruals and remains capped by the carryover limit
+    assert abs(new_ly['starting_balances']['annual'] - 236.0) < 1e-6
+    assert abs(new_ly['starting_balances']['sick'] - 154.0) < 1e-6

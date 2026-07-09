@@ -71,7 +71,7 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
     assert result["month_end"] == "2026-07-31"
     assert result["calendar_start"] == "2026-06-28"
     assert result["calendar_end"] == "2026-08-01"
-    assert result["automatic_accruals_posted"] > 0
+    assert result["automatic_accruals_posted"] == 0
 
     july_first = next(day for day in result["days"] if day["date"] == "2026-07-01")
     assert july_first["in_display_month"] is True
@@ -117,3 +117,33 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
     first_july_period = next(period for period in result["pay_periods"] if period["end"] == "2026-07-11")
     assert first_july_period["ending_balances"]["annual"] >= 0.0
     assert first_july_period["ending_balances"]["sick"] >= 0.0
+
+
+def test_month_command_reports_year_end_use_or_lose_when_annual_exceeds_carryover(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    init_config(
+        year=2026,
+        leave_year_start="2026-01-11",
+        annual_accrual=0.0,
+        starting_balances={
+            "annual": 300.0,
+            "sick": 20.0,
+            "comp": 0.0,
+            "credit": 0.0,
+            "travel_comp": 0.0,
+            "time_off_award": 0.0,
+            "religious_comp": 0.0,
+            "restored_annual": 0.0,
+        },
+        data_dir=data_dir,
+    )
+    capsys.readouterr()
+
+    month(year=2026, month=7, json_output=True, data_dir=data_dir)
+    result = _json_output(capsys)
+
+    assert result["projected_balance"]["project_to"] == "2027-01-09"
+    assert result["projected_balance"]["balances"]["annual"] == 300.0
+    assert result["projected_balance"]["use_or_lose"]["carryover_limit"] == 240.0
+    assert result["projected_balance"]["use_or_lose"]["annual_carryover"] == 240.0
+    assert result["projected_balance"]["use_or_lose"]["use_or_lose"] == 60.0

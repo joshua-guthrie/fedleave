@@ -113,9 +113,9 @@ def test_run_fedleave_uses_subcommand_arguments(monkeypatch, module_name):
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     monkeypatch.setattr(module, "find_fedleave_app", lambda: Path("/tmp/fedleave"))
 
-    module.run_fedleave(["balance", "--year", "2026", "--json", "--project"])
+    module.run_fedleave(["balance", "--year", "2026", "--json"])
 
-    assert captured["cmd"] == [str(Path("/tmp/fedleave")), "balance", "--year", "2026", "--json", "--project"]
+    assert captured["cmd"] == [str(Path("/tmp/fedleave")), "balance", "--year", "2026", "--json"]
 
 
 @pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])
@@ -238,7 +238,6 @@ def test_get_leave_year_data_reads_leave_year_file_after_fedleave_balance(
         "--year",
         "2026",
         "--json",
-        "--project",
         "--data-dir",
         str(data_dir),
     ]

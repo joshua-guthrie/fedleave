@@ -49,7 +49,7 @@ Date options accept either an ISO date such as `2026-03-10` or the keyword `toda
 
 ## Typical workflow
 
-Initialize a leave year. The leave year start date should be the first day of pay period 1 for that leave year. Annual leave accrual is configured per pay period; sick leave accrues at 4 hours per pay period.
+Initialize a leave year. The leave year start date should be the first day of pay period 1 for that leave year. Annual leave accrual is configured per pay period; sick leave accrues at 4 hours per pay period. Initialization creates the automatic annual and sick leave accrual transactions for the full leave year so future balances and charts can use them immediately.
 
 ```bash
 fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180
@@ -63,7 +63,7 @@ fedleave add --date 2026-03-12 --category overtime --worked 3 --description "Rel
 fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 ```
 
-Check balances. Missing automatic annual and sick accrual transactions are posted through the balance date.
+Check balances. Balances are calculated through the requested date; older data files that are missing automatic accrual rows are backfilled through the balance date.
 
 ```bash
 fedleave balance --year 2026 --as-of 2026-06-01
@@ -343,20 +343,21 @@ Commands and common options:
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction, voiding, or audit work.
 
 	balance
-	Show leave balances for a year, optionally as of a given date, projected to year end, and/or with use-or-lose calculations.
+	Show leave balances for a year, optionally as of a given date, projected to a future date, and/or with use-or-lose calculations.
 
 	Syntax:
 		fedleave balance --year YEAR [--as-of YYYY-MM-DD|today] [--project] [--project-to YYYY-MM-DD|today] [--use-or-lose] [--json] [--data-dir PATH]
 
 	Notes:
-		- `--year YEAR` reads the leave year file and computes balances from all recorded transactions.
+		- `--year YEAR` reads the leave year file and computes balances from recorded transactions.
 		- `--as-of YYYY-MM-DD|today` computes balances using only transactions on or before that date.
-		- Missing automatic annual and sick leave accrual transactions are posted through `--as-of`, or through today when `--as-of` is omitted.
-		- `--project` adds projected automatic annual and sick accruals for future pay periods through the leave year end (or via `--project-to`).
-		- `--project-to YYYY-MM-DD|today` projects accruals only through the specified date instead of year end.
-		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection even when `--project` is not passed.
+		- When `--as-of` is omitted and no projection option is used, balances are calculated through today.
+		- `init` creates automatic annual and sick leave accrual transactions for the full leave year. Balance commands backfill missing automatic accrual rows for compatibility with older data files.
+		- `--project-to YYYY-MM-DD|today` projects accruals through the specified date.
+		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection.
+		- `--project` is retained for existing scripts, but is no longer required for normal projection workflows.
 		- `--json` emits balances, use-or-lose values, and automatic accrual posting details.
-		- Federal employees earn annual and sick leave automatically each pay period; this tool posts or projects that accrual based on the leave year pay periods and configured accrual rates.
+		- Federal employees earn annual and sick leave automatically each pay period; this tool uses the leave year pay periods and configured accrual rates to create and project those accrual rows.
 
 	pay-period
 		Show earned, used, net leave, overtime worked, optional daily activity, and ending balances for the pay period containing a date.
@@ -365,7 +366,7 @@ Commands and common options:
 			fedleave pay-period --year YEAR --date YYYY-MM-DD|today [--daily] [--json] [--data-dir PATH]
 
 		Notes:
-			- Missing automatic annual and sick accrual transactions for the containing pay period are posted before totals are calculated.
+			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are backfilled for the containing pay period before totals are calculated.
 			- Overtime is shown as `worked`, which is the amount expected for that pay period's paycheck.
 			- `--daily` prints one row for every day in the pay period, including days with no activity.
 			- `--json` emits pay period metadata, activity totals, ending balances, and automatic accrual posting details.
@@ -377,7 +378,7 @@ Commands and common options:
 			fedleave pay-periods --year YEAR [--json] [--data-dir PATH]
 
 		Notes:
-			- Missing automatic annual and sick accrual transactions are posted through the final pay period accrual date before totals are calculated.
+			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are backfilled through the final pay period accrual date before totals are calculated.
 			- `--json` emits one structured summary per pay period.
 
 	month
@@ -389,7 +390,7 @@ Commands and common options:
 		Notes:
 			- `--month` is a number from 1 to 12.
 			- The output covers full Sunday-to-Saturday calendar weeks around the display month.
-			- Missing automatic annual and sick accrual transactions are posted through the calendar range before totals are calculated.
+			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are backfilled through the calendar range before totals are calculated.
 			- `--json` emits month bounds, calendar bounds, daily entries, display lines, holiday names, pay days, pay-period-end dates, pay-period totals, current balances, projected balances, use-or-lose values, and automatic accrual posting details.
 
 activity
@@ -830,7 +831,7 @@ Success output:
     "credit": 0.0,
     "sick": 36.0
   },
-  "automatic_accruals_posted": 8,
+  "automatic_accruals_posted": 0,
   "automatic_accruals_posted_through": "2026-03-10",
   "use_or_lose": null
 }
@@ -839,7 +840,7 @@ Success output:
 Use-or-lose command:
 
 ```bash
-fedleave balance --year 2026 --project --use-or-lose --json
+fedleave balance --year 2026 --use-or-lose --json
 ```
 
 Use-or-lose fields:
@@ -858,10 +859,10 @@ Fields:
 
 - `year`: Requested leave year.
 - `as_of`: Cutoff date, or `null` when omitted.
-- `projected`: `true` when `--project` or `--use-or-lose` is active.
+- `projected`: `true` when `--project-to`, `--project`, or `--use-or-lose` is active.
 - `project_to`: Projection end date when projected; otherwise `null`.
 - `balances`: Balance map by category.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before calculating balances.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before calculating balances. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
 - `automatic_accruals_posted_through`: Date through which automatic accrual posting was attempted.
 - `use_or_lose`: Use-or-lose object when `--use-or-lose` is passed; otherwise `null`.
 
@@ -915,7 +916,7 @@ Success output:
     "annual": 16.0,
     "sick": 24.0
   },
-  "automatic_accruals_posted": 2,
+  "automatic_accruals_posted": 0,
   "automatic_accruals_posted_through": "2026-01-24"
 }
 ```
@@ -928,7 +929,7 @@ Fields:
 - `activity`: Activity object for the whole pay period. This object also includes `pay_period`.
 - `daily_activity`: List of per-day activity objects when `--daily` is passed; otherwise `null`.
 - `ending_balances`: Balance map through the pay period end date.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted for the period.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted for the period. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
 - `automatic_accruals_posted_through`: Period accrual date or end date used for automatic accrual posting.
 
 ### `pay-periods --json`
@@ -978,7 +979,7 @@ Success output:
       }
     }
   ],
-  "automatic_accruals_posted": 52,
+  "automatic_accruals_posted": 0,
   "automatic_accruals_posted_through": "2027-01-09"
 }
 ```
@@ -990,7 +991,7 @@ Fields:
 - `pay_periods[].pay_period`: Pay period object, including `pay_date`. Older data files that do not contain `pay_date` are normalized in command output.
 - `pay_periods[].activity`: Activity object for that pay period.
 - `pay_periods[].ending_balances`: Balance map through that pay period's end date.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the summary.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the summary. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
 - `automatic_accruals_posted_through`: Final pay period accrual date or end date.
 
 ### `month --json`
@@ -1386,10 +1387,10 @@ Daily and as-of queries:
 	fedleave pay-periods --year 2026 --data-dir /path/to/data
 
 	# Project end-of-year balance including automatic annual/sick accrual
-	fedleave balance --year 2026 --project --use-or-lose --data-dir /path/to/data
+	fedleave balance --year 2026 --use-or-lose --data-dir /path/to/data
 
 	# Project balance to a custom date
-	fedleave balance --year 2026 --project --project-to 2026-12-15 --data-dir /path/to/data
+	fedleave balance --year 2026 --project-to 2026-12-15 --data-dir /path/to/data
 
 	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
 

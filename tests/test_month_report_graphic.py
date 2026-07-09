@@ -191,6 +191,26 @@ def test_render_svg_places_marker_legend_at_bottom_of_abbreviations_section():
     assert ">Today<" in svg
 
 
+def test_render_svg_shows_year_end_use_or_lose_when_annual_exceeds_carryover():
+    data = _report_data()
+    data.balance_json = {"balances": {"annual": 300.0, "sick": 20.0}}
+    data.projected_json = {
+        "balances": {"annual": 300.0, "sick": 20.0},
+        "use_or_lose": {
+            "carryover_limit": 240.0,
+            "annual_carryover": 240.0,
+            "use_or_lose": 60.0,
+        },
+    }
+
+    svg = render_svg(data, 1920)
+
+    assert ">End of Year Use or Loose<" in svg
+    assert ">Annual<" in svg
+    assert ">300<" in svg
+    assert ">60<" in svg
+
+
 def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
     calls = []
     month_payload = _report_data().month_json

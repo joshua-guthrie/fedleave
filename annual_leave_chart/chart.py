@@ -236,8 +236,8 @@ def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, An
     """
     data_dir = data_dir or get_default_data_dir()
 
-    # Let fedleave validate the year and post any automatic accruals before reading the ledger.
-    args = ["balance", "--year", str(year), "--json", "--project"]
+    # Let fedleave validate the year before reading the ledger.
+    args = ["balance", "--year", str(year), "--json"]
     args.extend(["--data-dir", str(data_dir)])
     run_fedleave(args)
 

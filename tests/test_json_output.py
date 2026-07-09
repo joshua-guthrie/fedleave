@@ -69,7 +69,7 @@ def test_add_balance_and_activity_emit_json(tmp_path: Path, capsys):
     balances = _json_output(capsys)
     assert balances["year"] == 2026
     assert balances["balances"]["annual"] == 30.0
-    assert balances["automatic_accruals_posted"] == 8
+    assert balances["automatic_accruals_posted"] == 0
 
     daily_activity(year=2026, date="2026-03-10", json_output=True, data_dir=data_dir)
     activity = _json_output(capsys)
@@ -112,14 +112,14 @@ def test_pay_period_commands_emit_json(tmp_path: Path, capsys):
     pay_period_summary(year=2026, date="2026-01-20", daily=True, json_output=True, data_dir=data_dir)
     period = _json_output(capsys)
     assert period["pay_period"]["pay_period_number"] == 1
-    assert period["automatic_accruals_posted"] == 2
+    assert period["automatic_accruals_posted"] == 0
     assert period["daily_activity"] is not None
 
     pay_periods_summary(year=2026, json_output=True, data_dir=data_dir)
     periods = _json_output(capsys)
     assert periods["year"] == 2026
     assert len(periods["pay_periods"]) == 26
-    assert periods["automatic_accruals_posted"] == 50
+    assert periods["automatic_accruals_posted"] == 0
 
 
 def test_validate_and_rollover_emit_json(tmp_path: Path, capsys):
