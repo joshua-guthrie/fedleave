@@ -1,11 +1,13 @@
 import json
+import sys
 from pathlib import Path
 
 from fedleave_gui.backend import BackendOptions, FedleaveBackend
 
 
 def _fake_fedleave(path: Path) -> Path:
-    path.write_text(
+    script = path.with_suffix(".py") if sys.platform.startswith("win") else path
+    script.write_text(
         """#!/usr/bin/env python3
 import json
 import sys
@@ -22,8 +24,13 @@ else:
 """,
         encoding="utf-8",
     )
-    path.chmod(0o755)
-    return path
+    if sys.platform.startswith("win"):
+        wrapper = path.with_suffix(".cmd")
+        wrapper.write_text(f'@python "{script}" %*\n', encoding="utf-8")
+        return wrapper
+
+    script.chmod(0o755)
+    return script
 
 
 def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
