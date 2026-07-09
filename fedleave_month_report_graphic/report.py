@@ -568,8 +568,6 @@ def _render_side_panel_svg(data: ReportData) -> list[str]:
         )
         y += 44 + 19 * max(1, len(rows)) + 14
 
-    marker_rows = [["Holiday", "Orange"], ["Pay Day", "Blue"], ["Pay Period End", "Green"], ["Today", "Gold"]]
-    parts.extend(_render_table_svg(1660, 622, ["Marker", "Meaning"], marker_rows, [110, 110], row_h=19, font_size=11))
     return parts
 
 
@@ -597,12 +595,43 @@ def _abbreviation_columns() -> list[list[list[str]]]:
     return [rows[index:index + 6] for index in range(0, len(rows), 6)]
 
 
+def _marker_legend_items() -> list[tuple[str, str, str]]:
+    return [
+        ("Holiday", HOLIDAY_FILL, HOLIDAY_STROKE),
+        ("Pay Day", PAYDAY_FILL, PAYDAY_STROKE),
+        ("Pay Period End", WHITE, PAY_PERIOD_STROKE),
+        ("Today", TODAY_FILL, TODAY_STROKE),
+    ]
+
+
+def _render_marker_legend_svg(x: float, y: float) -> list[str]:
+    parts: list[str] = []
+    for index, (label, fill, stroke) in enumerate(_marker_legend_items()):
+        item_x = x + index * 154
+        parts.append(
+            f'<rect x="{item_x:.1f}" y="{y - 14:.1f}" width="16" height="16" '
+            f'fill="{fill}" stroke="{stroke}" stroke-width="2"/>'
+        )
+        parts.append(_svg_text(item_x + 24, y, label, 11))
+    return parts
+
+
 def _render_bottom_svg(data: ReportData) -> list[str]:
     parts = [
         _svg_text(28, 780, "As of Today", 22, weight=700),
         f'<rect x="28" y="790" width="1180" height="250" fill="{WHITE}" stroke="{BORDER}" stroke-width="2" rx="6"/>',
     ]
-    parts.extend(_render_table_svg(42, 808, ["Category", "Balance", "Use/Lose"], _balance_rows(data), [220, 110, 110], row_h=21, font_size=12))
+    parts.extend(
+        _render_table_svg(
+            42,
+            808,
+            ["Category", "Balance", "End of Year Use or Loose"],
+            _balance_rows(data),
+            [220, 110, 190],
+            row_h=21,
+            font_size=12,
+        )
+    )
 
     parts.extend([
         _svg_text(1224, 780, "Abbreviations", 22, weight=700),
@@ -610,6 +639,7 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
     ])
     for index, rows in enumerate(_abbreviation_columns()):
         parts.extend(_render_table_svg(1238 + index * 216, 808, ["Abbr", "Category"], rows, [48, 154], row_h=20, font_size=11))
+    parts.extend(_render_marker_legend_svg(1240, 1018))
     return parts
 
 
@@ -698,16 +728,6 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
 
     text(1224, 64, "Pay Period", font_obj=bold)
     rect((1224, 88, 1892, 738), outline=BORDER, width_px=2)
-    marker_y = 646
-    for label, fill, outline in [
-        ("Holiday", HOLIDAY_FILL, HOLIDAY_STROKE),
-        ("Pay Day", PAYDAY_FILL, PAYDAY_STROKE),
-        ("Pay Period End", WHITE, PAY_PERIOD_STROKE),
-        ("Today", TODAY_FILL, TODAY_STROKE),
-    ]:
-        rect((1616, marker_y - 11, 1634, marker_y + 7), fill=fill, outline=outline, width_px=2)
-        text(1644, marker_y - 8, label)
-        marker_y += 22
 
     y = 112
     for period in month_json.get("pay_periods", [])[:4]:
@@ -729,12 +749,12 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
     rect((28, 790, 1208, 1040), outline=BORDER, width_px=2)
     text(42, 802, "Category", font_obj=bold)
     text(480, 802, "Balance", font_obj=bold, anchor="ra")
-    text(640, 802, "Use/Lose", font_obj=bold, anchor="ra")
+    text(740, 802, "End of Year Use or Loose", font_obj=bold, anchor="ra")
     yy = 816
     for row in _balance_rows(data):
         text(42, yy, row[0])
         text(480, yy, row[1], anchor="ra")
-        text(640, yy, row[2], anchor="ra")
+        text(740, yy, row[2], anchor="ra")
         yy += 19
     text(1224, 764, "Abbreviations", font_obj=bold)
     rect((1224, 790, 1892, 1040), outline=BORDER, width_px=2)
@@ -747,6 +767,10 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
             text(x, yy, abbr, font_obj=bold)
             text(x + 52, yy, label)
             yy += 18
+    for index, (label, fill, outline) in enumerate(_marker_legend_items()):
+        x = 1240 + index * 154
+        rect((x, 1004, x + 16, 1020), fill=fill, outline=outline, width_px=2)
+        text(x + 24, 1005, label)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, format="PNG")

@@ -165,6 +165,8 @@ def test_render_svg_applies_issue_28_cosmetic_layout():
 
     assert ">Markers<" not in svg
     assert ">Projected<" not in svg
+    assert ">Use/Lose<" not in svg
+    assert ">End of Year Use or Loose<" in svg
     assert ">Type<" in svg
     assert ">Earned<" in svg
     assert ">Used<" in svg
@@ -175,6 +177,18 @@ def test_render_svg_applies_issue_28_cosmetic_layout():
     for category in TRANSACTION_CATEGORIES:
         assert f">{CATEGORY_LABELS[category][0]}<" in svg
         assert f">{CATEGORY_LABELS[category][1]}<" in svg
+
+
+def test_render_svg_places_marker_legend_at_bottom_of_abbreviations_section():
+    svg = render_svg(_report_data(), 1920)
+
+    assert 'x="1240.0" y="1004.0" width="16"' in svg
+    assert 'x="1702.0" y="1004.0" width="16"' in svg
+    assert '<text x="1264.0" y="1018.0"' in svg
+    assert ">Holiday<" in svg
+    assert ">Pay Day<" in svg
+    assert ">Pay Period End<" in svg
+    assert ">Today<" in svg
 
 
 def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
