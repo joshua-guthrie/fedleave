@@ -284,6 +284,22 @@ Commands and common options:
 			fedleave add --date 2026-03-12 --category overtime --worked 3
 			fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 
+	accrual-change
+		Change automatic annual or sick leave accrual hours per pay period from an effective date forward.
+
+		Syntax:
+			fedleave accrual-change [--year YEAR] --as-of YYYY-MM-DD|today --category annual|sick --hours HOURS [--reason TEXT] [--json] [--data-dir PATH]
+
+		Notes:
+			- `--year` is optional; if omitted, the leave year is inferred from `--as-of`.
+			- `--category` must be `annual` or `sick`; other leave categories do not have automatic pay-period accrual rows.
+			- The command records an `accrual_rate_changes` entry in the leave-year file.
+			- Existing automatic accrual transactions on or after `--as-of` are updated to the applicable rate. Older data files with missing automatic accrual rows are backfilled using the stored rate changes.
+			- Use this when an employee moves from one accrual tier to another mid-year, such as annual leave changing from 4 to 6 hours per pay period.
+
+		Example:
+			fedleave accrual-change --year 2026 --as-of 2026-07-12 --category annual --hours 6 --reason "15-year service accrual"
+
 	reconcile
 		Add or update a transaction from a payroll, clocking, or recurring reconciliation source.
 
@@ -440,6 +456,7 @@ General rules:
 Commands with native JSON output:
 
 - `add`
+- `accrual-change`
 - `reconcile`
 - `correct`
 - `void`

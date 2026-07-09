@@ -9,6 +9,7 @@ from .commands.starting_balance import starting_balance_set
 from .commands.rollover import rollover
 from .commands.holidays import holidays
 from .commands.balances import balance, daily_activity, month, pay_period_summary, pay_periods_summary
+from .commands.accruals import accrual_change
 
 app.add_typer(starting_balance_app, name="starting-balance")
 

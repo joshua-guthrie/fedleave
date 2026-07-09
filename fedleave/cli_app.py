@@ -22,6 +22,8 @@ Usage:
 Primary commands:
     init        Initialize data directory and create leave year JSON
     add         Add a transaction to a leave year
+    accrual-change
+                Change automatic annual/sick accrual hours from a date forward
     reconcile   Add or update one reconciled transaction by date/category/direction
     list        List transactions for a leave year
     starting-balance
@@ -70,6 +72,12 @@ Command details and examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+
+    fedleave accrual-change [--year YEAR] --as-of YYYY-MM-DD|today --category annual|sick --hours HOURS [--reason TEXT] [--json] [--data-dir PATH]
+        Change automatic annual or sick leave accrual hours per pay period from the effective date forward.
+        Updates future automatic accrual transactions and records the change in accrual_rate_changes.
+    Example:
+        fedleave accrual-change --year 2026 --as-of 2026-07-12 --category annual --hours 6 --reason "15-year service accrual"
 
     fedleave reconcile --date YYYY-MM-DD|today --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
         Infer the leave year from the date, then set the active transaction for that date/category/direction to the requested hours.

@@ -342,12 +342,97 @@ def _has_auto_accrual(leave_year: dict[str, Any], category: str, accrual_date: s
     )
 
 
+def accrual_hours_for_date(leave_year: dict[str, Any], category: str, accrual_date: str) -> float:
+    target = _parse_iso_date(accrual_date)
+    if category == "annual":
+        base_hours = float(leave_year.get("annual_leave_accrual_hours", 0.0))
+    elif category == "sick":
+        base_hours = float(leave_year.get("sick_leave_accrual_hours", 4.0))
+    else:
+        raise ValueError("Automatic accrual changes are supported only for annual and sick leave.")
+
+    effective_changes: list[tuple[date, float]] = []
+    for change in leave_year.get("accrual_rate_changes", []):
+        if change.get("category") != category:
+            continue
+        try:
+            effective_date = _parse_iso_date(str(change.get("effective_date", "")))
+            hours = float(change.get("hours_per_pay_period", base_hours))
+        except (TypeError, ValueError):
+            continue
+        if effective_date <= target:
+            effective_changes.append((effective_date, hours))
+    if not effective_changes:
+        return base_hours
+    effective_changes.sort(key=lambda item: item[0])
+    return effective_changes[-1][1]
+
+
+def upsert_accrual_rate_change(
+    leave_year: dict[str, Any],
+    *,
+    category: str,
+    effective_date: str,
+    hours_per_pay_period: float,
+    reason: str = "",
+) -> dict[str, Any]:
+    if category not in {"annual", "sick"}:
+        raise ValueError("Automatic accrual changes are supported only for annual and sick leave.")
+    if hours_per_pay_period < 0:
+        raise ValueError("Accrual hours must be zero or positive.")
+
+    effective = _parse_iso_date(effective_date).isoformat()
+    previous_hours = accrual_hours_for_date(leave_year, category, effective)
+    changes = leave_year.setdefault("accrual_rate_changes", [])
+    replaced = False
+    for change in changes:
+        if change.get("category") == category and change.get("effective_date") == effective:
+            change["hours_per_pay_period"] = float(hours_per_pay_period)
+            change["reason"] = reason
+            replaced = True
+            break
+    if not replaced:
+        changes.append(
+            {
+                "category": category,
+                "effective_date": effective,
+                "hours_per_pay_period": float(hours_per_pay_period),
+                "reason": reason,
+            }
+        )
+    changes.sort(key=lambda item: (str(item.get("effective_date", "")), str(item.get("category", ""))))
+
+    updated_transactions = 0
+    for transaction in leave_year.get("transactions", []):
+        if (
+            transaction.get("source") != "auto_accrual"
+            or transaction.get("category") != category
+            or transaction.get("direction") != "earned"
+            or transaction.get("void")
+        ):
+            continue
+        tx_date = _parse_iso_date(str(transaction.get("date", "")))
+        if tx_date < _parse_iso_date(effective):
+            continue
+        new_hours = accrual_hours_for_date(leave_year, category, tx_date.isoformat())
+        if float(transaction.get("hours", 0.0)) != new_hours:
+            transaction["hours"] = new_hours
+            updated_transactions += 1
+
+    return {
+        "category": category,
+        "effective_date": effective,
+        "previous_hours_per_pay_period": previous_hours,
+        "new_hours_per_pay_period": float(hours_per_pay_period),
+        "updated_auto_accrual_transactions": updated_transactions,
+        "replaced_existing_change": replaced,
+    }
+
+
 def ensure_automatic_accruals(leave_year: dict[str, Any], through_date: str) -> int:
     """Add missing automatic annual/sick accrual transactions through a date."""
     cutoff = _parse_iso_date(through_date)
     existing_ids = [transaction.get("id", "") for transaction in leave_year.get("transactions", [])]
-    annual_accrual = float(leave_year.get("annual_leave_accrual_hours", 0.0))
-    sick_accrual = float(leave_year.get("sick_leave_accrual_hours", 4.0))
     added = 0
 
     for pay_period in leave_year.get("pay_periods", []):
@@ -356,7 +441,8 @@ def ensure_automatic_accruals(leave_year: dict[str, Any], through_date: str) -> 
         if not accrual_date or _parse_iso_date(accrual_date) > cutoff:
             continue
 
-        for category, hours in (("annual", annual_accrual), ("sick", sick_accrual)):
+        for category in ("annual", "sick"):
+            hours = accrual_hours_for_date(leave_year, category, accrual_date)
             if hours <= 0 or _has_auto_accrual(leave_year, category, accrual_date):
                 continue
             transaction = create_transaction(
