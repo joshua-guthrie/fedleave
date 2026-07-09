@@ -45,7 +45,7 @@ pip install -e .
 
 Run `fedleave --help` after installation.
 
-Date options accept either an ISO date such as `2026-03-10` or the keyword `today`.
+Date options accept either an ISO date such as `2026-03-10` or the keyword `today`. The `balance` command also accepts `leave-year-end` for `--as-of` and `--project-to`.
 
 ## Typical workflow
 
@@ -63,10 +63,12 @@ fedleave add --date 2026-03-12 --category overtime --worked 3 --description "Rel
 fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
 ```
 
-Check balances. Balances are calculated through the requested date; older data files that are missing automatic accrual rows are backfilled through the balance date.
+Check balances. If no date is supplied, balances default to today and the leave year is inferred from today. Older data files that are missing automatic accrual rows are backfilled through the balance date.
 
 ```bash
+fedleave balance
 fedleave balance --year 2026 --as-of 2026-06-01
+fedleave balance --year 2026 --as-of leave-year-end
 ```
 
 Check what was earned, used, and worked during the pay period containing a date:
@@ -346,14 +348,14 @@ Commands and common options:
 	Show leave balances for a year, optionally as of a given date, projected to a future date, and/or with use-or-lose calculations.
 
 	Syntax:
-		fedleave balance --year YEAR [--as-of YYYY-MM-DD|today] [--project] [--project-to YYYY-MM-DD|today] [--use-or-lose] [--json] [--data-dir PATH]
+		fedleave balance [--year YEAR] [--as-of YYYY-MM-DD|today|leave-year-end] [--project] [--project-to YYYY-MM-DD|today|leave-year-end] [--use-or-lose] [--json] [--data-dir PATH]
 
 	Notes:
-		- `--year YEAR` reads the leave year file and computes balances from recorded transactions.
-		- `--as-of YYYY-MM-DD|today` computes balances using only transactions on or before that date.
-		- When `--as-of` is omitted and no projection option is used, balances are calculated through today.
+		- `--year YEAR` is optional. If omitted, the leave year is inferred from `--as-of`; when `--as-of` is omitted or set to `leave-year-end`, it is inferred from today.
+		- `--as-of YYYY-MM-DD|today|leave-year-end` computes balances using only transactions on or before that date. Future `--as-of` dates include automatic annual and sick accruals through that date.
+		- When `--as-of` is omitted, balances are calculated through today.
 		- `init` creates automatic annual and sick leave accrual transactions for the full leave year. Balance commands backfill missing automatic accrual rows for compatibility with older data files.
-		- `--project-to YYYY-MM-DD|today` projects accruals through the specified date.
+		- `--project-to YYYY-MM-DD|today|leave-year-end` projects accruals through the specified date.
 		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection.
 		- `--project` is retained for existing scripts, but is no longer required for normal projection workflows.
 		- `--json` emits balances, use-or-lose values, and automatic accrual posting details.
@@ -858,7 +860,7 @@ Use-or-lose fields:
 Fields:
 
 - `year`: Requested leave year.
-- `as_of`: Cutoff date, or `null` when omitted.
+- `as_of`: Effective cutoff date. When omitted, this defaults to today.
 - `projected`: `true` when `--project-to`, `--project`, or `--use-or-lose` is active.
 - `project_to`: Projection end date when projected; otherwise `null`.
 - `balances`: Balance map by category.
@@ -1373,11 +1375,12 @@ Export/import:
 
 Daily and as-of queries:
 
-	# Current ledger balance through all recorded transactions
-	fedleave balance --year 2026 --data-dir /path/to/data
+	# Current balance as of today
+	fedleave balance --data-dir /path/to/data
 
 	# Balance as of a specific date
 	fedleave balance --year 2026 --as-of 2026-06-01 --data-dir /path/to/data
+	fedleave balance --year 2026 --as-of leave-year-end --data-dir /path/to/data
 
 	# Leave earned/used and overtime worked for the pay period containing a date
 	fedleave pay-period --year 2026 --date 2026-06-01 --data-dir /path/to/data

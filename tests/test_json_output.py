@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -75,6 +76,64 @@ def test_add_balance_and_activity_emit_json(tmp_path: Path, capsys):
     activity = _json_output(capsys)
     assert activity["has_activity"] is True
     assert activity["activity"]["used"]["annual"] == 4.0
+
+
+def test_balance_without_year_defaults_to_today_and_infers_leave_year(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    today = date.today()
+    init_config(
+        year=today.year,
+        leave_year_start=today.isoformat(),
+        annual_accrual=6.0,
+        starting_balances={
+            "annual": 10.0,
+            "sick": 20.0,
+            "comp": 0.0,
+            "credit": 0.0,
+            "travel_comp": 0.0,
+            "time_off_award": 0.0,
+            "religious_comp": 0.0,
+            "restored_annual": 0.0,
+        },
+        data_dir=data_dir,
+    )
+    capsys.readouterr()
+
+    balance(json_output=True, data_dir=data_dir)
+    balances = _json_output(capsys)
+
+    assert balances["year"] == today.year
+    assert balances["as_of"] == today.isoformat()
+    assert balances["balances"]["annual"] == 10.0
+    assert balances["automatic_accruals_posted_through"] == today.isoformat()
+
+
+def test_balance_as_of_leave_year_end_keyword(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+    capsys.readouterr()
+
+    balance(year=2026, as_of="leave-year-end", json_output=True, data_dir=data_dir)
+    balances = _json_output(capsys)
+
+    assert balances["year"] == 2026
+    assert balances["as_of"] == "2027-01-09"
+    assert balances["balances"]["annual"] == 166.0
+    assert balances["balances"]["sick"] == 124.0
+
+
+def test_balance_as_of_future_date_infers_year_and_includes_future_accruals(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+    capsys.readouterr()
+
+    balance(as_of="2026-04-03", json_output=True, data_dir=data_dir)
+    balances = _json_output(capsys)
+
+    assert balances["year"] == 2026
+    assert balances["as_of"] == "2026-04-03"
+    assert balances["balances"]["annual"] == 40.0
+    assert balances["balances"]["sick"] == 40.0
 
 
 def test_correct_and_void_emit_json(tmp_path: Path, capsys):

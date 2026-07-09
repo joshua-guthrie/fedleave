@@ -8,7 +8,7 @@ import typer
 from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
-from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date
+from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, resolve_leave_year_for_date
 from ..config import get_default_data_dir, load_config
 from ..ledger import (
     calculate_balances,
@@ -155,16 +155,45 @@ def _dates_from_pay_periods(pay_periods: list[dict], field: str) -> set[str]:
     return {str(period.get(field)) for period in pay_periods if period.get(field)}
 
 
+def _is_leave_year_end_keyword(value: str | None) -> bool:
+    return bool(value and value.strip().lower() == "leave-year-end")
+
+
+def _resolve_balance_leave_year(
+    year: int | None,
+    as_of: str | None,
+    data_dir: Path | None,
+) -> tuple[int, dict]:
+    if year is not None:
+        return year, load_leave_year(year, data_dir)
+
+    target = "today" if as_of is None or _is_leave_year_end_keyword(as_of) else as_of
+    return resolve_leave_year_for_date(target, data_dir)
+
+
+def _resolve_balance_date(value: str | None, leave_year: dict, *, default_today: bool) -> str | None:
+    if value is None:
+        return _date.today().isoformat() if default_today else None
+    if _is_leave_year_end_keyword(value):
+        leave_year_end = leave_year.get("leave_year_end")
+        if not leave_year_end:
+            raise ValueError("Leave year is missing leave_year_end.")
+        return parse_iso_date(str(leave_year_end)).isoformat()
+    return parse_iso_date(value).isoformat()
+
+
 @app.command()
 def balance(
-    year: int = typer.Option(..., help="Leave year."),
-    as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD or today."),
+    year: int | None = typer.Option(None, help="Leave year. Defaults to the leave year containing --as-of or today."),
+    as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD, today, or leave-year-end."),
     project: bool = typer.Option(False, help="Deprecated compatibility flag; projection is enabled by --project-to or --use-or-lose."),
-    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD or today. Defaults to leave year end when projection is enabled."),
+    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD, today, or leave-year-end. Defaults to leave year end when projection is enabled."),
     use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
+    if isinstance(year, OptionInfo):
+        year = None
     if isinstance(as_of, OptionInfo):
         as_of = None
     if not isinstance(project, bool):
@@ -179,21 +208,17 @@ def balance(
         data_dir = None
 
     try:
-        leave_year = load_leave_year(year, data_dir)
+        year, leave_year = _resolve_balance_leave_year(year, as_of, data_dir)
+        as_of = _resolve_balance_date(as_of, leave_year, default_today=True)
+        project_to = _resolve_balance_date(project_to, leave_year, default_today=False)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
-
-    try:
-        if as_of:
-            as_of = parse_iso_date(as_of).isoformat()
-        if project_to:
-            project_to = parse_iso_date(project_to).isoformat()
     except ValueError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
-    accrual_through = as_of or _date.today().isoformat()
+    accrual_through = as_of
     try:
         added_accruals = ensure_automatic_accruals(leave_year, accrual_through)
     except ValueError as exc:
@@ -203,12 +228,9 @@ def balance(
         write_json(get_leave_year_path(year, data_dir), leave_year)
 
     include_projected = project or use_or_lose or project_to is not None
-    balance_until = as_of
-    if balance_until is None and not include_projected:
-        balance_until = _date.today().isoformat()
     balances = calculate_balances(
         leave_year,
-        until_date=balance_until,
+        until_date=as_of,
         include_projected=include_projected,
         project_until=project_to,
     )
@@ -236,12 +258,10 @@ def balance(
         )
         return
 
-    if as_of:
-        console.print(f"Balances for {year} as of {as_of}:")
-    elif include_projected:
+    if include_projected:
         console.print(f"Projected balances for {year} as of {projection_label}:")
     else:
-        console.print(f"Balances for {year}:")
+        console.print(f"Balances for {year} as of {as_of}:")
 
     for category, amount in sorted(balances.items()):
         console.print(f"  {category}: {amount:.2f}")

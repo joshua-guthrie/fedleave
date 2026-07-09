@@ -83,8 +83,8 @@ Command details and examples:
         Set a leave year's starting balance for one category and record the prior value in starting_balance_history.
         If the matching carryover_from_previous_year value still equals the old starting balance, it is updated too.
 
-    fedleave balance --year YEAR [--as-of YYYY-MM-DD|today] [--project] [--project-to YYYY-MM-DD|today] [--use-or-lose] [--json] [--data-dir PATH]
-        Show balances calculated from the ledger.
+    fedleave balance [--year YEAR] [--as-of YYYY-MM-DD|today|leave-year-end] [--project] [--project-to YYYY-MM-DD|today|leave-year-end] [--use-or-lose] [--json] [--data-dir PATH]
+        Show balances calculated from the ledger as of a date. If omitted, --as-of defaults to today and --year is inferred.
         --project-to projects future annual and sick leave accruals through a custom date.
         --project is retained for compatibility with existing scripts.
         --use-or-lose prints projected annual carryover and annual leave lost above the carryover limit.
