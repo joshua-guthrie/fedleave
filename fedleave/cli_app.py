@@ -22,6 +22,7 @@ Usage:
 Primary commands:
     init        Initialize data directory and create leave year JSON
     add         Add a transaction to a leave year
+    set-day     Authoritatively set signed leave values for one day
     accrual-change
                 Change automatic annual/sick accrual hours from a date forward
     reconcile   Add or update one reconciled transaction by date/category/direction
@@ -72,6 +73,10 @@ Command details and examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+
+    fedleave set-day --date YYYY-MM-DD|today --authoritative --json [--annual HOURS] [--sick HOURS] [--credit HOURS] [--comp HOURS] [--travel-comp HOURS] [--overtime HOURS] [--data-dir PATH]
+        Authoritatively replace active transactions for the supplied categories on a date.
+        Positive values are earned or worked; negative values are used; zero clears active values for that category.
 
     fedleave accrual-change [--year YEAR] --as-of YYYY-MM-DD|today --category annual|sick --hours HOURS [--reason TEXT] [--json] [--data-dir PATH]
         Change automatic annual or sick leave accrual hours per pay period from the effective date forward.

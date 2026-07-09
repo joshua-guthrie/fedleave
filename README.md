@@ -61,6 +61,7 @@ Record leave usage and overtime as it happens:
 fedleave add --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
 fedleave add --date 2026-03-12 --category overtime --worked 3 --description "Release support"
 fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative --description "Actual leave used"
+fedleave set-day --date 2026-07-08 --annual -5 --credit 2 --authoritative --json
 ```
 
 Check balances. If no date is supplied, balances default to today and the leave year is inferred from today. Older data files that are missing automatic accrual rows are backfilled through the balance date.
@@ -91,6 +92,59 @@ Validate and normalize stored JSON data:
 
 ```bash
 fedleave validate --data-dir ~/.local/share/fedleave --apply
+```
+
+## GUI Application: FedLeave Calendar
+
+FedLeave Calendar is a cross-platform PySide6 desktop GUI for the `fedleave` backend. It displays the current month, calendar day values, pay days, pay-period endings, pay-period summaries, and as-of-today balances using `fedleave month --json`.
+
+The GUI does not read or edit leave JSON files directly. Reads and writes go through the selected `fedleave` executable. Day edits call `fedleave set-day --authoritative --json`, then the month is reloaded from the backend.
+
+Current GUI features:
+
+- Month navigation with Previous, Next, and Today
+- Calendar grid based on the month report graphic layout
+- Pay-period panel for periods touching the displayed month
+- As-of-today balance table
+- Authoritative day editing for supplied leave categories
+- Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
+- Help and About dialogs
+- Print preview, printer output, and PDF export
+- Zero values suppressed in day cells, tables, and reports
+
+Run from source:
+
+```bash
+pip install -r requirements.txt
+pip install -r requirements-gui.txt
+pip install -e .
+FedLeaveCalendar
+```
+
+Linux GUI build:
+
+```bash
+scripts/build_gui_pyinstaller.sh
+./dist/FedLeaveCalendar-Ubuntu/FedLeaveCalendar
+```
+
+Windows GUI build:
+
+```powershell
+.\scripts\build_gui_pyinstaller.ps1
+.\dist\FedLeaveCalendar-Windows\FedLeaveCalendar.exe
+```
+
+Install/uninstall helpers:
+
+```bash
+scripts/install_gui_ubuntu.sh
+scripts/uninstall_gui_ubuntu.sh
+```
+
+```powershell
+.\scripts\install_gui_windows.ps1
+.\scripts\uninstall_gui_windows.ps1
 ```
 
 ## Companion Application: AnnualLeaveChartForTheYear
@@ -361,6 +415,19 @@ Commands and common options:
 		Notes:
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction, voiding, or audit work.
 			- `--json` emits active transactions only. Voided transactions remain in the data file for audit history but are omitted from command JSON output.
+
+	set-day
+		Authoritatively set signed leave values for one day.
+
+		Syntax:
+			fedleave set-day --date YYYY-MM-DD|today --authoritative [--json] [--data-dir PATH] [--annual HOURS] [--sick HOURS] [--credit HOURS] [--comp HOURS] [--travel-comp HOURS] [--overtime HOURS] [--admin HOURS] [--lwop HOURS] [--military HOURS] [--court HOURS] [--religious-comp HOURS] [--time-off-award HOURS] [--excused HOURS] [--holiday HOURS] [--flex HOURS] [--other HOURS] [--restored-annual HOURS]
+
+		Notes:
+			- This command is intended for GUI and automation use.
+			- `--authoritative` is required.
+			- Positive values are earned or worked. Negative values are used. Zero clears active values for the supplied category on that date.
+			- Only supplied categories are changed.
+			- The command infers the leave year from `--date`.
 
 	balance
 	Show leave balances for a year, optionally as of a given date, projected to a future date, and/or with use-or-lose calculations.

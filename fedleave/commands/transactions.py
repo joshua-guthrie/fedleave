@@ -19,6 +19,106 @@ from ..ledger import (
 )
 from ..storage import write_json
 
+_SET_DAY_CATEGORIES = [
+    "annual",
+    "sick",
+    "credit",
+    "comp",
+    "travel_comp",
+    "overtime",
+    "admin",
+    "lwop",
+    "military",
+    "court",
+    "religious_comp",
+    "time_off_award",
+    "excused",
+    "holiday",
+    "flex",
+    "other",
+    "restored_annual",
+]
+
+
+def _direction_for_signed_day_value(category: str, value: float) -> tuple[str, float]:
+    if value < 0:
+        return "used", abs(value)
+    if category == "overtime":
+        return "worked", value
+    return "earned", value
+
+
+def _set_day_values(
+    *,
+    date: str,
+    values: dict[str, float | None],
+    authoritative: bool,
+    data_dir: Path | None,
+) -> dict:
+    if not authoritative:
+        raise ValueError("--authoritative is required for set-day.")
+
+    date = parse_iso_date(date).isoformat()
+    year, leave_year = resolve_leave_year_for_date(date, data_dir)
+    transactions = leave_year.setdefault("transactions", [])
+    existing_ids = [transaction.get("id", "") for transaction in transactions]
+    changed: list[dict] = []
+    voided_ids: list[str] = []
+    created_ids: list[str] = []
+
+    for category in _SET_DAY_CATEGORIES:
+        value = values.get(category)
+        if value is None:
+            continue
+        value = float(value)
+        direction, hours = _direction_for_signed_day_value(category, value)
+
+        for transaction in transactions:
+            if transaction.get("void"):
+                continue
+            if transaction.get("date") == date and transaction.get("category") == category:
+                transaction["void"] = True
+                transaction["void_reason"] = "Replaced by authoritative set-day"
+                voided_ids.append(str(transaction.get("id", "")))
+
+        new_id = None
+        if hours:
+            transaction = create_transaction(
+                date=date,
+                category=category,
+                direction=direction,
+                hours=hours,
+                description="Authoritative day value",
+                status="reconciled",
+                source="set-day",
+                existing_ids=existing_ids,
+            )
+            add_transaction_to_leave_year(leave_year, transaction)
+            existing_ids.append(transaction.id)
+            new_id = transaction.id
+            created_ids.append(transaction.id)
+
+        changed.append(
+            {
+                "category": category,
+                "value": value,
+                "direction": direction if hours else None,
+                "hours": hours,
+                "transaction_id": new_id,
+            }
+        )
+
+    write_json(get_leave_year_path(year, data_dir), leave_year)
+    return {
+        "action": "set-day",
+        "year": year,
+        "date": date,
+        "authoritative": True,
+        "changed": changed,
+        "voided_transaction_ids": voided_ids,
+        "created_transaction_ids": created_ids,
+    }
+
 
 @app.command()
 def add(
@@ -132,6 +232,80 @@ def add(
         console.print(f"Added {detail} to {year}{replaced_detail}")
     else:
         console.print(f"Added {detail} to {year}")
+
+
+@app.command(name="set-day")
+def set_day(
+    date: str = typer.Option(..., help="Date to update YYYY-MM-DD or today."),
+    authoritative: bool = typer.Option(False, help="Replace active transactions for supplied categories on this date."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    annual: float | None = typer.Option(None, help="Signed annual leave hours."),
+    sick: float | None = typer.Option(None, help="Signed sick leave hours."),
+    credit: float | None = typer.Option(None, help="Signed credit hours."),
+    comp: float | None = typer.Option(None, help="Signed comp time hours."),
+    travel_comp: float | None = typer.Option(None, "--travel-comp", help="Signed travel comp hours."),
+    overtime: float | None = typer.Option(None, help="Signed overtime hours."),
+    admin: float | None = typer.Option(None, help="Signed admin leave hours."),
+    lwop: float | None = typer.Option(None, help="Signed LWOP hours."),
+    military: float | None = typer.Option(None, help="Signed military leave hours."),
+    court: float | None = typer.Option(None, help="Signed court leave hours."),
+    religious_comp: float | None = typer.Option(None, "--religious-comp", help="Signed religious comp hours."),
+    time_off_award: float | None = typer.Option(None, "--time-off-award", help="Signed time-off award hours."),
+    excused: float | None = typer.Option(None, help="Signed excused leave hours."),
+    holiday: float | None = typer.Option(None, help="Signed holiday hours."),
+    flex: float | None = typer.Option(None, help="Signed flex hours."),
+    other: float | None = typer.Option(None, help="Signed other leave hours."),
+    restored_annual: float | None = typer.Option(None, "--restored-annual", help="Signed restored annual leave hours."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    if not isinstance(authoritative, bool):
+        authoritative = False
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    values = {
+        "annual": annual,
+        "sick": sick,
+        "credit": credit,
+        "comp": comp,
+        "travel_comp": travel_comp,
+        "overtime": overtime,
+        "admin": admin,
+        "lwop": lwop,
+        "military": military,
+        "court": court,
+        "religious_comp": religious_comp,
+        "time_off_award": time_off_award,
+        "excused": excused,
+        "holiday": holiday,
+        "flex": flex,
+        "other": other,
+        "restored_annual": restored_annual,
+    }
+    values = {key: value for key, value in values.items() if not isinstance(value, OptionInfo)}
+    if all(value is None for value in values.values()):
+        console.print("[red]ERROR:[/red] At least one leave category value is required.")
+        raise typer.Exit(code=2)
+
+    try:
+        result = _set_day_values(date=date, values=values, authoritative=authoritative, data_dir=data_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=1)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    if json_output:
+        _print_json(result)
+        return
+
+    console.print(
+        f"Updated {result['date']} in leave year {result['year']} "
+        f"({len(result['created_transaction_ids'])} created, {len(result['voided_transaction_ids'])} voided)."
+    )
 
 
 @app.command()
