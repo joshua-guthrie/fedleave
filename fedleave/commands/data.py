@@ -108,13 +108,41 @@ def _write_import_file(path: Path, data: dict, *, overwrite: bool) -> None:
         atomic_write_json(path, data)
 
 
+def _is_single_leave_year_backup(data: dict) -> bool:
+    return (
+        isinstance(data.get("leave_year"), int)
+        and isinstance(data.get("transactions"), list)
+        and isinstance(data.get("pay_periods"), list)
+    )
+
+
+def _normalize_import_archive(data: dict) -> tuple[dict, str]:
+    if isinstance(data.get("leave_years"), dict):
+        if data.get("schema_version") != 1:
+            raise ValueError("Unsupported import archive schema_version")
+        return data, "archive"
+
+    if _is_single_leave_year_backup(data):
+        year = str(data["leave_year"])
+        return {
+            "schema_version": 1,
+            "config": None,
+            "leave_years": {year: data},
+            "holiday_cache": {},
+        }, "single leave-year backup"
+
+    if data.get("schema_version") != 1:
+        raise ValueError("Unsupported import archive schema_version")
+    raise ValueError("Import archive missing leave_years mapping")
+
+
 @app.command("import-data")
 def import_data(
     input: Path = typer.Option(..., help="Input JSON archive path."),
     overwrite: bool = typer.Option(False, help="Overwrite existing files, creating backups first."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
-    """Import a JSON archive created by export-data."""
+    """Import a JSON archive created by export-data or a single leave-year backup."""
     if not isinstance(overwrite, bool):
         overwrite = False
     if isinstance(data_dir, OptionInfo):
@@ -130,11 +158,10 @@ def import_data(
         console.print(f"[red]ERROR:[/red] Invalid JSON archive: {exc}")
         raise typer.Exit(code=3)
 
-    if archive.get("schema_version") != 1:
-        console.print("[red]ERROR:[/red] Unsupported import archive schema_version")
-        raise typer.Exit(code=2)
-    if not isinstance(archive.get("leave_years"), dict):
-        console.print("[red]ERROR:[/red] Import archive missing leave_years mapping")
+    try:
+        archive, import_kind = _normalize_import_archive(archive)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
     base = get_default_data_dir(data_dir)
@@ -166,7 +193,7 @@ def import_data(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
-    console.print(f"Imported fedleave data into {base}")
+    console.print(f"Imported fedleave {import_kind} into {base}")
 
 @app.command(name="validate")
 def validate(

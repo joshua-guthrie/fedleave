@@ -33,7 +33,7 @@ Primary commands:
     pay-periods Show earned, used, overtime totals, and balances for every pay period
     month       Show calendar-day leave entries and pay periods for a month
     export-data Export config, leave years, and holiday cache to a JSON archive
-    import-data Import a JSON archive created by export-data
+    import-data Import a JSON archive created by export-data or a single leave-year backup
     correct     Audit-safe correction of transactions
     void        Void a transaction (preserve audit history)
     rollover    Preview or apply leave year rollover
@@ -111,7 +111,7 @@ Command details and examples:
         Export config, leave year files, and holiday cache to a portable JSON archive.
 
     fedleave import-data --input fedleave_backup.json [--overwrite] [--data-dir PATH]
-        Import a JSON archive created by export-data. Existing files are preserved unless --overwrite is used.
+        Import a JSON archive created by export-data or a single leave-year backup. Existing files are preserved unless --overwrite is used.
 
     fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--json] [--show-transaction-ids] [--data-dir PATH]
         Perform an audit-safe correction: void the original transaction and create a replacement linked to it.

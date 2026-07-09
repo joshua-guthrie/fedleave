@@ -55,3 +55,47 @@ def test_import_refuses_overwrite_without_flag(tmp_path: Path):
 
     with pytest.raises(typer.Exit):
         import_data(input=archive, data_dir=target)
+
+
+def test_import_accepts_single_leave_year_backup(tmp_path: Path):
+    target = tmp_path / "target"
+    archive = tmp_path / "single-leave-year-backup.json"
+    legacy_leave_year = {
+        "schema_version": 1,
+        "leave_year": 2026,
+        "leave_year_start": "2026-01-11",
+        "leave_year_end": "2027-01-09",
+        "pay_period_count": 1,
+        "annual_leave_accrual_hours": 6.0,
+        "sick_leave_accrual_hours": 4.0,
+        "starting_balances": {"annual": 120.0, "sick": 180.0},
+        "carryover_from_previous_year": {"annual": 120.0, "sick": 180.0},
+        "transactions": [
+            {
+                "id": "20260124-001",
+                "date": "2026-01-24",
+                "category": "annual",
+                "direction": "earned",
+                "hours": 6.0,
+                "description": "Automatic annual leave accrual",
+                "status": "reconciled",
+                "source": "auto_accrual",
+            }
+        ],
+        "pay_periods": [
+            {
+                "pay_period_number": 1,
+                "start_date": "2026-01-11",
+                "end_date": "2026-01-24",
+                "accrual_date": "2026-01-24",
+            }
+        ],
+        "holidays": [],
+    }
+    archive.write_text(json.dumps(legacy_leave_year), encoding="utf-8")
+
+    import_data(input=archive, data_dir=target)
+
+    imported = json.loads((target / "leave_years" / "2026.json").read_text(encoding="utf-8"))
+    assert imported == legacy_leave_year
+    assert not (target / "config.json").exists()

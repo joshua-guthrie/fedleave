@@ -342,7 +342,7 @@ Commands and common options:
 			fedleave export-data --output PATH [--data-dir PATH]
 
 	import-data
-		Import an archive created by `export-data`.
+		Import an archive created by `export-data` or a single leave-year backup JSON file.
 
 		Syntax:
 			fedleave import-data --input PATH [--overwrite] [--data-dir PATH]
@@ -350,6 +350,7 @@ Commands and common options:
 		Notes:
 			- Existing files are preserved by default.
 			- Use `--overwrite` to replace existing files; overwritten files are backed up first.
+			- Single leave-year backup files with top-level `leave_year`, `transactions`, and `pay_periods` fields are imported into `leave_years/YEAR.json` for backwards compatibility.
 
 	list
 		List active transactions for a leave year.
