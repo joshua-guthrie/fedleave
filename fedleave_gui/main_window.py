@@ -186,6 +186,7 @@ class DayEditDialog(QDialog):
         self.setWindowTitle(f"Edit {day['date']}")
         self.day = day
         self.inputs: dict[str, QDoubleSpinBox] = {}
+        self.directions: dict[str, QComboBox] = {}
         values: dict[str, float] = {}
         for entry in day.get("entries", []):
             value = _entry_value(entry)
@@ -194,15 +195,13 @@ class DayEditDialog(QDialog):
             values[value.category] = values.get(value.category, 0.0) + value.value
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("Authoritative nonzero values for this day. Positive values are earned/worked; negative values are used."))
+        layout.addWidget(QLabel("Choose Use or Earn for each leave type, then enter positive hours."))
         form = QFormLayout()
         for category, (_, label) in CATEGORY_LABELS.items():
             current = values.get(category, 0.0)
             if not _nonzero(current):
                 continue
-            spinner = self._spinner(current)
-            self.inputs[category] = spinner
-            form.addRow(label, spinner)
+            form.addRow(label, self._input_row(category, current))
         self.add_category = QComboBox()
         for category, (_, label) in CATEGORY_LABELS.items():
             if category not in self.inputs:
@@ -222,24 +221,42 @@ class DayEditDialog(QDialog):
 
     def _spinner(self, value: float = 0.0) -> QDoubleSpinBox:
         spinner = QDoubleSpinBox()
-        spinner.setRange(-24.0, 24.0)
+        spinner.setRange(0.0, 24.0)
         spinner.setSingleStep(0.25)
         spinner.setDecimals(2)
-        spinner.setValue(value)
+        spinner.setValue(abs(value))
         return spinner
+
+    def _input_row(self, category: str, value: float = 0.0) -> QWidget:
+        direction = QComboBox()
+        direction.addItem("Use", "use")
+        direction.addItem("Earn", "earn")
+        if value > 0:
+            direction.setCurrentIndex(direction.findData("earn"))
+        spinner = self._spinner(value)
+        self.directions[category] = direction
+        self.inputs[category] = spinner
+
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.addWidget(direction)
+        row_layout.addWidget(spinner, 1)
+        return row
 
     def _add_selected_category(self) -> None:
         category = self.add_category.currentData()
         if not category or category in self.inputs:
             return
-        spinner = self._spinner()
-        self.inputs[category] = spinner
-        self.form.addRow(CATEGORY_LABELS[category][1], spinner)
+        self.form.addRow(CATEGORY_LABELS[category][1], self._input_row(category))
         index = self.add_category.currentIndex()
         self.add_category.removeItem(index)
 
     def values(self) -> dict[str, float]:
-        return {category: widget.value() for category, widget in self.inputs.items()}
+        return {
+            category: (-widget.value() if self.directions[category].currentData() == "use" else widget.value())
+            for category, widget in self.inputs.items()
+        }
 
 
 class PreferencesDialog(QDialog):
