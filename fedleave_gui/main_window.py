@@ -756,10 +756,12 @@ class MainWindow(QMainWindow):
 
     def about_backend(self) -> None:
         try:
-            text = self.backend.run_text(["--version"])
-        except BackendError:
-            text = "fedleave backend version could not be read."
-        QMessageBox.information(self, "About fedleave Backend", text.strip() or "fedleave backend")
+            version = self.backend.version()
+            executable = self.backend.executable_path()
+        except BackendError as exc:
+            QMessageBox.warning(self, "About fedleave Backend", f"Backend information could not be read.\n\n{exc}")
+            return
+        QMessageBox.information(self, "About fedleave Backend", f"{version}\n\nExecutable: {executable}")
 
 
 def _monday_first(days: list[dict[str, Any]]) -> list[dict[str, Any]]:

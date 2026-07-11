@@ -5,6 +5,8 @@ import json
 import typer
 from rich.console import Console
 
+from . import __version__
+
 
 console = Console()
 
@@ -163,5 +165,26 @@ Exit codes:
 For full project specification and advanced usage, see the README in the project root.
 """
 
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"fedleave {__version__}")
+        raise typer.Exit()
+
+
 app = typer.Typer(help=HELP_TEXT, add_completion=False)
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the fedleave backend version and exit.",
+    ),
+) -> None:
+    """Federal leave and time tracker."""
+
+
 starting_balance_app = typer.Typer(help="Manage leave year starting balances.")

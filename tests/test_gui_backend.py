@@ -19,6 +19,8 @@ elif args[:1] == ["set-day"]:
     print(json.dumps({"action": "set-day", "args": args}))
 elif args[:1] == ["validate"]:
     print(json.dumps({"ok": True}))
+elif args[:1] == ["--version"]:
+    print("fedleave 0.2.0")
 else:
     print("ok")
 """,
@@ -50,3 +52,11 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     assert "--credit" in args
     assert "2" in args
     assert args[-2:] == ["--data-dir", str(tmp_path / "data")]
+
+
+def test_gui_backend_reports_version_and_executable_path(tmp_path: Path):
+    fake = _fake_fedleave(tmp_path / "fedleave")
+    backend = FedleaveBackend(BackendOptions(fedleave_path=str(fake), data_dir=str(tmp_path / "data")))
+
+    assert backend.version() == "fedleave 0.2.0"
+    assert backend.executable_path() == fake

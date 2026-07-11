@@ -45,6 +45,8 @@ pip install -e .
 
 Run `fedleave --help` after installation.
 
+Use `fedleave --version` to verify the installed backend version.
+
 Date options accept either an ISO date such as `2026-03-10` or the keyword `today`. The `balance` command also accepts `leave-year-end` for `--as-of` and `--project-to`.
 
 ## Typical workflow

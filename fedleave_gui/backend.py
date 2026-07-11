@@ -85,16 +85,25 @@ class FedleaveBackend:
             raise BackendError("fedleave returned an unexpected JSON payload.")
         return payload
 
-    def run_text(self, args: list[str]) -> str:
+    def run_text(self, args: list[str], *, include_data_dir: bool = True) -> str:
         fedleave = find_fedleave(self.options.fedleave_path)
         command = [str(fedleave), *args]
-        if self.options.data_dir:
+        if include_data_dir and self.options.data_dir:
             command.extend(["--data-dir", self.options.data_dir])
         result = subprocess.run(command, text=True, capture_output=True, check=False)
         if result.returncode != 0:
             message = (result.stderr or result.stdout or "fedleave command failed").strip()
             raise BackendError(message)
         return result.stdout
+
+    def executable_path(self) -> Path:
+        return find_fedleave(self.options.fedleave_path)
+
+    def version(self) -> str:
+        version = self.run_text(["--version"], include_data_dir=False).strip()
+        if not version:
+            raise BackendError("fedleave backend returned an empty version response.")
+        return version
 
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])
