@@ -112,8 +112,28 @@ class DayCell(QPushButton):
         self.day = day
         self.setMinimumSize(112, 92)
         self.setCursor(Qt.PointingHandCursor)
-        self.setText(self._text_for_day(settings))
+        self._display_text = self._text_for_day(settings)
+        lines = self._display_text.splitlines()
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(6, 4, 6, 6)
+        layout.setSpacing(2)
+        self.day_label = QLabel(lines[0])
+        self.day_label.setObjectName("dayNumber")
+        self.day_label.setAlignment(Qt.AlignRight | Qt.AlignTop)
+        self.day_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        layout.addWidget(self.day_label)
+
+        self.details_label = QLabel("\n".join(lines[1:]))
+        self.details_label.setObjectName("dayDetails")
+        self.details_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.details_label.setWordWrap(True)
+        self.details_label.setAttribute(Qt.WA_TransparentForMouseEvents)
+        layout.addWidget(self.details_label, 1)
         self.setStyleSheet(self._style_for_day(settings))
+
+    def display_text(self) -> str:
+        return self._display_text
 
     def _text_for_day(self, settings: GuiSettings) -> str:
         parts = [str(int(str(self.day["date"])[-2:]))]
@@ -153,8 +173,9 @@ class DayCell(QPushButton):
         return (
             "QPushButton {"
             f"background: {background}; border: 1px solid {border}; color: #1f2937;"
-            "text-align: left; padding: 6px; font-family: monospace;"
+            "font-family: monospace;"
             "}"
+            "QLabel { color: #1f2937; background: transparent; border: none; }"
             "QPushButton:hover { border-width: 2px; }"
         )
 
@@ -629,7 +650,7 @@ class MainWindow(QMainWindow):
         for row in range(0, len(days), 7):
             parts.append("<tr>")
             for day in days[row : row + 7]:
-                lines = html.escape(DayCell(day, self.settings).text()).replace("\n", "<br>")
+                lines = html.escape(DayCell(day, self.settings).display_text()).replace("\n", "<br>")
                 parts.append(f"<td valign='top' width='14%'>{lines}</td>")
             parts.append("</tr>")
         parts.append("</table><h2>Pay Periods</h2><ul>")
