@@ -7,7 +7,6 @@ $ErrorActionPreference = 'Stop'
 
 $HERE = Resolve-Path "$PSScriptRoot\.."
 $DIST_ROOT = [System.IO.Path]::GetFullPath($Dist)
-$APP_DIST = Join-Path $DIST_ROOT "FedLeaveCalendar-Windows"
 $VENV_DIR = Join-Path $HERE ".pyinstaller-gui-venv"
 
 python -m venv "$VENV_DIR"
@@ -26,13 +25,18 @@ if __name__ == '__main__':
     main()
 "@ | Set-Content -Path $ENTRY -Encoding utf8
 
-if (Test-Path $APP_DIST) {
-    Remove-Item -Recurse -Force $APP_DIST
+foreach ($LegacyPath in @(
+    (Join-Path $DIST_ROOT "FedLeaveCalendar-Windows"),
+    (Join-Path $DIST_ROOT "FedLeaveCalendar")
+)) {
+    if (Test-Path $LegacyPath) {
+        Remove-Item -Recurse -Force $LegacyPath
+    }
 }
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller `
     --noconfirm `
-    --onedir `
+    --onefile `
     --windowed `
     --name FedLeaveCalendar `
     --add-data "$HERE\help;help" `
@@ -45,10 +49,6 @@ if (Test-Path $APP_DIST) {
     --specpath "$HERE\.pyinstaller-spec" `
     "$ENTRY"
 
-Move-Item -Force (Join-Path $DIST_ROOT "FedLeaveCalendar") $APP_DIST
-Copy-Item -Force (Join-Path $DIST_ROOT "fedleave.exe") (Join-Path $APP_DIST "fedleave.exe")
-Copy-Item -Recurse -Force (Join-Path $HERE "help") (Join-Path $APP_DIST "help")
-
-Write-Host "GUI build complete: $APP_DIST"
+Write-Host "GUI build complete: $DIST_ROOT"
 Write-Host "  - FedLeaveCalendar.exe"
-Write-Host "  - fedleave.exe"
+Write-Host "  - fedleave.exe (shared backend; not duplicated)"

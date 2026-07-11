@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $HERE = Resolve-Path "$PSScriptRoot\.."
-$APP_SRC = Join-Path $HERE "dist\FedLeaveCalendar-Windows"
+$APP_SRC = Join-Path $HERE "dist"
 $INSTALL_DIR = Join-Path $env:LOCALAPPDATA "Programs\FedLeaveCalendar"
 
 if (-not (Test-Path (Join-Path $APP_SRC "FedLeaveCalendar.exe"))) {
@@ -14,7 +14,8 @@ if (-not (Test-Path (Join-Path $APP_SRC "FedLeaveCalendar.exe"))) {
 }
 
 New-Item -ItemType Directory -Force -Path $INSTALL_DIR | Out-Null
-Copy-Item -Recurse -Force (Join-Path $APP_SRC "*") $INSTALL_DIR
+Copy-Item -Force (Join-Path $APP_SRC "FedLeaveCalendar.exe") $INSTALL_DIR
+Copy-Item -Force (Join-Path $APP_SRC "fedleave.exe") $INSTALL_DIR
 
 $shell = New-Object -ComObject WScript.Shell
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\FedLeave Calendar.lnk"

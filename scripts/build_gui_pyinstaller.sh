@@ -4,7 +4,6 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 VENV_DIR="$HERE/.pyinstaller-gui-venv"
 DIST_ROOT="$HERE/dist"
-APP_DIST="$DIST_ROOT/FedLeaveCalendar-Ubuntu"
 
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
@@ -23,10 +22,10 @@ if __name__ == '__main__':
     main()
 PY
 
-rm -rf "$APP_DIST"
+rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar"
 pyinstaller \
   --noconfirm \
-  --onedir \
+  --onefile \
   --windowed \
   --name FedLeaveCalendar \
   --add-data "$HERE/help:help" \
@@ -39,10 +38,6 @@ pyinstaller \
   --specpath "$HERE/.pyinstaller-spec" \
   "$ENTRY"
 
-mv "$DIST_ROOT/FedLeaveCalendar" "$APP_DIST"
-cp "$DIST_ROOT/fedleave" "$APP_DIST/fedleave"
-cp -R "$HERE/help" "$APP_DIST/help"
-
-echo "GUI build complete: $APP_DIST"
+echo "GUI build complete: $DIST_ROOT"
 echo "  - FedLeaveCalendar"
-echo "  - fedleave"
+echo "  - fedleave (shared backend; not duplicated)"

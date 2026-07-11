@@ -1,0 +1,31 @@
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_linux_gui_build_uses_single_file_root_layout():
+    script = (ROOT / "scripts" / "build_gui_pyinstaller.sh").read_text()
+
+    assert "--onefile" in script
+    assert 'cp "$DIST_ROOT/fedleave"' not in script
+    assert 'APP_DIST="$DIST_ROOT/FedLeaveCalendar-Ubuntu"' not in script
+
+
+def test_windows_gui_build_uses_single_file_root_layout():
+    script = (ROOT / "scripts" / "build_gui_pyinstaller.ps1").read_text()
+
+    assert "--onefile" in script
+    assert "Copy-Item -Force (Join-Path $DIST_ROOT \"fedleave.exe\")" not in script
+    assert 'APP_DIST = Join-Path $DIST_ROOT "FedLeaveCalendar-Windows"' not in script
+
+
+def test_gui_installers_copy_the_shared_backend_from_dist_root():
+    linux = (ROOT / "scripts" / "install_gui_ubuntu.sh").read_text()
+    windows = (ROOT / "scripts" / "install_gui_windows.ps1").read_text()
+
+    assert 'APP_SRC="$HERE/dist"' in linux
+    assert 'cp "$APP_SRC/FedLeaveCalendar" "$APP_SRC/fedleave" "$INSTALL_DIR/"' in linux
+    assert '$APP_SRC = Join-Path $HERE "dist"' in windows
+    assert 'Join-Path $APP_SRC "FedLeaveCalendar.exe"' in windows
+    assert 'Join-Path $APP_SRC "fedleave.exe"' in windows

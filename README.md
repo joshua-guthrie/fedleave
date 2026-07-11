@@ -125,15 +125,19 @@ Linux GUI build:
 
 ```bash
 scripts/build_gui_pyinstaller.sh
-./dist/FedLeaveCalendar-Ubuntu/FedLeaveCalendar
+./dist/FedLeaveCalendar
 ```
 
 Windows GUI build:
 
 ```powershell
 .\scripts\build_gui_pyinstaller.ps1
-.\dist\FedLeaveCalendar-Windows\FedLeaveCalendar.exe
+.\dist\FedLeaveCalendar.exe
 ```
+
+Both GUI build scripts place all executables directly in `dist/`. The GUI uses
+the sibling `fedleave` executable as its backend, so only one backend binary is
+built and distributed at the root instead of being duplicated in a GUI bundle.
 
 Install/uninstall helpers:
 
