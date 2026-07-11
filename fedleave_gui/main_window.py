@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QGridLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -432,10 +433,15 @@ class MainWindow(QMainWindow):
         top.addWidget(self.calendar_widget, 3)
         side = QVBoxLayout()
         side.addWidget(QLabel("Pay Periods"))
-        self.pay_period_table = QTableWidget(0, 4)
-        self.pay_period_table.setHorizontalHeaderLabels(["Period", "Dates", "Pay Day", "Summary"])
-        self.pay_period_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        side.addWidget(self.pay_period_table)
+        self.pay_period_scroll = QScrollArea()
+        self.pay_period_scroll.setWidgetResizable(True)
+        self.pay_period_widget = QWidget()
+        self.pay_period_layout = QVBoxLayout(self.pay_period_widget)
+        self.pay_period_layout.setContentsMargins(0, 0, 0, 0)
+        self.pay_period_layout.setSpacing(8)
+        self.pay_period_scroll.setWidget(self.pay_period_widget)
+        self.pay_period_tables: list[QTableWidget] = []
+        side.addWidget(self.pay_period_scroll)
         top.addLayout(side, 1)
         root_layout.addLayout(top, 4)
         root_layout.addWidget(QLabel("As of Today"))
@@ -539,23 +545,42 @@ class MainWindow(QMainWindow):
 
     def _render_pay_periods(self) -> None:
         periods = [period for period in self.month_json.get("pay_periods", []) if period.get("touches_display_month")]
-        self.pay_period_table.setRowCount(0)
+        while self.pay_period_layout.count():
+            item = self.pay_period_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        self.pay_period_tables = []
+        if not periods:
+            self.pay_period_layout.addWidget(QLabel("No pay periods touch this month."))
+            self.pay_period_layout.addStretch(1)
+            return
         for period in periods:
-            row = self.pay_period_table.rowCount()
-            self.pay_period_table.insertRow(row)
-            summaries = []
-            for category, totals in sorted((period.get("totals") or {}).items()):
-                parts = []
-                for key in ("earned", "used", "worked", "net"):
-                    value = totals.get(key)
-                    if _nonzero(value):
-                        parts.append(f"{key} {_fmt(value, signed=True)}")
-                balance = (period.get("ending_balances") or {}).get(category)
-                if _nonzero(balance):
-                    parts.append(f"bal {_fmt(balance)}")
-                if parts:
-                    summaries.append(f"{CATEGORY_LABELS.get(category, ('', category))[1]}: " + ", ".join(parts))
-            self._set_row(self.pay_period_table, row, [str(period.get("number") or ""), f"{period.get('start')} to {period.get('end')}", str(period.get("pay_date") or ""), "\n".join(summaries)])
+            title = f"PP {period.get('number') or ''}: {period.get('start') or ''} to {period.get('end') or ''}"
+            group = QGroupBox(title)
+            group_layout = QVBoxLayout(group)
+            pay_date = QLabel(f"Pay date: {period.get('pay_date') or 'Not available'}")
+            pay_date.setStyleSheet("color: #475569;")
+            group_layout.addWidget(pay_date)
+
+            rows = _pay_period_rows(period)
+            table = QTableWidget(len(rows), 4)
+            table.setHorizontalHeaderLabels(["Type", "Earned", "Used", "Balance"])
+            table.verticalHeader().setVisible(False)
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+            for column in range(1, 4):
+                table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
+            table.setSelectionMode(QTableWidget.NoSelection)
+            table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            for row, values in enumerate(rows):
+                self._set_row(table, row, values)
+            table.resizeRowsToContents()
+            row_height = table.verticalHeader().defaultSectionSize()
+            table.setFixedHeight(table.horizontalHeader().height() + max(1, len(rows)) * row_height + 4)
+            group_layout.addWidget(table)
+            self.pay_period_layout.addWidget(group)
+            self.pay_period_tables.append(table)
+        self.pay_period_layout.addStretch(1)
 
     def _render_balances(self) -> None:
         balance = ((self.month_json.get("balance_as_of_today") or {}).get("balances") or {})
@@ -766,6 +791,23 @@ def _monday_first(days: list[dict[str, Any]]) -> list[dict[str, Any]]:
         else:
             reordered.extend(row)
     return reordered
+
+
+def _pay_period_rows(period: dict[str, Any]) -> list[list[str]]:
+    totals = period.get("totals") or {}
+    balances = period.get("ending_balances") or {}
+    categories = sorted({*totals, *balances})
+    rows: list[list[str]] = []
+    for category in categories:
+        category_totals = totals.get(category) or {}
+        earned = _fmt(category_totals.get("earned"))
+        used = _fmt(category_totals.get("used"))
+        balance = _fmt(balances.get(category))
+        if not any((earned, used, balance)):
+            continue
+        label = CATEGORY_LABELS.get(category, (category, category))[1]
+        rows.append([label, earned, used, balance])
+    return rows
 
 
 def _help_file(filename: str) -> Path:

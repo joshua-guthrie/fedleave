@@ -106,7 +106,7 @@ Current GUI features:
 
 - Month navigation with Previous, Next, and Today
 - Calendar grid based on the month report graphic layout
-- Pay-period panel for periods touching the displayed month
+- Separate Type/Earned/Used/Balance tables for pay periods touching the displayed month
 - As-of-today balance table
 - Authoritative day editing with explicit Use/Earn controls and positive hour entry
 - Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
