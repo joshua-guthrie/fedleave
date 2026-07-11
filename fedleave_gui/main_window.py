@@ -259,6 +259,29 @@ class DayEditDialog(QDialog):
         }
 
 
+class AbbreviationsDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Leave Abbreviations")
+        self.resize(520, 520)
+        layout = QVBoxLayout(self)
+        self.table = QTableWidget(len(CATEGORY_LABELS), 2)
+        self.table.setHorizontalHeaderLabels(["Abbreviation", "Leave Type"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.setSelectionMode(QTableWidget.NoSelection)
+        for row, (short, label) in enumerate(CATEGORY_LABELS.values()):
+            for column, value in enumerate((short, label)):
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                self.table.setItem(row, column, item)
+        layout.addWidget(self.table)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+
 class PreferencesDialog(QDialog):
     def __init__(self, settings: GuiSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -729,8 +752,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def show_abbreviations(self) -> None:
-        rows = "\n".join(f"{short}: {label}" for short, label in CATEGORY_LABELS.values())
-        QMessageBox.information(self, "Leave Abbreviations", rows)
+        AbbreviationsDialog(self).exec()
 
     def about_backend(self) -> None:
         try:
