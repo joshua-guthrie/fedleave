@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from .config import get_default_data_dir
-from .storage import load_json
+from .storage import load_json, remove_legacy_transaction_history, write_json
 from .validation import sanitize_text
+
+
 def resolve_data_dir(data_dir: Path | None) -> Path:
     return get_default_data_dir(data_dir)
 
@@ -21,7 +23,10 @@ def load_leave_year(year: int, data_dir: Path | None = None) -> dict[str, Any]:
     path = get_leave_year_path(year, data_dir)
     if not path.exists():
         raise FileNotFoundError(f"Leave year file not found: {path}")
-    return load_json(path)
+    leave_year = load_json(path)
+    if remove_legacy_transaction_history(leave_year):
+        write_json(path, leave_year)
+    return leave_year
 
 
 def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = None) -> tuple[int, dict[str, Any]]:
@@ -35,6 +40,8 @@ def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = N
         if not path.is_file() or path.suffix != ".json":
             continue
         leave_year = load_json(path)
+        if remove_legacy_transaction_history(leave_year):
+            write_json(path, leave_year)
         try:
             start = parse_iso_date(str(leave_year.get("leave_year_start", "")))
             end = parse_iso_date(str(leave_year.get("leave_year_end", "")))

@@ -39,7 +39,6 @@ TRANSACTION_DIRECTIONS = [
     "restored",
     "corrected",
     "reconciled",
-    "voided",
 ]
 
 TRANSACTION_STATUSES = [
@@ -56,7 +55,7 @@ TRANSACTION_STATUSES = [
 
 
 EARNED_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled"}
-USED_DIRECTIONS = {"used", "expired", "forfeited", "voided"}
+USED_DIRECTIONS = {"used", "expired", "forfeited"}
 WORKED_DIRECTIONS = {"worked"}
 
 
@@ -71,10 +70,6 @@ class Transaction(BaseModel):
     source: str = "manual"
     created_at: str = Field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now().isoformat())
-    void: bool = False
-    void_reason: str | None = None
-    replaces_transaction_id: str | None = None
-    correction_reason: str | None = None
     expiration_date: str | None = None
     expiration_pay_period: int | None = None
     earned_transaction_id: str | None = None

@@ -30,7 +30,7 @@ Primary commands:
     reconcile   Add or update one reconciled transaction by date/category/direction
     list        List transactions for a leave year
     starting-balance
-                Set starting balances with audit history
+                Set starting balances
     balance     Show balances calculated from the ledger
     use-or-lose Show year-end annual carryover and use-or-lose for a leave year
     pay-period  Show earned, used, overtime totals, and balances for a pay period
@@ -38,8 +38,8 @@ Primary commands:
     month       Show calendar-day leave entries and pay periods for a month
     export-data Export config, leave years, and holiday cache to a JSON archive
     import-data Import a JSON archive created by export-data or a single leave-year backup
-    correct     Audit-safe correction of transactions
-    void        Void a transaction (preserve audit history)
+    correct     Update a transaction in place
+    void        Delete a transaction (legacy command name)
     rollover    Preview or apply leave year rollover
     holidays    Manage federal holiday data
     help        Show this detailed help
@@ -67,7 +67,7 @@ Command details and examples:
 
     fedleave add --year YEAR --date YYYY-MM-DD|today --category CATEGORY [--earned HOURS | --used HOURS | --worked HOURS | --adjusted HOURS] [--description TEXT] [--status STATUS] [--source SOURCE] [--authoritative] [--json] [--show-transaction-ids]
         Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
-        --authoritative voids active transactions with the same date, category, and direction before adding the new transaction.
+        --authoritative removes transactions with the same date, category, and direction before adding the new transaction.
         --json emits the created transaction ID and any replaced transaction IDs.
         Transaction IDs are hidden by default in human-readable output. Use --show-transaction-ids when needed.
         Valid categories: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual
@@ -89,14 +89,14 @@ Command details and examples:
 
     fedleave reconcile --date YYYY-MM-DD|today --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
         Infer the leave year from the date, then set the active transaction for that date/category/direction to the requested hours.
-        Adds a transaction when no active match exists. Updates exactly one active match and records reconcile_history.
+        Adds a transaction when no match exists. Updates exactly one match in place without retaining prior values.
         If multiple active matches exist, rerun with --id to choose the transaction.
 
     fedleave list --year YEAR [--json] [--show-transaction-ids] [--data-dir PATH]
         List active transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
 
     fedleave starting-balance set --year YEAR --category CATEGORY --hours HOURS --reason TEXT [--data-dir PATH]
-        Set a leave year's starting balance for one category and record the prior value in starting_balance_history.
+        Set a leave year's starting balance for one category, retaining only the final value.
         If the matching carryover_from_previous_year value still equals the old starting balance, it is updated too.
 
     fedleave balance [--year YEAR] [--as-of YYYY-MM-DD|today|leave-year-end] [--project] [--project-to YYYY-MM-DD|today|leave-year-end] [--use-or-lose] [--json] [--data-dir PATH]
@@ -128,12 +128,12 @@ Command details and examples:
         Import a JSON archive created by export-data or a single leave-year backup. Existing files are preserved unless --overwrite is used.
 
     fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--json] [--show-transaction-ids] [--data-dir PATH]
-        Perform an audit-safe correction: void the original transaction and create a replacement linked to it.
+        Update the selected transaction in place, preserving its ID and retaining only final values.
     Example:
         fedleave correct --id 20260310-001 --hours 3 --reason "Only used 3 hours"
 
     fedleave void --id TRANSACTION_ID --reason "TEXT" [--json] [--show-transaction-ids] [--data-dir PATH]
-        Mark a transaction as void while preserving its record.
+        Delete a transaction. The `void` name is retained for compatibility with existing scripts.
     Example:
         fedleave void --id 20260310-002 --reason "Entered in error"
 
@@ -192,6 +192,14 @@ def main(
     ),
 ) -> None:
     """Federal leave and time tracker."""
+    from .config import get_default_data_dir
+    from .storage import migrate_leave_year_files
+
+    try:
+        migrate_leave_year_files(get_default_data_dir())
+    except (OSError, ValueError, json.JSONDecodeError):
+        # The requested command reports malformed or inaccessible data with context.
+        pass
 
 
 starting_balance_app = typer.Typer(help="Manage leave year starting balances.")

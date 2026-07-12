@@ -7,7 +7,7 @@ from fedleave.storage import write_json
 from fedleave.cli import correct, list_transactions
 
 
-def test_correct_creates_replacement(tmp_path: Path):
+def test_correct_updates_transaction_in_place(tmp_path: Path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     init_config(
@@ -33,6 +33,8 @@ def test_correct_creates_replacement(tmp_path: Path):
     # add a transaction
     leave_year = __import__('json').loads(year_file.read_text())
     t = create_transaction(date="2026-03-10", category="annual", direction="used", hours=4.0, existing_ids=[])
+    t.expiration_date = "2026-12-31"
+    t.earned_transaction_id = "20260101-001"
     add_transaction_to_leave_year(leave_year, t)
     write_json(year_file, leave_year)
 
@@ -40,10 +42,11 @@ def test_correct_creates_replacement(tmp_path: Path):
     correct(id=t.id, hours=3.0, reason="Only used 3 hours", data_dir=data_dir)
 
     ly2 = __import__('json').loads(year_file.read_text())
-    # original should be void
-    orig = next(x for x in ly2['transactions'] if x['id'] == t.id)
-    assert orig['void'] is True
-    # replacement exists
-    repls = [x for x in ly2['transactions'] if x.get('replaces_transaction_id') == t.id]
-    assert len(repls) == 1
-    assert abs(repls[0]['hours'] - 3.0) < 1e-6
+    matches = [x for x in ly2['transactions'] if x['id'] == t.id]
+    assert len(matches) == 1
+    assert abs(matches[0]['hours'] - 3.0) < 1e-6
+    assert matches[0]["description"] == "Only used 3 hours"
+    assert matches[0]["expiration_date"] == "2026-12-31"
+    assert matches[0]["earned_transaction_id"] == "20260101-001"
+    assert "void" not in matches[0]
+    assert "replaces_transaction_id" not in matches[0]

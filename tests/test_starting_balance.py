@@ -28,7 +28,7 @@ def _init_data_dir(data_dir: Path) -> Path:
     return data_dir / "leave_years" / "2026.json"
 
 
-def test_starting_balance_set_updates_balance_carryover_and_history(tmp_path: Path, capsys):
+def test_starting_balance_set_updates_balance_and_carryover(tmp_path: Path, capsys):
     data_dir = tmp_path / "data"
     year_file = _init_data_dir(data_dir)
 
@@ -44,17 +44,10 @@ def test_starting_balance_set_updates_balance_carryover_and_history(tmp_path: Pa
     assert leave_year["starting_balances"]["annual"] == 193.6
     assert leave_year["carryover_from_previous_year"]["annual"] == 193.6
 
-    history = leave_year["starting_balance_history"]
-    assert len(history) == 1
-    assert history[0]["category"] == "annual"
-    assert history[0]["old_hours"] == 120.0
-    assert history[0]["new_hours"] == 193.6
-    assert history[0]["reason"] == "Corrected imported starting balance"
-    assert history[0]["carryover_updated"] is True
+    assert "starting_balance_history" not in leave_year
 
     output = capsys.readouterr().out
     assert "Set annual starting balance for 2026: 120.00 -> 193.60" in output
-    assert "Recorded starting balance audit history entry" in output
 
 
 def test_starting_balance_set_preserves_manual_carryover_override(tmp_path: Path):
@@ -75,7 +68,7 @@ def test_starting_balance_set_preserves_manual_carryover_override(tmp_path: Path
     updated = json.loads(year_file.read_text(encoding="utf-8"))
     assert updated["starting_balances"]["annual"] == 193.6
     assert updated["carryover_from_previous_year"]["annual"] == 100.0
-    assert updated["starting_balance_history"][0]["carryover_updated"] is False
+    assert "starting_balance_history" not in updated
 
 
 def test_starting_balance_set_rejects_invalid_category(tmp_path: Path):

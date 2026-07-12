@@ -101,6 +101,8 @@ Validate and normalize stored JSON data:
 fedleave validate --data-dir ~/.local/share/fedleave --apply
 ```
 
+Older leave-year files are migrated automatically. Voided transactions and stored audit-history fields are removed from the active data file on startup or when a custom data store is loaded; the normal pre-write backup is created first.
+
 ## GUI Application: FedLeave Calendar
 
 FedLeave Calendar is a cross-platform PySide6 desktop GUI for the `fedleave` backend. It displays the current month, calendar day values, pay days, pay-period endings, pay-period summaries, and as-of-today balances using `fedleave month --json`.
@@ -365,7 +367,7 @@ Commands and common options:
 			- `--year` is optional; if omitted, the leave year is inferred from the transaction date using each leave-year file's `leave_year_start` and `leave_year_end`.
 			- `--date` accepts `today` as shorthand for the current local date.
 			- Exactly one of `--earned`, `--used`, `--worked`, or `--adjusted` must be provided.
-			- `--authoritative` voids active transactions with the same date, category, and direction before adding the new transaction.
+			- `--authoritative` removes transactions with the same date, category, and direction before adding the new transaction.
 			- `--json` emits the created transaction ID and any replaced transaction IDs.
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when needed.
 			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual.
@@ -403,23 +405,23 @@ Commands and common options:
 
 		Notes:
 			- The leave year is inferred from the transaction date using each leave-year file's `leave_year_start` and `leave_year_end`.
-			- If no active transaction exists for the same date, category, and direction, a new transaction is added.
-			- If exactly one active match exists, it is updated in place and a `reconcile_history` entry records the previous hours, status, source, and description.
-			- If multiple active matches exist, the command exits without writing and prints the matching IDs; rerun with `--id TRANSACTION_ID` to choose one.
+			- If no transaction exists for the same date, category, and direction, a new transaction is added.
+			- If exactly one match exists, it is updated in place and only the final values are stored.
+			- If multiple matches exist, the command exits without writing and prints the matching IDs; rerun with `--id TRANSACTION_ID` to choose one.
 			- `--json` emits a machine-readable result for automation.
 
 		Example:
 			fedleave reconcile --date 2026-03-10 --category credit --direction earned --hours 1.5 --status reconciled --source clocking-report --reason "March clocking report"
 
 	starting-balance
-		Set a leave year's starting balance for one category and keep audit history.
+		Set a leave year's starting balance for one category.
 
 		Syntax:
 			fedleave starting-balance set --year YEAR --category CATEGORY --hours HOURS --reason TEXT [--data-dir PATH]
 
 		Notes:
 			- The command updates `starting_balances[CATEGORY]` in the leave-year JSON.
-			- Each change appends a dated entry to `starting_balance_history` with the old value, new value, reason, and carryover decision.
+			- Only the final starting balance is stored; prior values and reasons are not retained.
 			- If `carryover_from_previous_year[CATEGORY]` still equals the old starting balance, it is updated to the new value too.
 			- Existing JSON backups are created before the leave-year file is rewritten.
 
@@ -450,8 +452,8 @@ Commands and common options:
 			fedleave list --year YEAR [--json] [--show-transaction-ids] [--data-dir PATH]
 
 		Notes:
-			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction, voiding, or audit work.
-			- `--json` emits active transactions only. Voided transactions remain in the data file for audit history but are omitted from command JSON output.
+			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction or deletion.
+			- Legacy voided transactions are automatically removed from the data file when it is loaded.
 
 	set-day
 		Authoritatively set signed leave values for one day.
@@ -613,10 +615,6 @@ Transaction object:
   "source": "manual",
   "created_at": "2026-06-30T01:00:00.000000",
   "updated_at": "2026-06-30T01:00:00.000000",
-  "void": false,
-  "void_reason": null,
-  "replaces_transaction_id": null,
-  "correction_reason": null,
   "expiration_date": null,
   "expiration_pay_period": null,
   "earned_transaction_id": null
@@ -635,14 +633,11 @@ Transaction fields:
 - `source`: Transaction source, such as `manual`, `clocking-report`, or `correction`.
 - `created_at`: Creation timestamp.
 - `updated_at`: Last update timestamp.
-- `void`: Boolean flag for audit-preserved voided transactions.
-- `void_reason`: Reason a transaction was voided, or `null`.
-- `replaces_transaction_id`: Original transaction ID replaced by a correction transaction, or `null`.
-- `correction_reason`: Reason for a correction, or `null`.
 - `expiration_date`: Expiration date for expiring leave categories, or `null`.
 - `expiration_pay_period`: Expiration pay period number, or `null`.
 - `earned_transaction_id`: Linked earned transaction ID for expiration workflows, or `null`.
-- `reconcile_history`: Present only on transactions updated by `reconcile`. It is a list of prior values and the reconciliation reason.
+
+Legacy `void`, `void_reason`, `replaces_transaction_id`, `correction_reason`, and `reconcile_history` fields are removed automatically. Transactions marked as void are deleted from the active leave-year data file.
 
 Balance map:
 
@@ -718,10 +713,6 @@ Success output:
     "source": "manual",
     "created_at": "2026-06-30T01:00:00.000000",
     "updated_at": "2026-06-30T01:00:00.000000",
-    "void": false,
-    "void_reason": null,
-    "replaces_transaction_id": null,
-    "correction_reason": null,
     "expiration_date": null,
     "expiration_pay_period": null,
     "earned_transaction_id": null
@@ -737,7 +728,7 @@ Fields:
 - `year`: Leave year file written.
 - `transaction_id`: ID of the created transaction.
 - `transaction`: Full created transaction object.
-- `replaced_transaction_ids`: IDs voided by `--authoritative`. Empty when `--authoritative` does not replace anything.
+- `replaced_transaction_ids`: IDs removed by `--authoritative`. Empty when `--authoritative` does not replace anything.
 - `automatic_accruals_posted`: Always `0` for `add`; included for consistency with workflow consumers.
 
 ### `reconcile --json`
@@ -810,28 +801,7 @@ Fields:
 - `date`, `category`, `direction`, `hours`, `status`, `source`, `reason`: Reconciled transaction values.
 - `message`: Human-readable explanation for ambiguous JSON results.
 
-When `action` is `updated`, the transaction in the leave-year JSON also receives or appends a `reconcile_history` list:
-
-```json
-[
-  {
-    "updated_at": "2026-06-30T01:00:00.000000",
-    "reason": "March clocking report",
-    "old": {
-      "hours": 1.0,
-      "status": "planned",
-      "source": "manual",
-      "description": "Original report"
-    },
-    "new": {
-      "hours": 1.5,
-      "status": "reconciled",
-      "source": "clocking-report",
-      "description": "March clocking report"
-    }
-  }
-]
-```
+When `action` is `updated`, the existing transaction is updated in place. Prior values are not retained.
 
 ### `correct --json`
 
@@ -848,25 +818,18 @@ Success output:
   "action": "corrected",
   "year": 2026,
   "original_transaction_id": "20260310-001",
-  "voided_transaction_ids": [
-    "20260310-001"
-  ],
-  "replacement_transaction_id": "20260310-002",
-  "replacement_transaction": {
-    "id": "20260310-002",
+  "transaction_id": "20260310-001",
+  "transaction": {
+    "id": "20260310-001",
     "date": "2026-03-10",
     "category": "annual",
     "direction": "used",
     "hours": 3.0,
-    "description": "Correction of 20260310-001: Only used 3 hours",
+    "description": "Only used 3 hours",
     "status": "reconciled",
     "source": "correction",
     "created_at": "2026-06-30T01:00:00.000000",
     "updated_at": "2026-06-30T01:00:00.000000",
-    "void": false,
-    "void_reason": null,
-    "replaces_transaction_id": "20260310-001",
-    "correction_reason": "Only used 3 hours",
     "expiration_date": null,
     "expiration_pay_period": null,
     "earned_transaction_id": null
@@ -893,10 +856,7 @@ Preview output:
     "direction": "used",
     "hours": 3.0
   },
-  "would_void_transaction_ids": [
-    "20260310-001"
-  ],
-  "would_create_replacement": true
+  "would_update_transaction_id": "20260310-001"
 }
 ```
 
@@ -905,12 +865,10 @@ Fields:
 - `action`: `corrected` or `preview`.
 - `year`: Leave year written. Present for applied corrections.
 - `original_transaction_id`: Corrected transaction ID.
-- `voided_transaction_ids`: Transactions voided by the correction.
-- `replacement_transaction_id`: New replacement transaction ID.
-- `replacement_transaction`: Full replacement transaction object.
-- `replacement`: Preview replacement values.
-- `would_void_transaction_ids`: Preview of IDs that would be voided.
-- `would_create_replacement`: Boolean preview flag.
+- `transaction_id`: ID preserved by the in-place correction.
+- `transaction`: Full final transaction object.
+- `replacement`: Preview of the final values retained for compatibility with existing preview consumers.
+- `would_update_transaction_id`: ID that would be updated by a preview.
 - `reason`: Sanitized correction reason.
 
 ### `void --json`
@@ -925,10 +883,10 @@ Success output:
 
 ```json
 {
-  "action": "voided",
+  "action": "deleted",
   "year": 2026,
   "transaction_id": "20260310-002",
-  "voided_transaction_ids": [
+  "deleted_transaction_ids": [
     "20260310-002"
   ],
   "reason": "Entered in error",
@@ -938,11 +896,11 @@ Success output:
 
 Fields:
 
-- `action`: Always `voided`.
+- `action`: Always `deleted`.
 - `year`: Leave year file containing the transaction.
-- `transaction_id`: Voided transaction ID.
-- `voided_transaction_ids`: List containing the voided ID.
-- `reason`: Void reason recorded in the transaction. Defaults to `Voided by user` when `--reason` is omitted.
+- `transaction_id`: Deleted transaction ID.
+- `deleted_transaction_ids`: List containing the deleted ID.
+- `reason`: Optional compatibility input echoed in the result; it is not retained.
 - `file`: Leave-year JSON file path that was written.
 
 ### `balance --json`
@@ -1488,7 +1446,7 @@ else:
 
 ## Additional Command Examples
 
-Correction (audit-safe):
+Correction (in place):
 
 	fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--json] [--show-transaction-ids] --data-dir /path/to/data
 
@@ -1502,7 +1460,7 @@ Alternatively, you can correct by transaction date and type (more human-friendly
 	Example:
 		fedleave correct --search-date 2026-06-01 --search-type annual --hours 3 --reason "Adjust entry" --data-dir ./.data
 
-Void a transaction:
+Delete a transaction (legacy `void` command name):
 
 	fedleave void --id TRANSACTION_ID --reason "TEXT" [--json] [--show-transaction-ids] --data-dir /path/to/data
 

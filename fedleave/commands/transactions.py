@@ -10,6 +10,7 @@ from typer.models import OptionInfo
 from ..cli_app import _print_json, app, console
 from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, resolve_leave_year_for_date, sanitize_text
 from ..ledger import (
+    Transaction,
     TRANSACTION_CATEGORIES,
     TRANSACTION_DIRECTIONS,
     TRANSACTION_STATUSES,
@@ -63,7 +64,7 @@ def _set_day_values(
     transactions = leave_year.setdefault("transactions", [])
     existing_ids = [transaction.get("id", "") for transaction in transactions]
     changed: list[dict] = []
-    voided_ids: list[str] = []
+    removed_ids: list[str] = []
     created_ids: list[str] = []
 
     for category in _SET_DAY_CATEGORIES:
@@ -73,13 +74,13 @@ def _set_day_values(
         value = float(value)
         direction, hours = _direction_for_signed_day_value(category, value)
 
-        for transaction in transactions:
-            if transaction.get("void"):
-                continue
-            if transaction.get("date") == date and transaction.get("category") == category:
-                transaction["void"] = True
-                transaction["void_reason"] = "Replaced by authoritative set-day"
-                voided_ids.append(str(transaction.get("id", "")))
+        replaced = [
+            transaction
+            for transaction in transactions
+            if transaction.get("date") == date and transaction.get("category") == category
+        ]
+        removed_ids.extend(str(transaction.get("id", "")) for transaction in replaced)
+        transactions[:] = [transaction for transaction in transactions if transaction not in replaced]
 
         new_id = None
         if hours:
@@ -115,7 +116,7 @@ def _set_day_values(
         "date": date,
         "authoritative": True,
         "changed": changed,
-        "voided_transaction_ids": voided_ids,
+        "removed_transaction_ids": removed_ids,
         "created_transaction_ids": created_ids,
     }
 
@@ -132,7 +133,7 @@ def add(
     description: str = typer.Option("", help="Transaction description."),
     status: str = typer.Option("planned", help="Transaction status."),
     source: str = typer.Option("manual", help="Transaction source."),
-    authoritative: bool = typer.Option(False, help="Void existing same-date/category/direction transactions before adding this one."),
+    authoritative: bool = typer.Option(False, help="Remove existing same-date/category/direction transactions before adding this one."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     show_transaction_ids: bool = typer.Option(
         False,
@@ -201,17 +202,17 @@ def add(
 
     replaced_ids: list[str] = []
     if authoritative:
+        retained = []
         for existing in leave_year.get("transactions", []):
-            if existing.get("void"):
-                continue
             if (
                 existing.get("date") == date
                 and existing.get("category") == category
                 and existing.get("direction") == direction
             ):
-                existing["void"] = True
-                existing["void_reason"] = f"Replaced by authoritative transaction {transaction.id}"
                 replaced_ids.append(existing.get("id", ""))
+            else:
+                retained.append(existing)
+        leave_year["transactions"] = retained
 
     add_transaction_to_leave_year(leave_year, transaction)
     write_json(get_leave_year_path(year, data_dir), leave_year)
@@ -304,7 +305,7 @@ def set_day(
 
     console.print(
         f"Updated {result['date']} in leave year {result['year']} "
-        f"({len(result['created_transaction_ids'])} created, {len(result['voided_transaction_ids'])} voided)."
+        f"({len(result['created_transaction_ids'])} created, {len(result['removed_transaction_ids'])} removed)."
     )
 
 
@@ -371,8 +372,7 @@ def reconcile(
     active_matches = [
         transaction
         for transaction in transactions
-        if not transaction.get("void")
-        and transaction.get("date") == date
+        if transaction.get("date") == date
         and transaction.get("category") == category
         and transaction.get("direction") == direction
     ]
@@ -405,30 +405,11 @@ def reconcile(
 
     if len(active_matches) == 1:
         transaction = active_matches[0]
-        old_values = {
-            "hours": float(transaction.get("hours", 0.0)),
-            "status": transaction.get("status"),
-            "source": transaction.get("source"),
-            "description": transaction.get("description", ""),
-        }
         transaction["hours"] = float(hours)
         transaction["status"] = status
         transaction["source"] = source
         transaction["description"] = reason
         transaction["updated_at"] = _datetime.now().isoformat()
-        transaction.setdefault("reconcile_history", []).append(
-            {
-                "updated_at": transaction["updated_at"],
-                "reason": reason,
-                "old": old_values,
-                "new": {
-                    "hours": float(hours),
-                    "status": status,
-                    "source": source,
-                    "description": reason,
-                },
-            }
-        )
         action = "updated"
         transaction_id = transaction.get("id")
     else:
@@ -475,9 +456,9 @@ def correct(
     id: str | None = typer.Option(None, help="Transaction ID to correct (YYYYMMDD-NNN)."),
     hours: float = typer.Option(..., help="Corrected hours to record."),
     reason: str = typer.Option(..., help="Reason for correction."),
-    date: str | None = typer.Option(None, help="Optional date for replacement transaction YYYY-MM-DD or today."),
-    category: str | None = typer.Option(None, help="Optional category for replacement transaction."),
-    direction: str | None = typer.Option(None, help="Optional direction for replacement transaction (earned/used/worked/adjusted)."),
+    date: str | None = typer.Option(None, help="Optional corrected transaction date YYYY-MM-DD or today."),
+    category: str | None = typer.Option(None, help="Optional corrected transaction category."),
+    direction: str | None = typer.Option(None, help="Optional corrected direction (earned/used/worked/adjusted)."),
     # human-friendly lookup: find transaction by date and type/category
     search_date: str | None = typer.Option(None, help="Find transaction by this transaction date YYYY-MM-DD or today."),
     search_type: str | None = typer.Option(None, help="Find transaction by this transaction category/type."),
@@ -491,10 +472,7 @@ def correct(
     ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
-    """Audit-safe correction: void the original transaction and create a replacement.
-
-    The replacement transaction will link to the original via `replaces_transaction_id`.
-    """
+    """Update a transaction in place, retaining only its final values."""
     # If this function is called directly (tests), Typer Option defaults arrive as OptionInfo objects.
     # Coerce those to None so direct calls behave like CLI invocation.
     if isinstance(id, OptionInfo):
@@ -531,7 +509,7 @@ def correct(
                 console.print(f"[red]ERROR:[/red] {exc}")
                 raise typer.Exit(code=1)
 
-            matches = [t for t in ly.get("transactions", []) if t.get("date") == search_date and t.get("category") == search_type and not t.get("void")]
+            matches = [t for t in ly.get("transactions", []) if t.get("date") == search_date and t.get("category") == search_type]
             if not matches:
                 console.print(f"[red]ERROR:[/red] No matching transaction on {search_date} for category {search_type}")
                 raise typer.Exit(code=1)
@@ -611,48 +589,41 @@ def correct(
                         "direction": direction or orig["direction"],
                         "hours": hours,
                     },
-                    "would_void_transaction_ids": [id],
-                    "would_create_replacement": True,
+                    "would_update_transaction_id": id,
                 }
             )
             return
-        console.print("Preview: would void original transaction and create replacement with:")
+        console.print("Preview: would update transaction with:")
         console.print(f"  date={date or orig['date']} category={category or orig['category']} direction={direction or orig['direction']} hours={hours}")
         return
 
-    # void original
-    orig["void"] = True
-    orig["void_reason"] = f"Correction: {reason}"
-
-    # Sanitize reason before creating replacement.
+    # Sanitize the reason before updating the final record.
     try:
         reason = sanitize_text(reason, field_name="reason")
     except ValueError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
-    # create replacement
-    existing_ids = [t["id"] for t in leave_year.get("transactions", [])]
     try:
-        replacement = create_transaction(
-            date=date or orig["date"],
-            category=category or orig["category"],
-            direction=direction or orig["direction"],
-            hours=hours,
-            description=f"Correction of {id}: {reason}",
-            status="reconciled",
-            source="correction",
-            existing_ids=existing_ids,
-        )
+        updated = Transaction.model_validate(
+            {
+                **orig,
+                "date": date or orig["date"],
+                "category": category or orig["category"],
+                "direction": direction or orig["direction"],
+                "hours": hours,
+                "description": reason,
+                "status": "reconciled",
+                "source": "correction",
+                "updated_at": _datetime.now().isoformat(),
+            }
+        ).model_dump()
     except ValueError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
-    # link replacement to original by setting fields on the model
-    replacement.replaces_transaction_id = id
-    replacement.correction_reason = reason
-
-    add_transaction_to_leave_year(leave_year, replacement)
+    orig.clear()
+    orig.update(updated)
     write_json(get_leave_year_path(int(leave_year.get("leave_year", 0)), data_dir), leave_year)
     if json_output:
         _print_json(
@@ -660,17 +631,16 @@ def correct(
                 "action": "corrected",
                 "year": int(leave_year.get("leave_year", 0)),
                 "original_transaction_id": id,
-                "voided_transaction_ids": [id],
-                "replacement_transaction_id": replacement.id,
-                "replacement_transaction": replacement.model_dump(),
+                "transaction_id": id,
+                "transaction": orig,
                 "reason": reason,
             }
         )
         return
     if show_transaction_ids:
-        console.print(f"Corrected transaction {id}: created replacement {replacement.id}")
+        console.print(f"Corrected transaction {id} in place")
     else:
-        console.print("Corrected transaction and created replacement")
+        console.print("Corrected transaction in place")
 
 @app.command(name="list")
 def list_transactions(
@@ -697,7 +667,7 @@ def list_transactions(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
 
-    transactions = [transaction for transaction in leave_year.get("transactions", []) if not transaction.get("void")]
+    transactions = list(leave_year.get("transactions", []))
     if not transactions:
         if json_output:
             _print_json({"year": year, "transactions": []})
@@ -718,8 +688,8 @@ def list_transactions(
 
 @app.command()
 def void(
-    id: str = typer.Option(..., help="Transaction ID to void (YYYYMMDD-NNN)."),
-    reason: str = typer.Option("", help="Reason for voiding the transaction."),
+    id: str = typer.Option(..., help="Transaction ID to delete (YYYYMMDD-NNN)."),
+    reason: str = typer.Option("", help="Optional reason for deleting the transaction (not stored)."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     show_transaction_ids: bool = typer.Option(
         False,
@@ -729,7 +699,7 @@ def void(
     ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
-    """Void a transaction while preserving the audit trail."""
+    """Delete a transaction. The command name is retained for compatibility."""
     if isinstance(show_transaction_ids, OptionInfo):
         show_transaction_ids = False
     if not isinstance(json_output, bool):
@@ -743,25 +713,24 @@ def void(
     for pj in base.iterdir():
         if pj.suffix == ".json":
             ly = load_leave_year(int(pj.stem), data_dir)
-            for t in ly.get("transactions", []):
+            for t in list(ly.get("transactions", [])):
                 if t.get("id") == id:
-                    t["void"] = True
-                    t["void_reason"] = reason or "Voided by user"
+                    ly["transactions"].remove(t)
                     write_json(pj, ly)
                     if json_output:
                         _print_json(
                             {
-                                "action": "voided",
+                                "action": "deleted",
                                 "year": int(pj.stem),
                                 "transaction_id": id,
-                                "voided_transaction_ids": [id],
-                                "reason": t["void_reason"],
+                                "deleted_transaction_ids": [id],
+                                "reason": reason,
                                 "file": str(pj),
                             }
                         )
                         return
                     detail = f"transaction {id}" if show_transaction_ids else "transaction"
-                    console.print(f"Voided {detail} in {pj.name}")
+                    console.print(f"Deleted {detail} from {pj.name}")
                     found = True
                     break
         if found:

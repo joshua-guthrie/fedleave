@@ -6,7 +6,7 @@ from fedleave.storage import write_json
 from fedleave.cli import void
 
 
-def test_void_marks_transaction(tmp_path: Path):
+def test_void_deletes_transaction(tmp_path: Path):
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     init_config(
@@ -32,10 +32,7 @@ def test_void_marks_transaction(tmp_path: Path):
     add_transaction_to_leave_year(leave_year, t)
     write_json(year_file, leave_year)
 
-    # void it
     void(id=t.id, reason="test void", data_dir=data_dir)
 
     ly2 = __import__('json').loads(year_file.read_text())
-    found = next(x for x in ly2['transactions'] if x['id'] == t.id)
-    assert found['void'] is True
-    assert 'test void' in (found.get('void_reason') or '')
+    assert all(x['id'] != t.id for x in ly2['transactions'])

@@ -99,3 +99,25 @@ def test_import_accepts_single_leave_year_backup(tmp_path: Path):
     imported = json.loads((target / "leave_years" / "2026.json").read_text(encoding="utf-8"))
     assert imported == legacy_leave_year
     assert not (target / "config.json").exists()
+
+
+def test_import_removes_legacy_transaction_history(tmp_path: Path):
+    target = tmp_path / "target"
+    archive = tmp_path / "legacy.json"
+    legacy = {
+        "schema_version": 1,
+        "leave_year": 2026,
+        "transactions": [
+            {"id": "active", "void": False, "void_reason": None, "reconcile_history": []},
+            {"id": "obsolete", "void": True, "void_reason": "replaced"},
+        ],
+        "starting_balance_history": [{"old_hours": 100.0, "new_hours": 120.0}],
+        "pay_periods": [],
+    }
+    archive.write_text(json.dumps(legacy), encoding="utf-8")
+
+    import_data(input=archive, data_dir=target)
+
+    imported = json.loads((target / "leave_years" / "2026.json").read_text(encoding="utf-8"))
+    assert imported["transactions"] == [{"id": "active"}]
+    assert "starting_balance_history" not in imported

@@ -12,7 +12,7 @@ from dateutil.parser import isoparse
 from .validation import sanitize_url
 from rich.console import Console
 
-from .storage import ensure_data_dir, atomic_write_json
+from .storage import ensure_data_dir, atomic_write_json, migrate_leave_year_files
 from .payperiods import generate_pay_periods
 from .holidays import DEFAULT_OPM_ICS_URL, generate_federal_holidays
 from .ledger import ensure_automatic_accruals
@@ -225,6 +225,7 @@ def init_config(
         console.print(f"[green]Created[/green] config file: {config_path}")
 
     if year_file.exists():
+        migrate_leave_year_files(data_dir)
         console.print(f"[yellow]INFO:[/yellow] Preserving existing leave year file: {year_file}")
     else:
         atomic_write_json(year_file, leave_year_data, overwrite=False)

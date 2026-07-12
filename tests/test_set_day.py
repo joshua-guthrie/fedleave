@@ -47,12 +47,11 @@ def test_set_day_authoritatively_replaces_supplied_categories(tmp_path: Path, ca
         data_dir=data_dir,
     )
     second = _json_output(capsys)
-    assert len(second["voided_transaction_ids"]) == 2
+    assert len(second["removed_transaction_ids"]) == 2
     assert len(second["created_transaction_ids"]) == 1
 
     leave_year = load_json(year_file)
-    active = [transaction for transaction in leave_year["transactions"] if not transaction.get("void")]
-    manual = [transaction for transaction in active if transaction.get("source") == "set-day"]
+    manual = [transaction for transaction in leave_year["transactions"] if transaction.get("source") == "set-day"]
     assert len(manual) == 1
     assert manual[0]["category"] == "annual"
     assert manual[0]["direction"] == "used"

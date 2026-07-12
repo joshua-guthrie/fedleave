@@ -11,7 +11,7 @@ from ..cli_app import _print_json, app, console
 from ..cli_helpers import load_leave_year, parse_iso_date
 from ..config import get_default_data_dir
 from ..ledger import apply_fixes_to_leave_year, validate_leave_year
-from ..storage import atomic_write_json, ensure_data_dir, load_json, write_json
+from ..storage import atomic_write_json, ensure_data_dir, load_json, remove_legacy_transaction_history, write_json
 
 
 @app.command()
@@ -64,11 +64,15 @@ def init(
 def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
     if not directory.exists():
         return {}
-    return {
-        path.stem: load_json(path)
-        for path in sorted(directory.iterdir())
-        if path.is_file() and path.suffix == ".json"
-    }
+    result = {}
+    for path in sorted(directory.iterdir()):
+        if not path.is_file() or path.suffix != ".json":
+            continue
+        data = load_json(path)
+        if directory.name == "leave_years" and remove_legacy_transaction_history(data):
+            write_json(path, data)
+        result[path.stem] = data
+    return result
 
 
 @app.command("export-data")
@@ -177,6 +181,7 @@ def import_data(
         for year, leave_year in archive.get("leave_years", {}).items():
             if not str(year).isdigit() or not isinstance(leave_year, dict):
                 raise ValueError(f"Invalid leave year entry: {year}")
+            remove_legacy_transaction_history(leave_year)
             _write_import_file(base / "leave_years" / f"{year}.json", leave_year, overwrite=overwrite)
 
         holiday_cache = archive.get("holiday_cache", {})

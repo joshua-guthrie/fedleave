@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime as _datetime
 from pathlib import Path
 
 import typer
@@ -19,7 +18,7 @@ def starting_balance_set(
     reason: str = typer.Option(..., help="Reason for the starting-balance correction."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
-    """Set one starting balance and preserve a dated audit history."""
+    """Set one starting balance, retaining only the final value."""
     if category not in TRANSACTION_CATEGORIES:
         console.print(
             f"[red]ERROR:[/red] Invalid category: {category}. Valid categories: {', '.join(TRANSACTION_CATEGORIES)}."
@@ -52,21 +51,6 @@ def starting_balance_set(
         carryover[category] = new_hours
         carryover_updated = True
 
-    history = leave_year.setdefault("starting_balance_history", [])
-    history.append(
-        {
-            "updated_at": _datetime.now().isoformat(),
-            "year": int(year),
-            "category": category,
-            "old_hours": old_hours,
-            "new_hours": new_hours,
-            "reason": reason_text,
-            "carryover_updated": carryover_updated,
-            "old_carryover_hours": float(old_carryover) if old_carryover is not None else None,
-            "new_carryover_hours": float(carryover.get(category)) if category in carryover else None,
-        }
-    )
-
     try:
         write_json(get_leave_year_path(year, data_dir), leave_year)
     except Exception as exc:
@@ -76,4 +60,3 @@ def starting_balance_set(
     console.print(f"Set {category} starting balance for {year}: {old_hours:.2f} -> {new_hours:.2f}")
     if carryover_updated:
         console.print(f"Updated {category} carryover_from_previous_year to {new_hours:.2f}")
-    console.print("Recorded starting balance audit history entry")

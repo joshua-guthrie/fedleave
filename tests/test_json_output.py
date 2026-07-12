@@ -80,7 +80,7 @@ def test_add_balance_and_activity_emit_json(tmp_path: Path, capsys):
     assert activity["activity"]["used"]["annual"] == 4.0
 
 
-def test_json_outputs_ignore_voided_transactions(tmp_path: Path, capsys):
+def test_loading_legacy_data_removes_voided_transactions(tmp_path: Path, capsys):
     data_dir = tmp_path / "data"
     year_file = _init_data_dir(data_dir)
     leave_year = json.loads(year_file.read_text(encoding="utf-8"))
@@ -98,10 +98,13 @@ def test_json_outputs_ignore_voided_transactions(tmp_path: Path, capsys):
         hours=8.0,
         existing_ids=[active.id],
     )
-    voided.void = True
-    voided.void_reason = "Superseded"
     add_transaction_to_leave_year(leave_year, active)
     add_transaction_to_leave_year(leave_year, voided)
+    leave_year["transactions"][-1]["void"] = True
+    leave_year["transactions"][-1]["void_reason"] = "Superseded"
+    leave_year["transactions"][0]["void"] = False
+    leave_year["transactions"][0]["correction_reason"] = None
+    leave_year["transactions"][0]["reconcile_history"] = [{"old": {"hours": 1.0}}]
     write_json(year_file, leave_year)
     capsys.readouterr()
 
@@ -110,7 +113,11 @@ def test_json_outputs_ignore_voided_transactions(tmp_path: Path, capsys):
     listed_ids = {transaction["id"] for transaction in listed["transactions"]}
     assert active.id in listed_ids
     assert voided.id not in listed_ids
-    assert all(not transaction.get("void") for transaction in listed["transactions"])
+    stored = json.loads(year_file.read_text(encoding="utf-8"))
+    assert {transaction["id"] for transaction in stored["transactions"]} == listed_ids
+    assert all("void" not in transaction for transaction in stored["transactions"])
+    assert all("correction_reason" not in transaction for transaction in stored["transactions"])
+    assert all("reconcile_history" not in transaction for transaction in stored["transactions"])
 
     balance(year=2026, as_of="2026-03-10", json_output=True, data_dir=data_dir)
     balances = _json_output(capsys)
@@ -215,13 +222,13 @@ def test_correct_and_void_emit_json(tmp_path: Path, capsys):
     correct(id=transaction.id, hours=3.0, reason="Actual use", json_output=True, data_dir=data_dir)
     corrected = _json_output(capsys)
     assert corrected["action"] == "corrected"
-    assert corrected["voided_transaction_ids"] == [transaction.id]
-    replacement_id = corrected["replacement_transaction_id"]
+    assert corrected["transaction_id"] == transaction.id
+    assert corrected["transaction"]["hours"] == 3.0
 
-    void(id=replacement_id, reason="Entered in error", json_output=True, data_dir=data_dir)
+    void(id=transaction.id, reason="Entered in error", json_output=True, data_dir=data_dir)
     voided = _json_output(capsys)
-    assert voided["action"] == "voided"
-    assert voided["voided_transaction_ids"] == [replacement_id]
+    assert voided["action"] == "deleted"
+    assert voided["deleted_transaction_ids"] == [transaction.id]
 
 
 def test_pay_period_commands_emit_json(tmp_path: Path, capsys):

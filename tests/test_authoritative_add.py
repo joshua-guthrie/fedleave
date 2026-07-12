@@ -5,7 +5,7 @@ from fedleave.cli import add
 from fedleave.config import init_config
 
 
-def test_authoritative_add_voids_matching_transaction(tmp_path: Path):
+def test_authoritative_add_removes_matching_transaction(tmp_path: Path):
     data_dir = tmp_path / "data"
     init_config(
         year=2026,
@@ -50,8 +50,6 @@ def test_authoritative_add_voids_matching_transaction(tmp_path: Path):
         if tx["date"] == "2026-03-10" and tx["category"] == "annual" and tx["direction"] == "used"
     ]
 
-    assert len(annual_used) == 2
-    assert annual_used[0]["void"] is True
-    assert "Replaced by authoritative transaction" in annual_used[0]["void_reason"]
-    assert annual_used[1]["void"] is False
-    assert annual_used[1]["hours"] == 6.0
+    assert len(annual_used) == 1
+    assert annual_used[0]["hours"] == 6.0
+    assert "void" not in annual_used[0]

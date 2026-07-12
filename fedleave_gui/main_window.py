@@ -127,7 +127,7 @@ def _entry_value(entry: dict[str, Any]) -> DayValue | None:
     if not _nonzero(hours):
         return None
     direction = str(entry.get("direction", ""))
-    value = -hours if direction in {"used", "expired", "forfeited", "voided"} else hours
+    value = -hours if direction in {"used", "expired", "forfeited"} else hours
     return DayValue(category, value)
 
 

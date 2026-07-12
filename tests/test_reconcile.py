@@ -67,7 +67,7 @@ def test_reconcile_adds_transaction_and_infers_leave_year(tmp_path: Path, capsys
     assert "in 2026" in output
 
 
-def test_reconcile_updates_single_match_and_records_history(tmp_path: Path):
+def test_reconcile_updates_single_match_without_history(tmp_path: Path):
     data_dir = tmp_path / "data"
     year_file = _init_data_dir(data_dir)
     leave_year = _load(year_file)
@@ -102,14 +102,7 @@ def test_reconcile_updates_single_match_and_records_history(tmp_path: Path):
     assert transactions[0]["source"] == "clocking-report"
     assert transactions[0]["description"] == "March clocking report"
 
-    history = transactions[0]["reconcile_history"]
-    assert len(history) == 1
-    assert history[0]["reason"] == "March clocking report"
-    assert history[0]["old"]["hours"] == 1.0
-    assert history[0]["old"]["status"] == "planned"
-    assert history[0]["old"]["source"] == "manual"
-    assert history[0]["old"]["description"] == "Original report"
-    assert history[0]["new"]["hours"] == 1.5
+    assert "reconcile_history" not in transactions[0]
 
 
 def test_reconcile_blocks_multiple_active_matches(tmp_path: Path):
