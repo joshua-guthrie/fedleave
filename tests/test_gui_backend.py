@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+import types
 
 from fedleave_gui.backend import BackendOptions, FedleaveBackend
 
@@ -60,3 +61,30 @@ def test_gui_backend_reports_version_and_executable_path(tmp_path: Path):
 
     assert backend.version() == "fedleave 0.2.0"
     assert backend.executable_path() == fake
+
+
+def test_gui_backend_hides_windows_console_when_launching_backend(monkeypatch, tmp_path: Path):
+    fake = _fake_fedleave(tmp_path / "fedleave")
+    backend_module = __import__("fedleave_gui.backend", fromlist=["FedleaveBackend"])
+    backend = backend_module.FedleaveBackend(
+        backend_module.BackendOptions(fedleave_path=str(fake), data_dir=str(tmp_path / "data"))
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return types.SimpleNamespace(returncode=0, stdout="fedleave 0.2.0", stderr="")
+
+    monkeypatch.setattr(backend_module.sys, "platform", "win32")
+    monkeypatch.setattr(backend_module.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(backend_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(backend_module, "find_fedleave", lambda explicit=None: fake)
+
+    assert backend.version() == "fedleave 0.2.0"
+    assert captured["command"] == [str(fake), "--version"]
+    assert captured["kwargs"]["creationflags"] == 0x08000000
+    assert captured["kwargs"]["text"] is True
+    assert captured["kwargs"]["capture_output"] is True
+    assert captured["kwargs"]["check"] is False

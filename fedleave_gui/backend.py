@@ -104,12 +104,18 @@ class FedleaveBackend:
     def __init__(self, options: BackendOptions | None = None) -> None:
         self.options = options or BackendOptions()
 
+    def _run_command(self, command: list[str]) -> subprocess.CompletedProcess[str]:
+        kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
+        if sys.platform.startswith("win"):
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        return subprocess.run(command, **kwargs)
+
     def run_json(self, args: list[str]) -> dict[str, Any]:
         fedleave = find_fedleave(self.options.fedleave_path)
         command = [str(fedleave), *args]
         if self.options.data_dir:
             command.extend(["--data-dir", self.options.data_dir])
-        result = subprocess.run(command, text=True, capture_output=True, check=False)
+        result = self._run_command(command)
         if result.returncode != 0:
             message = (result.stderr or result.stdout or "fedleave command failed").strip()
             raise BackendError(message)
@@ -126,7 +132,7 @@ class FedleaveBackend:
         command = [str(fedleave), *args]
         if include_data_dir and self.options.data_dir:
             command.extend(["--data-dir", self.options.data_dir])
-        result = subprocess.run(command, text=True, capture_output=True, check=False)
+        result = self._run_command(command)
         if result.returncode != 0:
             message = (result.stderr or result.stdout or "fedleave command failed").strip()
             raise BackendError(message)
@@ -215,7 +221,10 @@ def run_month_report_graphic(
         command.extend(["--fedleave", fedleave_path])
     if data_dir:
         command.extend(["--data-dir", data_dir])
-    result = subprocess.run(command, text=True, capture_output=True, check=False)
+    kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
+    if sys.platform.startswith("win"):
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    result = subprocess.run(command, **kwargs)
     if result.returncode != 0:
         message = (result.stderr or result.stdout or "fedleaveMonthReportGraphic command failed").strip()
         raise BackendError(message)
