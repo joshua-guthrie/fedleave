@@ -112,6 +112,32 @@ def _entry_value(entry: dict[str, Any]) -> DayValue | None:
     return DayValue(category, value)
 
 
+def _day_values_by_category(day: dict[str, Any]) -> dict[str, float]:
+    values: dict[str, float] = {}
+    for entry in day.get("entries", []):
+        value = _entry_value(entry)
+        if value is None:
+            continue
+        values[value.category] = values.get(value.category, 0.0) + value.value
+    return values
+
+
+def _format_value_summary(value: Any) -> str:
+    if not _nonzero(value):
+        return "0"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return "0"
+    text = f"{abs(number):.2f}".rstrip("0").rstrip(".")
+    direction = "earned" if number > 0 else "used"
+    return f"{text} {direction}"
+
+
+def _category_display_text(category: str) -> str:
+    return CATEGORY_LABELS.get(category, (category, category))[1]
+
+
 class DayCell(QPushButton):
     def __init__(self, day: dict[str, Any], settings: GuiSettings) -> None:
         super().__init__()
@@ -193,12 +219,7 @@ class DayEditDialog(QDialog):
         self.day = day
         self.inputs: dict[str, QDoubleSpinBox] = {}
         self.directions: dict[str, QComboBox] = {}
-        values: dict[str, float] = {}
-        for entry in day.get("entries", []):
-            value = _entry_value(entry)
-            if value is None:
-                continue
-            values[value.category] = values.get(value.category, 0.0) + value.value
+        values = _day_values_by_category(day)
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose Use or Earn for each leave type, then enter positive hours."))
@@ -263,6 +284,61 @@ class DayEditDialog(QDialog):
             category: (-widget.value() if self.directions[category].currentData() == "use" else widget.value())
             for category, widget in self.inputs.items()
         }
+
+
+class SaveDayPreviewDialog(QDialog):
+    def __init__(self, day: dict[str, Any], existing_values: dict[str, float], new_values: dict[str, float], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(f"Review Save for {day['date']}")
+        self.resize(640, 420)
+        self.setModal(True)
+        self._existing_values = dict(existing_values)
+        self._new_values = dict(new_values)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(
+            QLabel(
+                "This will replace the current values for each listed leave type. "
+                "Review the current and new values before saving."
+            )
+        )
+        layout.addWidget(QLabel(f"Date: {day['date']}"))
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Leave Type", "Existing", "New"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.table.setSelectionMode(QTableWidget.NoSelection)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(self.table)
+
+        self._populate_table()
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Save).setText("Save Changes")
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _populate_table(self) -> None:
+        categories = sorted({*self._existing_values, *self._new_values})
+        rows = [
+            category
+            for category in categories
+            if _nonzero(self._existing_values.get(category, 0.0)) or _nonzero(self._new_values.get(category, 0.0))
+        ]
+        self.table.setRowCount(len(rows))
+        for row, category in enumerate(rows):
+            values = [
+                _category_display_text(category),
+                _format_value_summary(self._existing_values.get(category, 0.0)),
+                _format_value_summary(self._new_values.get(category, 0.0)),
+            ]
+            for column, value in enumerate(values):
+                item = QTableWidgetItem(value)
+                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                self.table.setItem(row, column, item)
 
 
 class AbbreviationsDialog(QDialog):
@@ -619,7 +695,8 @@ class MainWindow(QMainWindow):
         values = dialog.values()
         if not values:
             return
-        if QMessageBox.question(self, "Confirm Authoritative Save", "Replace existing values for the supplied leave categories?") != QMessageBox.Yes:
+        preview = SaveDayPreviewDialog(day, _day_values_by_category(day), values, self)
+        if preview.exec() != QDialog.Accepted:
             return
         try:
             self.backend.set_day(str(day["date"]), values)
