@@ -4,15 +4,16 @@ import calendar
 import html
 import os
 import sys
-import tempfile
+from datetime import datetime
 import webbrowser
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor, QFont, QPainter, QTextDocument
+from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -43,7 +44,9 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
-from .backend import run_month_report_graphic
+from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
+from fedleave_month_report_graphic.report import ReportData as MonthReportData
+from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
 from .settings import GuiSettings, load_settings, save_settings, settings_path
 
 
@@ -458,7 +461,6 @@ class MainWindow(QMainWindow):
         self._action(file_menu, "Print Preview...", self.print_preview)
         self._action(file_menu, "Print Month...", self.print_month)
         self._action(file_menu, "Save Month as PDF...", self.save_pdf)
-        self._action(file_menu, "Save Month as PNG/SVG...", self.save_month_graphic)
         self._action(file_menu, "Preferences...", self.preferences)
         self._action(file_menu, "Exit", self.close)
         view_menu = self.menuBar().addMenu("View")
@@ -700,34 +702,35 @@ class MainWindow(QMainWindow):
             return
         self.refresh()
 
-    def _report_html(self) -> str:
+    def _month_report_data(self) -> MonthReportData:
         if not self.month_json:
-            return "<h1>FedLeave Calendar</h1>"
-        title = f"{calendar.month_name[self.month]} {self.year}"
-        parts = [f"<h1>FedLeave Calendar - {html.escape(title)}</h1>", "<table border='1' cellspacing='0' cellpadding='4'>"]
-        parts.append("<tr>" + "".join(f"<th>{day}</th>" for day in ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]) + "</tr>")
-        days = list(self.month_json.get("days", []))
-        for row in range(0, len(days), 7):
-            parts.append("<tr>")
-            for day in days[row : row + 7]:
-                lines = html.escape(DayCell(day, self.settings).display_text()).replace("\n", "<br>")
-                parts.append(f"<td valign='top' width='14%'>{lines}</td>")
-            parts.append("</tr>")
-        parts.append("</table><h2>Pay Periods</h2><ul>")
-        for period in self.month_json.get("pay_periods", []):
-            if period.get("touches_display_month"):
-                parts.append(f"<li>PP {period.get('number')}: {period.get('start')} to {period.get('end')}</li>")
-        parts.append("</ul><h2>As of Today</h2><ul>")
-        for category, value in ((self.month_json.get("balance_as_of_today") or {}).get("balances") or {}).items():
-            if _nonzero(value):
-                parts.append(f"<li>{html.escape(CATEGORY_LABELS.get(category, ('', category))[1])}: {_fmt(value)}</li>")
-        parts.append("</ul>")
-        return "\n".join(parts)
+            raise BackendError("Month data is not loaded.")
+        month_json = dict(self.month_json)
+        balance_json = month_json.get("balance_as_of_today")
+        if not isinstance(balance_json, dict):
+            balance_json = {"balances": {}}
+        projected_json = month_json.get("projected_balance")
+        if not isinstance(projected_json, dict):
+            projected_json = {"balances": {}, "use_or_lose": {}}
+        return MonthReportData(
+            month_json=month_json,
+            balance_json=balance_json,
+            projected_json=projected_json,
+            pay_periods_json=None,
+            today=self.today,
+            generated_at=datetime.now(),
+        )
 
     def _print_document(self, printer: QPrinter) -> None:
-        document = QTextDocument()
-        document.setHtml(self._report_html())
-        document.print_(printer)
+        printer.setPageOrientation(QPageLayout.Landscape)
+        svg = render_month_report_svg(self._month_report_data(), MONTH_REPORT_WIDTH)
+        renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
+        painter = QPainter(printer)
+        try:
+            painter.fillRect(printer.pageLayout().paintRectPixels(printer.resolution()), QColor("white"))
+            renderer.render(painter, printer.pageLayout().paintRectPixels(printer.resolution()))
+        finally:
+            painter.end()
 
     def print_preview(self) -> None:
         preview = QPrintPreviewDialog(self)
@@ -750,44 +753,6 @@ class MainWindow(QMainWindow):
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(path)
         self._print_document(printer)
-
-    def save_month_graphic(self) -> None:
-        folder = self.settings.pdf_export_folder or str(Path.home())
-        default = str(Path(folder) / f"fedleave-{self.year}-{self.month:02d}.png")
-        path, selected_filter = QFileDialog.getSaveFileName(
-            self,
-            "Save Month as Graphic",
-            default,
-            "PNG files (*.png);;SVG files (*.svg)",
-        )
-        if not path:
-            return
-        output = Path(path).expanduser()
-        if not output.suffix:
-            if "svg" in selected_filter.lower():
-                output = output.with_suffix(".svg")
-            else:
-                output = output.with_suffix(".png")
-        if output.suffix.lower() not in {".png", ".svg"}:
-            QMessageBox.warning(self, "Save Month as Graphic", "Please choose a .png or .svg output file.")
-            return
-        try:
-            fedleave = str(self.backend.executable_path())
-        except BackendError as exc:
-            QMessageBox.warning(self, "Save Month as Graphic", str(exc))
-            return
-        try:
-            run_month_report_graphic(
-                output_file=output,
-                year=self.year,
-                month=self.month,
-                fedleave_path=fedleave,
-                data_dir=self.settings.data_dir or None,
-            )
-        except BackendError as exc:
-            QMessageBox.warning(self, "Save Month as Graphic", str(exc))
-            return
-        QMessageBox.information(self, "Save Month as Graphic", f"Saved month graphic to {output}.")
 
     def show_help(self) -> None:
         self._show_html_file("fedleave-calendar-help.html", "Help Contents")
