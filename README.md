@@ -148,6 +148,12 @@ Windows GUI build:
 .\dist\fedleave-Windows\FedLeaveCalendar.exe
 ```
 
+Windows command prompt or double-click launchers:
+
+```bat
+scripts\build_gui_pyinstaller.bat
+```
+
 Both GUI build scripts place all executables in platform-specific subfolders
 under `dist/` such as `dist/fedleave-Ubuntu` and `dist/fedleave-Windows`. The
 GUI uses the sibling `fedleave` executable as its backend, so only one backend
@@ -164,6 +170,13 @@ scripts/uninstall_gui_ubuntu.sh
 ```powershell
 .\scripts\install_gui_windows.ps1
 .\scripts\uninstall_gui_windows.ps1
+```
+
+Windows command prompt or double-click launchers:
+
+```bat
+scripts\install_gui_windows.bat
+scripts\uninstall_gui_windows.bat
 ```
 
 ## Companion Application: AnnualLeaveChartForTheYear
@@ -1567,8 +1580,10 @@ python -m venv .build-venv
 .\.build-venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install pyinstaller
-pwsh .\scripts\build_pyinstaller.ps1
+.\scripts\build_pyinstaller.ps1
 ```
+
+If you prefer not to open PowerShell manually, the `scripts\*.bat` launchers call the same PowerShell scripts for you.
 
 3. Output:
 
