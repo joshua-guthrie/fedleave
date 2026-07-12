@@ -1,5 +1,6 @@
 param(
-    [string]$Dist = "$PSScriptRoot\..\dist"
+    [string]$Dist = "$PSScriptRoot\..\dist",
+    [switch]$SkipBackendBuild
 )
 
 Set-StrictMode -Version Latest
@@ -15,7 +16,9 @@ python -m venv "$VENV_DIR"
 & "$VENV_DIR\Scripts\python.exe" -m pip install -r "$HERE\requirements.txt"
 & "$VENV_DIR\Scripts\python.exe" -m pip install -r "$HERE\requirements-gui.txt"
 
-& "$HERE\scripts\build_pyinstaller.ps1" -Dist "$DIST_ROOT"
+if (-not $SkipBackendBuild) {
+    & "$HERE\scripts\build_pyinstaller_core.ps1" -Dist "$DIST_ROOT"
+}
 
 $ENTRY = Join-Path $HERE ".pyinstaller_gui_entry.py"
 @"

@@ -4,6 +4,23 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 VENV_DIR="$HERE/.pyinstaller-gui-venv"
 DIST_ROOT="$HERE/dist"
+SKIP_BACKEND_BUILD=
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dist)
+      DIST_ROOT="$2"
+      shift 2
+      ;;
+    --skip-backend-build)
+      SKIP_BACKEND_BUILD=1
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
 
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
@@ -12,7 +29,9 @@ python -m pip install pyinstaller
 python -m pip install -r "$HERE/requirements.txt"
 python -m pip install -r "$HERE/requirements-gui.txt"
 
-"$HERE/scripts/build_pyinstaller.sh" --dist "$DIST_ROOT"
+if [[ -z "$SKIP_BACKEND_BUILD" ]]; then
+  "$HERE/scripts/build_pyinstaller_core.sh" --dist "$DIST_ROOT"
+fi
 
 ENTRY="$HERE/.pyinstaller_gui_entry.py"
 cat > "$ENTRY" <<'PY'
