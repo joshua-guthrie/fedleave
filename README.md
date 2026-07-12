@@ -111,7 +111,7 @@ Current GUI features:
 - Authoritative day editing with explicit Use/Earn controls and positive hour entry
 - Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
 - Help and About dialogs
-- Print preview, printer output, and PDF export
+- Print preview, printer output, PDF export, and PNG/SVG month graphic export through `fedleaveMonthReportGraphic`
 - Zero values suppressed in day cells, tables, and reports
 
 Run from source:

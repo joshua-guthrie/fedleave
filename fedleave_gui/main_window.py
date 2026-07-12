@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
+from .backend import run_month_report_graphic
 from .settings import GuiSettings, load_settings, save_settings, settings_path
 
 
@@ -457,6 +458,7 @@ class MainWindow(QMainWindow):
         self._action(file_menu, "Print Preview...", self.print_preview)
         self._action(file_menu, "Print Month...", self.print_month)
         self._action(file_menu, "Save Month as PDF...", self.save_pdf)
+        self._action(file_menu, "Save Month as PNG/SVG...", self.save_month_graphic)
         self._action(file_menu, "Preferences...", self.preferences)
         self._action(file_menu, "Exit", self.close)
         view_menu = self.menuBar().addMenu("View")
@@ -748,6 +750,44 @@ class MainWindow(QMainWindow):
         printer.setOutputFormat(QPrinter.PdfFormat)
         printer.setOutputFileName(path)
         self._print_document(printer)
+
+    def save_month_graphic(self) -> None:
+        folder = self.settings.pdf_export_folder or str(Path.home())
+        default = str(Path(folder) / f"fedleave-{self.year}-{self.month:02d}.png")
+        path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Save Month as Graphic",
+            default,
+            "PNG files (*.png);;SVG files (*.svg)",
+        )
+        if not path:
+            return
+        output = Path(path).expanduser()
+        if not output.suffix:
+            if "svg" in selected_filter.lower():
+                output = output.with_suffix(".svg")
+            else:
+                output = output.with_suffix(".png")
+        if output.suffix.lower() not in {".png", ".svg"}:
+            QMessageBox.warning(self, "Save Month as Graphic", "Please choose a .png or .svg output file.")
+            return
+        try:
+            fedleave = str(self.backend.executable_path())
+        except BackendError as exc:
+            QMessageBox.warning(self, "Save Month as Graphic", str(exc))
+            return
+        try:
+            run_month_report_graphic(
+                output_file=output,
+                year=self.year,
+                month=self.month,
+                fedleave_path=fedleave,
+                data_dir=self.settings.data_dir or None,
+            )
+        except BackendError as exc:
+            QMessageBox.warning(self, "Save Month as Graphic", str(exc))
+            return
+        QMessageBox.information(self, "Save Month as Graphic", f"Saved month graphic to {output}.")
 
     def show_help(self) -> None:
         self._show_html_file("fedleave-calendar-help.html", "Help Contents")

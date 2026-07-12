@@ -64,6 +64,42 @@ def find_fedleave(explicit: str | None = None) -> Path:
     raise BackendMissingError("fedleave backend executable was not found.")
 
 
+def find_month_report_graphic(explicit: str | None = None) -> Path:
+    if explicit:
+        path = Path(explicit).expanduser()
+        if _is_executable(path):
+            return path
+        raise BackendMissingError("fedleaveMonthReportGraphic executable was not found.")
+
+    names = (
+        ("fedleaveMonthReportGraphic.exe", "fedleaveMonthReportGraphic.bat", "fedleaveMonthReportGraphic.cmd")
+        if sys.platform.startswith("win")
+        else ("fedleaveMonthReportGraphic",)
+    )
+    candidate_dirs: list[Path] = []
+    for raw in (Path(sys.argv[0]), Path(sys.executable)):
+        path = raw if raw.is_absolute() else Path.cwd() / raw
+        resolved = path.resolve()
+        candidate_dirs.append(resolved if resolved.is_dir() else resolved.parent)
+    here = Path(__file__).resolve().parents[1]
+    candidate_dirs.extend([here, here / "dist", here.parent / "dist"])
+
+    seen: set[Path] = set()
+    for directory in candidate_dirs:
+        if directory in seen:
+            continue
+        seen.add(directory)
+        for name in names:
+            candidate = directory / name
+            if _is_executable(candidate):
+                return candidate
+
+    path_hit = shutil.which("fedleaveMonthReportGraphic")
+    if path_hit:
+        return Path(path_hit)
+    raise BackendMissingError("fedleaveMonthReportGraphic executable was not found.")
+
+
 class FedleaveBackend:
     def __init__(self, options: BackendOptions | None = None) -> None:
         self.options = options or BackendOptions()
@@ -153,6 +189,36 @@ class FedleaveBackend:
 
     def validate(self) -> dict[str, Any]:
         return self.run_json(["validate", "--json"])
+
+
+def run_month_report_graphic(
+    *,
+    output_file: Path,
+    year: int,
+    month: int,
+    fedleave_path: str | None = None,
+    data_dir: str | None = None,
+    graphic_path: str | None = None,
+) -> None:
+    graphic = find_month_report_graphic(graphic_path)
+    command = [
+        str(graphic),
+        "--year",
+        str(year),
+        "--month",
+        str(month),
+        "--outputFile",
+        str(output_file),
+        "--overwrite",
+    ]
+    if fedleave_path:
+        command.extend(["--fedleave", fedleave_path])
+    if data_dir:
+        command.extend(["--data-dir", data_dir])
+    result = subprocess.run(command, text=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout or "fedleaveMonthReportGraphic command failed").strip()
+        raise BackendError(message)
 
 
 def _format_number(value: float) -> str:
