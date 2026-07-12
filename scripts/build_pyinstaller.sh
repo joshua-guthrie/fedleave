@@ -19,5 +19,9 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-"$HERE/scripts/build_pyinstaller_core.sh" --dist "$DIST_DIR"
-"$HERE/scripts/build_gui_pyinstaller.sh" --dist "$DIST_DIR" --skip-backend-build
+PLATFORM_DIR="$DIST_DIR/fedleave-Ubuntu"
+mkdir -p "$DIST_DIR"
+find "$DIST_DIR" -maxdepth 1 -type f -delete
+rm -rf "$DIST_DIR/FedLeaveCalendar-Ubuntu" "$DIST_DIR/FedLeaveCalendar-Windows" "$PLATFORM_DIR"
+"$HERE/scripts/build_pyinstaller_core.sh" --dist "$PLATFORM_DIR"
+"$HERE/scripts/build_gui_pyinstaller.sh" --dist "$PLATFORM_DIR" --skip-backend-build

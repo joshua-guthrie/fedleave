@@ -58,11 +58,11 @@ jobs:
         run: |
           set -euo pipefail
           DATA_DIR="$(mktemp -d)"
-          ./dist/fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir "$DATA_DIR"
-          ./dist/AnnualLeaveChartForTheYear --outputFile "$DATA_DIR/annual.png" --data-dir "$DATA_DIR"
-          ./dist/SickLeaveChartForTheYear --outputFile "$DATA_DIR/sick.png" --data-dir "$DATA_DIR"
-          ./dist/fedleaveMonthReportGraphic --year 2026 --month July --outputFile "$DATA_DIR/month.png" --data-dir "$DATA_DIR"
-          ./dist/fedleaveMonthReportGraphic --year 2026 --month 7 --outputFile "$DATA_DIR/month.svg" --data-dir "$DATA_DIR"
+          ./dist/fedleave-Ubuntu/fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir "$DATA_DIR"
+          ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear --outputFile "$DATA_DIR/annual.png" --data-dir "$DATA_DIR"
+          ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear --outputFile "$DATA_DIR/sick.png" --data-dir "$DATA_DIR"
+          ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic --year 2026 --month July --outputFile "$DATA_DIR/month.png" --data-dir "$DATA_DIR"
+          ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic --year 2026 --month 7 --outputFile "$DATA_DIR/month.svg" --data-dir "$DATA_DIR"
           test -s "$DATA_DIR/annual.png"
           test -s "$DATA_DIR/sick.png"
           test -s "$DATA_DIR/month.png"
@@ -79,11 +79,11 @@ jobs:
         run: |
           $DataDir = Join-Path $env:RUNNER_TEMP "fedleave-data"
           New-Item -ItemType Directory -Force -Path $DataDir | Out-Null
-          .\dist\fedleave.exe init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir $DataDir
-          .\dist\AnnualLeaveChartForTheYear.exe --outputFile (Join-Path $DataDir "annual.png") --data-dir $DataDir
-          .\dist\SickLeaveChartForTheYear.exe --outputFile (Join-Path $DataDir "sick.png") --data-dir $DataDir
-          .\dist\fedleaveMonthReportGraphic.exe --year 2026 --month July --outputFile (Join-Path $DataDir "month.png") --data-dir $DataDir
-          .\dist\fedleaveMonthReportGraphic.exe --year 2026 --month 7 --outputFile (Join-Path $DataDir "month.svg") --data-dir $DataDir
+          .\dist\fedleave-Windows\fedleave.exe init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir $DataDir
+          .\dist\fedleave-Windows\AnnualLeaveChartForTheYear.exe --outputFile (Join-Path $DataDir "annual.png") --data-dir $DataDir
+          .\dist\fedleave-Windows\SickLeaveChartForTheYear.exe --outputFile (Join-Path $DataDir "sick.png") --data-dir $DataDir
+          .\dist\fedleave-Windows\fedleaveMonthReportGraphic.exe --year 2026 --month July --outputFile (Join-Path $DataDir "month.png") --data-dir $DataDir
+          .\dist\fedleave-Windows\fedleaveMonthReportGraphic.exe --year 2026 --month 7 --outputFile (Join-Path $DataDir "month.svg") --data-dir $DataDir
           if (-not (Test-Path (Join-Path $DataDir "annual.png"))) { throw "Annual chart was not created" }
           if (-not (Test-Path (Join-Path $DataDir "sick.png"))) { throw "Sick chart was not created" }
           if (-not (Test-Path (Join-Path $DataDir "month.png"))) { throw "Month report PNG was not created" }

@@ -133,19 +133,21 @@ Linux GUI build:
 
 ```bash
 scripts/build_gui_pyinstaller.sh
-./dist/FedLeaveCalendar
+./dist/fedleave-Ubuntu/FedLeaveCalendar
 ```
 
 Windows GUI build:
 
 ```powershell
 .\scripts\build_gui_pyinstaller.ps1
-.\dist\FedLeaveCalendar.exe
+.\dist\fedleave-Windows\FedLeaveCalendar.exe
 ```
 
-Both GUI build scripts place all executables directly in `dist/`. The GUI uses
-the sibling `fedleave` executable as its backend, so only one backend binary is
-built and distributed at the root instead of being duplicated in a GUI bundle.
+Both GUI build scripts place all executables in platform-specific subfolders
+under `dist/` such as `dist/fedleave-Ubuntu` and `dist/fedleave-Windows`. The
+GUI uses the sibling `fedleave` executable as its backend, so only one backend
+binary is built per platform folder instead of being duplicated in a GUI
+bundle.
 
 Install/uninstall helpers:
 
@@ -193,7 +195,7 @@ The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the `dist/` directory alongside this application (when built from source)
+3. In the `dist/fedleave-Ubuntu/` directory alongside this application (when built from source)
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -232,7 +234,7 @@ The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of t
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the `dist/` directory alongside this application (when built from source)
+3. In the `dist/fedleave-Ubuntu/` directory alongside this application (when built from source)
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -281,7 +283,7 @@ The `fedleaveMonthReportGraphic` application requires `fedleave` to be available
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the `dist/` directory alongside this application when built from source
+3. In the `dist/fedleave-Ubuntu/` directory alongside this application when built from source
 
 If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
 
@@ -1530,13 +1532,13 @@ pwsh .\scripts\build_pyinstaller.ps1
 
 3. Output:
 
-- The built executables will appear in `dist/` and are platform-specific. Build on the target platform or use an appropriate builder.
-- The regular build scripts produce the CLI tools, the month report graphic, and `FedLeaveCalendar` in the same `dist/` tree.
-- On Windows, the PowerShell build script verifies these files exist directly in `dist/`: `fedleave.exe`, `AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear.exe`, `fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar.exe`.
+- The built executables will appear in platform-specific subfolders under `dist/`. Build on the target platform or use an appropriate builder.
+- The regular build scripts produce the CLI tools, the month report graphic, and `FedLeaveCalendar` in the same platform-specific `dist/` folder.
+- On Windows, the PowerShell build script verifies these files exist directly in `dist/fedleave-Windows/`: `fedleave.exe`, `AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear.exe`, `fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar.exe`.
 - On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
 
 ```bash
-chmod +x ./dist/fedleave ./dist/AnnualLeaveChartForTheYear ./dist/SickLeaveChartForTheYear ./dist/fedleaveMonthReportGraphic ./dist/FedLeaveCalendar
+chmod +x ./dist/fedleave-Ubuntu/fedleave ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic ./dist/fedleave-Ubuntu/FedLeaveCalendar
 ```
 
 Notes and caveats:

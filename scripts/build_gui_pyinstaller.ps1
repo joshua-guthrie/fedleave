@@ -1,5 +1,5 @@
 param(
-    [string]$Dist = "$PSScriptRoot\..\dist",
+    [string]$Dist = "$PSScriptRoot\..\dist\fedleave-Windows",
     [switch]$SkipBackendBuild
 )
 
@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 
 $HERE = Resolve-Path "$PSScriptRoot\.."
 $DIST_ROOT = [System.IO.Path]::GetFullPath($Dist)
+$DIST_PARENT = Split-Path -Parent $DIST_ROOT
 $VENV_DIR = Join-Path $HERE ".pyinstaller-gui-venv"
 
 python -m venv "$VENV_DIR"
@@ -16,8 +17,27 @@ python -m venv "$VENV_DIR"
 & "$VENV_DIR\Scripts\python.exe" -m pip install -r "$HERE\requirements.txt"
 & "$VENV_DIR\Scripts\python.exe" -m pip install -r "$HERE\requirements-gui.txt"
 
+New-Item -ItemType Directory -Force -Path $DIST_PARENT | Out-Null
+Get-ChildItem -Force -Path $DIST_PARENT -File | Remove-Item -Force
+foreach ($LegacyPath in @(
+    (Join-Path $DIST_PARENT "FedLeaveCalendar-Ubuntu"),
+    (Join-Path $DIST_PARENT "FedLeaveCalendar-Windows")
+)) {
+    if (Test-Path $LegacyPath) {
+        Remove-Item -Recurse -Force $LegacyPath
+    }
+}
+
 if (-not $SkipBackendBuild) {
+    if (Test-Path $DIST_ROOT) {
+        Remove-Item -Recurse -Force $DIST_ROOT
+    }
     & "$HERE\scripts\build_pyinstaller_core.ps1" -Dist "$DIST_ROOT"
+} else {
+    $guiExe = Join-Path $DIST_ROOT "FedLeaveCalendar.exe"
+    if (Test-Path $guiExe) {
+        Remove-Item -Force $guiExe
+    }
 }
 
 $ENTRY = Join-Path $HERE ".pyinstaller_gui_entry.py"
@@ -27,15 +47,6 @@ from fedleave_gui.__main__ import main
 if __name__ == '__main__':
     main()
 "@ | Set-Content -Path $ENTRY -Encoding utf8
-
-foreach ($LegacyPath in @(
-    (Join-Path $DIST_ROOT "FedLeaveCalendar-Windows"),
-    (Join-Path $DIST_ROOT "FedLeaveCalendar")
-)) {
-    if (Test-Path $LegacyPath) {
-        Remove-Item -Recurse -Force $LegacyPath
-    }
-}
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller `
     --noconfirm `

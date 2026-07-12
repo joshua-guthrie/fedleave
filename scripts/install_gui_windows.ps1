@@ -6,7 +6,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $HERE = Resolve-Path "$PSScriptRoot\.."
-$APP_SRC = Join-Path $HERE "dist"
+$APP_SRC = Join-Path $HERE "dist\fedleave-Windows"
 $INSTALL_DIR = Join-Path $env:LOCALAPPDATA "Programs\FedLeaveCalendar"
 
 if (-not (Test-Path (Join-Path $APP_SRC "FedLeaveCalendar.exe"))) {

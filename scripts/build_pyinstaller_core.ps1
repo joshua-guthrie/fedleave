@@ -1,5 +1,5 @@
 param(
-    [string]$Dist = "$PSScriptRoot\..\dist"
+    [string]$Dist = "$PSScriptRoot\..\dist\fedleave-Windows"
 )
 
 Set-StrictMode -Version Latest
@@ -8,7 +8,18 @@ $ErrorActionPreference = 'Stop'
 $HERE = Resolve-Path "$PSScriptRoot\.."
 $VENV_DIR = Join-Path $HERE ".pyinstaller-venv"
 $DIST_DIR = [System.IO.Path]::GetFullPath($Dist)
-New-Item -ItemType Directory -Force -Path $DIST_DIR | Out-Null
+$DIST_PARENT = Split-Path -Parent $DIST_DIR
+New-Item -ItemType Directory -Force -Path $DIST_PARENT | Out-Null
+Get-ChildItem -Force -Path $DIST_PARENT -File | Remove-Item -Force
+foreach ($LegacyPath in @(
+    (Join-Path $DIST_PARENT "FedLeaveCalendar-Ubuntu"),
+    (Join-Path $DIST_PARENT "FedLeaveCalendar-Windows"),
+    $DIST_DIR
+)) {
+    if (Test-Path $LegacyPath) {
+        Remove-Item -Recurse -Force $LegacyPath
+    }
+}
 
 function Move-BuildOutputToDist {
     param(

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-APP_SRC="$HERE/dist"
+APP_SRC="$HERE/dist/fedleave-Ubuntu"
 INSTALL_DIR="${HOME}/.local/share/fedleave-calendar"
 BIN_DIR="${HOME}/.local/bin"
 DESKTOP_DIR="${HOME}/.local/share/applications"

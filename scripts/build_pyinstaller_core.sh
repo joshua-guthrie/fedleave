@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # Build the CLI and companion console executables using PyInstaller.
-# Usage: ./scripts/build_pyinstaller_core.sh [--dist dist]
+# Usage: ./scripts/build_pyinstaller_core.sh [--dist dist/fedleave-Ubuntu]
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 VENV_DIR="$HERE/.pyinstaller-venv"
-DIST_DIR="$HERE/dist"
+DIST_DIR="$HERE/dist/fedleave-Ubuntu"
 ONEFILE=--onefile
 
 while [[ $# -gt 0 ]]; do
@@ -20,6 +20,12 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+DIST_ROOT="$(dirname "$DIST_DIR")"
+
+mkdir -p "$DIST_ROOT"
+find "$DIST_ROOT" -maxdepth 1 -type f -delete
+rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar-Windows" "$DIST_DIR"
 
 echo "Building fedleave with PyInstaller (venv: $VENV_DIR)"
 python3 -m venv "$VENV_DIR"

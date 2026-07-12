@@ -3,13 +3,13 @@ set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 VENV_DIR="$HERE/.pyinstaller-gui-venv"
-DIST_ROOT="$HERE/dist"
+DIST_DIR="$HERE/dist/fedleave-Ubuntu"
 SKIP_BACKEND_BUILD=
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dist)
-      DIST_ROOT="$2"
+      DIST_DIR="$2"
       shift 2
       ;;
     --skip-backend-build)
@@ -22,6 +22,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+DIST_ROOT="$(dirname "$DIST_DIR")"
+
 python3 -m venv "$VENV_DIR"
 source "$VENV_DIR/bin/activate"
 python -m pip install --upgrade pip
@@ -29,8 +31,15 @@ python -m pip install pyinstaller
 python -m pip install -r "$HERE/requirements.txt"
 python -m pip install -r "$HERE/requirements-gui.txt"
 
+mkdir -p "$DIST_ROOT"
+find "$DIST_ROOT" -maxdepth 1 -type f -delete
+rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar-Windows"
+
 if [[ -z "$SKIP_BACKEND_BUILD" ]]; then
-  "$HERE/scripts/build_pyinstaller_core.sh" --dist "$DIST_ROOT"
+  rm -rf "$DIST_DIR"
+  "$HERE/scripts/build_pyinstaller_core.sh" --dist "$DIST_DIR"
+else
+  rm -f "$DIST_DIR/FedLeaveCalendar"
 fi
 
 ENTRY="$HERE/.pyinstaller_gui_entry.py"
@@ -41,7 +50,6 @@ if __name__ == '__main__':
     main()
 PY
 
-rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar"
 pyinstaller \
   --noconfirm \
   --onefile \
@@ -52,11 +60,11 @@ pyinstaller \
   --hidden-import PySide6.QtGui \
   --hidden-import PySide6.QtWidgets \
   --hidden-import PySide6.QtPrintSupport \
-  --distpath "$DIST_ROOT" \
+  --distpath "$DIST_DIR" \
   --workpath "$HERE/.pyinstaller-build" \
   --specpath "$HERE/.pyinstaller-spec" \
   "$ENTRY"
 
-echo "GUI build complete: $DIST_ROOT"
+echo "GUI build complete: $DIST_DIR"
 echo "  - FedLeaveCalendar"
 echo "  - fedleave (shared backend; not duplicated)"
