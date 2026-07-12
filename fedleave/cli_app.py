@@ -22,7 +22,7 @@ Usage:
     fedleave COMMAND [OPTIONS]
 
 Primary commands:
-    init        Initialize data directory and create leave year JSON
+    init        Initialize or repair the data directory and create missing leave year JSON
     add         Add a transaction to a leave year
     set-day     Authoritatively set signed leave values for one day
     accrual-change

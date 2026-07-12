@@ -7,7 +7,6 @@ from pathlib import Path
 from datetime import datetime
 from typing import Any
 
-import typer
 from pydantic import BaseModel, Field
 from dateutil.parser import isoparse
 from .validation import sanitize_url
@@ -189,8 +188,6 @@ def init_config(
         config.holidays.ics_url = DEFAULT_OPM_ICS_URL
 
     config_path = data_dir / "config.json"
-    if config_path.exists():
-        raise typer.Exit(code=1)
 
     try:
         leave_year_start_date = isoparse(leave_year_start).date()
@@ -200,6 +197,9 @@ def init_config(
         ) from exc
     pay_periods = generate_pay_periods(leave_year_start_date, 26)
     leave_year_end = pay_periods[-1]["end_date"]
+    year_path = data_dir / "leave_years"
+    year_file = year_path / f"{year}.json"
+    holiday_cache_path = data_dir / "holiday_cache" / f"federal_holidays_{year}.json"
 
     leave_year = LeaveYear(
         leave_year=year,
@@ -215,13 +215,31 @@ def init_config(
     leave_year_data = leave_year.model_dump()
     ensure_automatic_accruals(leave_year_data, leave_year_end)
 
-    atomic_write_json(config_path, config.model_dump(), overwrite=False)
-    year_path = data_dir / "leave_years"
-    year_path.mkdir(exist_ok=True)
-    year_file = year_path / f"{year}.json"
-    atomic_write_json(year_file, leave_year_data, overwrite=False)
+    created_any = False
 
-    holiday_cache = generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
-    atomic_write_json(data_dir / "holiday_cache" / f"federal_holidays_{year}.json", holiday_cache, overwrite=True)
+    if config_path.exists():
+        console.print(f"[yellow]INFO:[/yellow] Preserving existing config file: {config_path}")
+    else:
+        atomic_write_json(config_path, config.model_dump(), overwrite=False)
+        created_any = True
+        console.print(f"[green]Created[/green] config file: {config_path}")
 
-    console.print(f"Initialized fedleave data in [bold]{data_dir}[/bold]")
+    if year_file.exists():
+        console.print(f"[yellow]INFO:[/yellow] Preserving existing leave year file: {year_file}")
+    else:
+        atomic_write_json(year_file, leave_year_data, overwrite=False)
+        created_any = True
+        console.print(f"[green]Created[/green] leave year file: {year_file}")
+
+    if holiday_cache_path.exists():
+        console.print(f"[yellow]INFO:[/yellow] Preserving existing holiday cache: {holiday_cache_path}")
+    else:
+        holiday_cache = generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
+        atomic_write_json(holiday_cache_path, holiday_cache, overwrite=False)
+        created_any = True
+        console.print(f"[green]Created[/green] holiday cache: {holiday_cache_path}")
+
+    if created_any:
+        console.print(f"Initialized fedleave data in [bold]{data_dir}[/bold]")
+    else:
+        console.print(f"fedleave data already initialized in [bold]{data_dir}[/bold]")

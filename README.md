@@ -322,7 +322,7 @@ Usage:
 Commands and common options:
 
 	init
-		Initialize the data directory and create a leave year JSON file.
+		Initialize or repair the data directory and create missing core files.
 
 		Syntax:
 			fedleave init --year YEAR --leave-year-start YYYY-MM-DD|today [--annual-accrual FLOAT] [--annual-start FLOAT] [--sick-start FLOAT] [--comp-start FLOAT] [--credit-start FLOAT] [--travel-comp-start FLOAT] [--holiday-source python_holidays|opm_ics] [--holiday-ics-url URL] [--data-dir PATH]
@@ -340,6 +340,9 @@ Commands and common options:
 			--holiday-source python_holidays
 			--holiday-ics-url https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics
 			--data-dir ~/.local/share/fedleave
+
+		Notes:
+			- If `config.json`, a leave-year file, or the holiday cache already exists, `init` preserves the existing file and creates any missing ones.
 
 		Example:
 			fedleave init --year 2026 --leave-year-start 2026-01-11 --annual-accrual 6 --annual-start 120 --sick-start 180 --data-dir ~/.local/share/fedleave
