@@ -22,11 +22,13 @@ def test_abbreviations_dialog_uses_complete_noneditable_table():
     assert table.columnCount() == 2
     assert table.horizontalHeaderItem(0).text() == "Abbreviation"
     assert table.horizontalHeaderItem(1).text() == "Leave Type"
-    assert table.horizontalHeader().defaultAlignment() & Qt.AlignLeft
+    assert table.horizontalHeaderItem(0).textAlignment() & Qt.AlignLeft
+    assert table.horizontalHeaderItem(1).textAlignment() & Qt.AlignLeft
     assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeToContents
     assert table.horizontalHeader().sectionResizeMode(1) == QHeaderView.Stretch
 
     expected = list(CATEGORY_LABELS.values())
     actual = [(table.item(row, 0).text(), table.item(row, 1).text()) for row in range(table.rowCount())]
     assert actual == expected
+    assert all(table.item(row, column).textAlignment() & Qt.AlignLeft for row in range(table.rowCount()) for column in range(2))
     assert all(not (table.item(row, column).flags() & Qt.ItemIsEditable) for row in range(table.rowCount()) for column in range(2))

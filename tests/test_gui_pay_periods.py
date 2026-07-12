@@ -55,6 +55,9 @@ def test_gui_renders_separate_table_for_each_visible_pay_period(monkeypatch):
         "Used",
         "Balance",
     ]
-    assert table.horizontalHeader().defaultAlignment() & Qt.AlignLeft
+    assert table.horizontalHeaderItem(0).textAlignment() & Qt.AlignLeft
+    assert all(table.horizontalHeaderItem(column).textAlignment() & Qt.AlignRight for column in range(1, 4))
     assert table.rowCount() == 2
     assert [table.item(0, column).text() for column in range(4)] == ["Annual Leave", "6", "2", "14"]
+    assert table.item(0, 0).textAlignment() & Qt.AlignLeft
+    assert all(table.item(0, column).textAlignment() & Qt.AlignRight for column in range(1, 4))

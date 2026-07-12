@@ -88,8 +88,22 @@ def _nonzero(value: Any) -> bool:
         return False
 
 
-def _set_table_header_alignment(table: QTableWidget) -> None:
-    table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+TABLE_TEXT_ALIGNMENT = Qt.AlignLeft | Qt.AlignVCenter
+TABLE_NUMBER_ALIGNMENT = Qt.AlignRight | Qt.AlignVCenter
+
+
+def _set_table_header_alignments(table: QTableWidget, alignments: list[int]) -> None:
+    for column, alignment in enumerate(alignments):
+        header_item = table.horizontalHeaderItem(column)
+        if header_item is not None:
+            header_item.setTextAlignment(alignment)
+
+
+def _table_item(value: str, alignment: int) -> QTableWidgetItem:
+    item = QTableWidgetItem(value)
+    item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+    item.setTextAlignment(alignment)
+    return item
 
 
 def _fmt(value: Any, *, signed: bool = False) -> str:
@@ -321,7 +335,7 @@ class SaveDayPreviewDialog(QDialog):
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Leave Type", "Existing", "New"])
         self.table.verticalHeader().setVisible(False)
-        _set_table_header_alignment(self.table)
+        _set_table_header_alignments(self.table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -347,14 +361,12 @@ class SaveDayPreviewDialog(QDialog):
         self.table.setRowCount(len(rows))
         for row, category in enumerate(rows):
             values = [
-                _category_display_text(category),
-                _format_value_summary(self._existing_values.get(category, 0.0)),
-                _format_value_summary(self._new_values.get(category, 0.0)),
+                (_category_display_text(category), TABLE_TEXT_ALIGNMENT),
+                (_format_value_summary(self._existing_values.get(category, 0.0)), TABLE_NUMBER_ALIGNMENT),
+                (_format_value_summary(self._new_values.get(category, 0.0)), TABLE_NUMBER_ALIGNMENT),
             ]
-            for column, value in enumerate(values):
-                item = QTableWidgetItem(value)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                self.table.setItem(row, column, item)
+            for column, (value, alignment) in enumerate(values):
+                self.table.setItem(row, column, _table_item(value, alignment))
 
 
 class AbbreviationsDialog(QDialog):
@@ -366,15 +378,13 @@ class AbbreviationsDialog(QDialog):
         self.table = QTableWidget(len(CATEGORY_LABELS), 2)
         self.table.setHorizontalHeaderLabels(["Abbreviation", "Leave Type"])
         self.table.verticalHeader().setVisible(False)
-        _set_table_header_alignment(self.table)
+        _set_table_header_alignments(self.table, [TABLE_TEXT_ALIGNMENT, TABLE_TEXT_ALIGNMENT])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setSelectionMode(QTableWidget.NoSelection)
         for row, (short, label) in enumerate(CATEGORY_LABELS.values()):
-            for column, value in enumerate((short, label)):
-                item = QTableWidgetItem(value)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-                self.table.setItem(row, column, item)
+            self.table.setItem(row, 0, _table_item(short, TABLE_TEXT_ALIGNMENT))
+            self.table.setItem(row, 1, _table_item(label, TABLE_TEXT_ALIGNMENT))
         layout.addWidget(self.table)
         buttons = QDialogButtonBox(QDialogButtonBox.Close)
         buttons.rejected.connect(self.reject)
@@ -577,7 +587,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(QLabel("As of Today"))
         self.balance_table = QTableWidget(0, 3)
         self.balance_table.setHorizontalHeaderLabels(["Category", "Balance", "Use or Lose"])
-        _set_table_header_alignment(self.balance_table)
+        _set_table_header_alignments(self.balance_table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
         self.balance_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         root_layout.addWidget(self.balance_table, 1)
 
@@ -699,14 +709,22 @@ class MainWindow(QMainWindow):
             table = QTableWidget(len(rows), 4)
             table.setHorizontalHeaderLabels(["Type", "Earned", "Used", "Balance"])
             table.verticalHeader().setVisible(False)
-            _set_table_header_alignment(table)
+            _set_table_header_alignments(
+                table,
+                [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT],
+            )
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
             for column in range(1, 4):
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
             table.setSelectionMode(QTableWidget.NoSelection)
             table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             for row, values in enumerate(rows):
-                self._set_row(table, row, values)
+                self._set_row(
+                    table,
+                    row,
+                    values,
+                    [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT],
+                )
             table.resizeRowsToContents()
             row_height = table.verticalHeader().defaultSectionSize()
             table.setFixedHeight(table.horizontalHeader().height() + max(1, len(rows)) * row_height + 4)
@@ -729,13 +747,17 @@ class MainWindow(QMainWindow):
             row = self.balance_table.rowCount()
             self.balance_table.insertRow(row)
             lose = use_or_lose.get("use_or_lose") if category == "annual" else None
-            self._set_row(self.balance_table, row, [CATEGORY_LABELS.get(category, ("", category))[1], _fmt(value), _fmt(lose)])
+            self._set_row(
+                self.balance_table,
+                row,
+                [CATEGORY_LABELS.get(category, ("", category))[1], _fmt(value), _fmt(lose)],
+                [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT],
+            )
 
-    def _set_row(self, table: QTableWidget, row: int, values: list[str]) -> None:
+    def _set_row(self, table: QTableWidget, row: int, values: list[str], alignments: list[int] | None = None) -> None:
         for column, value in enumerate(values):
-            item = QTableWidgetItem(value)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            table.setItem(row, column, item)
+            alignment = alignments[column] if alignments and column < len(alignments) else TABLE_TEXT_ALIGNMENT
+            table.setItem(row, column, _table_item(value, alignment))
 
     def edit_day(self, day: dict[str, Any]) -> None:
         dialog = DayEditDialog(day, self)
