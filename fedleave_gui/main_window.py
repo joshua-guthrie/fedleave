@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSpinBox,
     QDoubleSpinBox,
     QTableWidget,
@@ -136,6 +137,16 @@ def _format_value_summary(value: Any) -> str:
 
 def _category_display_text(category: str) -> str:
     return CATEGORY_LABELS.get(category, (category, category))[1]
+
+
+def _month_toolbar_font(widget: QWidget) -> QFont:
+    font = QFont(widget.font())
+    point_size = font.pointSizeF()
+    if point_size <= 0:
+        point_size = 10.0
+    font.setPointSizeF(max(point_size * 1.8, point_size + 6.0, 16.0))
+    font.setBold(True)
+    return font
 
 
 class DayCell(QPushButton):
@@ -491,20 +502,50 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         self._build_menus()
         toolbar = QToolBar("Month")
+        toolbar.setMovable(False)
+        toolbar.setFloatable(False)
         self.addToolBar(toolbar)
-        previous_action = QAction("< Previous", self)
-        previous_action.triggered.connect(self.previous_month)
-        next_action = QAction("Next >", self)
-        next_action.triggered.connect(self.next_month)
-        today_action = QAction("Today", self)
-        today_action.triggered.connect(self.go_today)
-        toolbar.addAction(previous_action)
+        self.month_toolbar_widget = QWidget()
+        self.month_toolbar_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.month_toolbar_layout = QHBoxLayout(self.month_toolbar_widget)
+        self.month_toolbar_layout.setContentsMargins(8, 4, 8, 4)
+        self.month_toolbar_layout.setSpacing(12)
+
+        self.previous_button = QPushButton("< Previous")
+        self.previous_button.clicked.connect(self.previous_month)
+        self.previous_button.setMinimumHeight(42)
+        self.previous_button.setMinimumWidth(140)
+        self.previous_button.setFont(_month_toolbar_font(self.previous_button))
+        self.month_toolbar_layout.addWidget(self.previous_button)
+        self.month_toolbar_layout.addStretch(1)
+
+        self.month_toolbar_center = QWidget()
+        self.month_toolbar_center.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
+        center_layout = QHBoxLayout(self.month_toolbar_center)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        center_layout.setSpacing(10)
         self.title_label = QLabel()
-        self.title_label.setMinimumWidth(180)
         self.title_label.setAlignment(Qt.AlignCenter)
-        toolbar.addWidget(self.title_label)
-        toolbar.addAction(next_action)
-        toolbar.addAction(today_action)
+        self.title_label.setFont(_month_toolbar_font(self.title_label))
+        self.title_label.setMinimumWidth(180)
+        self.today_button = QPushButton("Today")
+        self.today_button.clicked.connect(self.go_today)
+        self.today_button.setMinimumHeight(42)
+        self.today_button.setMinimumWidth(92)
+        self.today_button.setFont(_month_toolbar_font(self.today_button))
+        center_layout.addWidget(self.title_label)
+        center_layout.addWidget(self.today_button)
+        self.month_toolbar_layout.addWidget(self.month_toolbar_center)
+        self.month_toolbar_layout.addStretch(1)
+
+        self.next_button = QPushButton("Next >")
+        self.next_button.clicked.connect(self.next_month)
+        self.next_button.setMinimumHeight(42)
+        self.next_button.setMinimumWidth(120)
+        self.next_button.setFont(_month_toolbar_font(self.next_button))
+        self.month_toolbar_layout.addWidget(self.next_button)
+
+        toolbar.addWidget(self.month_toolbar_widget)
 
         root = QWidget()
         self.setCentralWidget(root)
