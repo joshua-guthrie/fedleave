@@ -276,6 +276,22 @@ def balance(
         console.print(f"Projected use-or-lose: {use_or_lose_data['use_or_lose']:.2f}")
 
 
+@app.command(name="use-or-lose")
+@app.command(name="use-or-loose")
+def use_or_lose(
+    year: int | None = typer.Option(None, help="Leave year. Defaults to the current leave year."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    balance(
+        year=year,
+        as_of="leave-year-end",
+        use_or_lose=True,
+        json_output=json_output,
+        data_dir=data_dir,
+    )
+
+
 @app.command(name="pay-period")
 def pay_period_summary(
     year: int = typer.Option(..., help="Leave year."),

@@ -1,7 +1,7 @@
 from pathlib import Path
 import json
 
-from fedleave.cli import accrual_change, balance, pay_period_summary, pay_periods_summary
+from fedleave.cli import accrual_change, balance, pay_period_summary, pay_periods_summary, use_or_lose
 from fedleave.config import init_config
 from fedleave.ledger import calculate_balances, calculate_pay_period_activity, ensure_automatic_accruals
 from fedleave.storage import write_json
@@ -224,6 +224,20 @@ def test_balance_command_reports_projected_use_or_lose(tmp_path: Path, capsys):
 
     output = capsys.readouterr().out
     assert "Projected balances for 2026 as of 2027-01-09:" in output
+    assert "Carryover limit: 240.00" in output
+    assert "Projected annual carryover: 166.00" in output
+    assert "Projected use-or-lose: 0.00" in output
+
+
+def test_use_or_lose_command_reports_year_end_projection(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+
+    use_or_lose(year=2026, data_dir=data_dir)
+
+    output = capsys.readouterr().out
+    assert "Projected balances for 2026 as of 2027-01-09:" in output
+    assert "annual: 166.00" in output
     assert "Carryover limit: 240.00" in output
     assert "Projected annual carryover: 166.00" in output
     assert "Projected use-or-lose: 0.00" in output

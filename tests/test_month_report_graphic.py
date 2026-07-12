@@ -241,6 +241,18 @@ def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
         "balances": {"annual": 180.0},
         "use_or_lose": {"use_or_lose": 0.0},
     }
+    projected_payload = {
+        "year": 2026,
+        "as_of": "2027-01-09",
+        "projected": True,
+        "project_to": "2027-01-09",
+        "balances": {"annual": 180.0},
+        "use_or_lose": {
+            "carryover_limit": 240.0,
+            "annual_carryover": 180.0,
+            "use_or_lose": 0.0,
+        },
+    }
 
     monkeypatch.setattr("fedleave_month_report_graphic.report.find_fedleave", lambda explicit=None: tmp_path / "fedleave")
 
@@ -248,6 +260,8 @@ def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
         calls.append(args)
         if args[0] == "month":
             return month_payload
+        if args[0] == "use-or-lose":
+            return projected_payload
         raise AssertionError(f"Unexpected extra fedleave call: {args}")
 
     monkeypatch.setattr("fedleave_month_report_graphic.report.run_fedleave", fake_run_fedleave)
@@ -256,9 +270,10 @@ def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
         Options(tmp_path / "month.png", 2026, 7, 1920, None, None, False, False, False)
     )
 
-    assert [call[0] for call in calls] == ["month"]
+    assert [call[0] for call in calls] == ["month", "use-or-lose"]
     assert data.balance_json["balances"]["annual"] == 124.0
     assert data.projected_json["balances"]["annual"] == 180.0
+    assert data.projected_json["use_or_lose"]["use_or_lose"] == 0.0
 
 
 def test_write_output_creates_svg_and_png(tmp_path):

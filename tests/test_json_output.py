@@ -12,6 +12,7 @@ from fedleave.cli import (
     list_transactions,
     pay_period_summary,
     pay_periods_summary,
+    use_or_lose,
     rollover,
     validate,
     void,
@@ -176,6 +177,24 @@ def test_balance_as_of_future_date_infers_year_and_includes_future_accruals(tmp_
     assert balances["as_of"] == "2026-04-03"
     assert balances["balances"]["annual"] == 40.0
     assert balances["balances"]["sick"] == 40.0
+
+
+def test_use_or_lose_json_output(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+    capsys.readouterr()
+
+    use_or_lose(year=2026, json_output=True, data_dir=data_dir)
+    payload = _json_output(capsys)
+
+    assert payload["year"] == 2026
+    assert payload["as_of"] == "2027-01-09"
+    assert payload["projected"] is True
+    assert payload["project_to"] == "2027-01-09"
+    assert payload["balances"]["annual"] == 166.0
+    assert payload["use_or_lose"]["carryover_limit"] == 240.0
+    assert payload["use_or_lose"]["annual_carryover"] == 166.0
+    assert payload["use_or_lose"]["use_or_lose"] == 0.0
 
 
 def test_correct_and_void_emit_json(tmp_path: Path, capsys):

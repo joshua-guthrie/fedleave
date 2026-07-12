@@ -147,6 +147,9 @@ class FedleaveBackend:
             raise BackendError("fedleave backend returned an empty version response.")
         return version
 
+    def use_or_lose(self, year: int) -> dict[str, Any]:
+        return self.run_json(["use-or-lose", "--year", str(year), "--json"])
+
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])
 

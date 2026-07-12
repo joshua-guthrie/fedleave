@@ -289,8 +289,14 @@ def load_report_data(options: Options) -> tuple[Path, ReportData]:
             ["balance", "--year", str(options.year), "--as-of", "today", "--json", *common],
         )
 
-    projected_json = month_json.get("projected_balance")
-    if not isinstance(projected_json, dict) or "balances" not in projected_json:
+    try:
+        projected_json = run_fedleave(
+            fedleave,
+            ["use-or-lose", "--year", str(options.year), "--json", *common],
+        )
+    except FedleaveCommandError:
+        projected_json = month_json.get("projected_balance")
+    if not isinstance(projected_json, dict) or "use_or_lose" not in projected_json:
         projected_json = run_fedleave(
             fedleave,
             ["balance", "--year", str(options.year), "--project", "--use-or-lose", "--json", *common],

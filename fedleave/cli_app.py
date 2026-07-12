@@ -32,6 +32,7 @@ Primary commands:
     starting-balance
                 Set starting balances with audit history
     balance     Show balances calculated from the ledger
+    use-or-lose Show year-end annual carryover and use-or-lose for a leave year
     pay-period  Show earned, used, overtime totals, and balances for a pay period
     pay-periods Show earned, used, overtime totals, and balances for every pay period
     month       Show calendar-day leave entries and pay periods for a month
@@ -104,6 +105,12 @@ Command details and examples:
         --project is retained for compatibility with existing scripts.
         --use-or-lose prints projected annual carryover and annual leave lost above the carryover limit.
         --json emits balances, use-or-lose values, and automatic accrual posting details.
+
+    fedleave use-or-lose [--year YEAR] [--json] [--data-dir PATH]
+        Show year-end annual carryover and use-or-lose for a leave year.
+        Alias: fedleave use-or-loose
+        If --year is omitted, the current leave year is inferred from today.
+        --json emits the same projected balance payload used by `fedleave balance --use-or-lose`.
 
     fedleave pay-period --year YEAR --date YYYY-MM-DD|today [--daily] [--json] [--data-dir PATH]
         Show leave earned/used, overtime worked, optional daily activity, and ending balances for the pay period containing the date.

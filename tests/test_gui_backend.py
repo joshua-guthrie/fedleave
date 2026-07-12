@@ -20,6 +20,23 @@ elif args[:1] == ["set-day"]:
     print(json.dumps({"action": "set-day", "args": args}))
 elif args[:1] == ["validate"]:
     print(json.dumps({"ok": True}))
+elif args[:1] == ["use-or-lose"]:
+    print(
+        json.dumps(
+            {
+                "year": int(args[args.index("--year") + 1]),
+                "as_of": "2027-01-09",
+                "projected": True,
+                "project_to": "2027-01-09",
+                "balances": {"annual": 166.0},
+                "use_or_lose": {
+                    "carryover_limit": 240.0,
+                    "annual_carryover": 166.0,
+                    "use_or_lose": 0.0,
+                },
+            }
+        )
+    )
 elif args[:1] == ["--version"]:
     print("fedleave 0.2.0")
 else:
@@ -43,6 +60,10 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     month = backend.load_month(2026, 7)
     assert month["year"] == 2026
     assert month["month"] == 7
+
+    projection = backend.use_or_lose(2026)
+    assert projection["year"] == 2026
+    assert projection["use_or_lose"]["use_or_lose"] == 0.0
 
     result = backend.set_day("2026-07-08", {"annual": -5.0, "credit": 2.0})
     args = result["args"]

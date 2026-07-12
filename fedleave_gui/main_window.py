@@ -398,6 +398,7 @@ class MainWindow(QMainWindow):
         self.year = self.today.year
         self.month = self.today.month
         self.month_json: dict[str, Any] | None = None
+        self.use_or_lose_json: dict[str, Any] | None = None
         self.setWindowTitle("FedLeave Calendar")
         self.resize(1320, 860)
         self._build_ui()
@@ -507,6 +508,7 @@ class MainWindow(QMainWindow):
         try:
             self.backend = self._backend()
             self.month_json = self.backend.load_month(self.year, self.month)
+            self.use_or_lose_json = self.backend.use_or_lose(self.year)
         except BackendMissingError:
             QMessageBox.critical(self, "Backend Missing", "The fedleave backend executable could not be found. Open Preferences to set the path.")
             self.preferences()
@@ -590,7 +592,11 @@ class MainWindow(QMainWindow):
 
     def _render_balances(self) -> None:
         balance = ((self.month_json.get("balance_as_of_today") or {}).get("balances") or {})
-        use_or_lose = ((self.month_json.get("projected_balance") or {}).get("use_or_lose") or {})
+        use_or_lose = (self.use_or_lose_json or {}).get("use_or_lose") if isinstance(self.use_or_lose_json, dict) else {}
+        if not isinstance(use_or_lose, dict):
+            use_or_lose = {}
+        if not use_or_lose:
+            use_or_lose = ((self.month_json.get("projected_balance") or {}).get("use_or_lose") or {})
         self.balance_table.setRowCount(0)
         for category, value in sorted(balance.items()):
             if not _nonzero(value):
@@ -711,7 +717,9 @@ class MainWindow(QMainWindow):
         balance_json = month_json.get("balance_as_of_today")
         if not isinstance(balance_json, dict):
             balance_json = {"balances": {}}
-        projected_json = month_json.get("projected_balance")
+        projected_json = self.use_or_lose_json
+        if not isinstance(projected_json, dict):
+            projected_json = month_json.get("projected_balance")
         if not isinstance(projected_json, dict):
             projected_json = {"balances": {}, "use_or_lose": {}}
         return MonthReportData(

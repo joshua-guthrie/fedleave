@@ -76,6 +76,7 @@ Check balances. If no date is supplied, balances default to today and the leave 
 fedleave balance
 fedleave balance --year 2026 --as-of 2026-06-01
 fedleave balance --year 2026 --as-of leave-year-end
+fedleave use-or-lose --year 2026
 ```
 
 Check what was earned, used, and worked during the pay period containing a date:
@@ -252,6 +253,8 @@ The report includes:
 - Pay-period table for periods touching the displayed month, including earned, used, and ending balance columns
 - As-of-today balance table with use-or-lose values
 - Leave category abbreviation table covering all supported leave types
+
+The report queries `fedleave use-or-lose` directly for the year-end projection used in the balance table. That keeps the use-or-lose value independent from the month payload’s projected balance field.
 
 Transaction IDs, descriptions, sources, statuses, and data file paths are intentionally omitted from the report.
 
@@ -463,6 +466,18 @@ Commands and common options:
 		- `--project` is retained for existing scripts, but is no longer required for normal projection workflows.
 		- `--json` emits balances, use-or-lose values, and automatic accrual posting details.
 		- Federal employees earn annual and sick leave automatically each pay period; this tool uses the leave year pay periods and configured accrual rates to create and project those accrual rows.
+
+	use-or-lose
+		Show year-end annual carryover and use-or-lose for a leave year.
+
+		Syntax:
+			fedleave use-or-lose [--year YEAR] [--json] [--data-dir PATH]
+
+		Notes:
+			- `--year YEAR` is optional. If omitted, the current leave year is inferred from today.
+			- The command always computes the leave year’s final day projection.
+			- `--json` emits the same projected balance payload used by `fedleave balance --use-or-lose`.
+			- `fedleave use-or-loose` is accepted as a compatibility alias.
 
 	pay-period
 		Show earned, used, net leave, overtime worked, optional daily activity, and ending balances for the pay period containing a date.
@@ -947,12 +962,33 @@ Use-or-lose command:
 
 ```bash
 fedleave balance --year 2026 --use-or-lose --json
+fedleave use-or-lose --year 2026 --json
 ```
 
-Use-or-lose fields:
+Both commands return the same payload schema. The dedicated `use-or-lose` command always projects to the leave year end and is the path used by the month report graphic and GUI.
+
+### `use-or-lose --json`
+
+Command:
+
+```bash
+fedleave use-or-lose --year 2026 --json
+```
+
+Success output:
 
 ```json
 {
+  "year": 2026,
+  "as_of": "2027-01-09",
+  "projected": true,
+  "project_to": "2027-01-09",
+  "balances": {
+    "annual": 166.0,
+    "sick": 124.0
+  },
+  "automatic_accruals_posted": 0,
+  "automatic_accruals_posted_through": "2027-01-09",
   "use_or_lose": {
     "carryover_limit": 240.0,
     "annual_carryover": 166.0,
@@ -964,13 +1000,13 @@ Use-or-lose fields:
 Fields:
 
 - `year`: Requested leave year.
-- `as_of`: Effective cutoff date. When omitted, this defaults to today.
-- `projected`: `true` when `--project-to`, `--project`, or `--use-or-lose` is active.
-- `project_to`: Projection end date when projected; otherwise `null`.
-- `balances`: Balance map by category.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before calculating balances. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
-- `automatic_accruals_posted_through`: Date through which automatic accrual posting was attempted.
-- `use_or_lose`: Use-or-lose object when `--use-or-lose` is passed; otherwise `null`.
+- `as_of`: Always the leave year end date.
+- `projected`: Always `true`.
+- `project_to`: Leave year end date.
+- `balances`: Projected balances at leave year end.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before calculating the projection.
+- `automatic_accruals_posted_through`: Leave year end date used for automatic accrual posting.
+- `use_or_lose`: Use-or-lose payload with carryover limit, projected annual carryover, and projected annual leave lost above the limit.
 
 ### `pay-period --json`
 
