@@ -102,6 +102,12 @@ FedLeave Calendar is a cross-platform PySide6 desktop GUI for the `fedleave` bac
 
 The GUI does not read or edit leave JSON files directly. Reads and writes go through the selected `fedleave` executable. Day edits call `fedleave set-day --authoritative --json`, then the month is reloaded from the backend.
 
+Screenshots:
+
+![FedLeave Calendar main window](examples/fedleave-calendar-main-screen.png)
+
+![FedLeave Calendar day editor](examples/fedleave-calendar-edit-leave.png)
+
 Current GUI features:
 
 - Month navigation with Previous, Next, and Today
