@@ -53,7 +53,9 @@ if __name__ == '__main__':
     --onefile `
     --windowed `
     --name FedLeaveCalendar `
+    --icon "$HERE\assets\fedleave-icon.ico" `
     --add-data "$HERE\help;help" `
+    --add-data "$HERE\assets;assets" `
     --hidden-import PySide6.QtCore `
     --hidden-import PySide6.QtGui `
     --hidden-import PySide6.QtWidgets `

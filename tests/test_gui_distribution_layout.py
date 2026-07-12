@@ -11,6 +11,8 @@ def test_linux_gui_build_uses_single_file_root_layout():
     assert "--onefile" in script
     assert 'build_pyinstaller_core.sh' in script
     assert 'fedleave-Ubuntu' in script
+    assert '--icon "$HERE/assets/fedleave-icon.ico"' in script
+    assert '--add-data "$HERE/assets:assets"' in script
     assert 'find "$DIST_ROOT" -maxdepth 1 -type f -delete' in script
     assert 'rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar-Windows"' in script
     assert 'rm -rf "$DIST_DIR"' in script
@@ -24,6 +26,8 @@ def test_windows_gui_build_uses_single_file_root_layout():
     assert "--onefile" in script
     assert "build_pyinstaller_core.ps1" in script
     assert "fedleave-Windows" in script
+    assert '--icon "$HERE\\assets\\fedleave-icon.ico"' in script
+    assert '--add-data "$HERE\\assets;assets"' in script
     assert 'Get-ChildItem -Force -Path $DIST_PARENT -File | Remove-Item -Force' in script
     assert '(Join-Path $DIST_PARENT "FedLeaveCalendar-Ubuntu")' in script
     assert '(Join-Path $DIST_PARENT "FedLeaveCalendar-Windows")' in script
@@ -54,3 +58,10 @@ def test_regular_build_scripts_include_gui_build():
     assert "build_pyinstaller_core.ps1" in windows
     assert "build_gui_pyinstaller.ps1" in windows
     assert "-SkipBackendBuild" in windows
+
+
+def test_about_page_mentions_the_logo_asset():
+    about = (ROOT / "help" / "about-fedleave-calendar.html").read_text()
+
+    assert "../assets/fedleave-logo.png" in about
+    assert "Version 0.2.0" in about

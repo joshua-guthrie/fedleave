@@ -2,6 +2,10 @@
 
 Federal leave and time tracker.
 
+<p align="center">
+  <img src="assets/fedleave-logo.png" alt="FedLeave logo" width="640">
+</p>
+
 This project is a command-line application for tracking federal-style leave balances and generating pay period calendars.
 
 The hope is that it is not only useful at the CLI, but could become the basis of larger leave tracking applications (web apps or GUIs).

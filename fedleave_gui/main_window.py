@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
+from .resources import help_base_url, help_file, window_icon
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
 from fedleave_month_report_graphic.report import ReportData as MonthReportData
 from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
@@ -392,6 +393,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.settings = load_settings()
         self.backend = self._backend()
+        self.setWindowIcon(window_icon())
         self.today = date.today()
         self.year = self.today.year
         self.month = self.today.month
@@ -761,13 +763,14 @@ class MainWindow(QMainWindow):
         self._show_html_file("about-fedleave-calendar.html", "About FedLeave Calendar")
 
     def _show_html_file(self, filename: str, title: str) -> None:
-        path = _help_file(filename)
+        path = help_file(filename)
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
         dialog.resize(760, 620)
         layout = QVBoxLayout(dialog)
         browser = QTextBrowser()
         if path.exists():
+            browser.document().setBaseUrl(help_base_url(filename))
             browser.setHtml(path.read_text(encoding="utf-8"))
         else:
             browser.setHtml(f"<h1>{html.escape(title)}</h1><p>Help file was not found.</p>")
@@ -813,15 +816,3 @@ def _pay_period_rows(period: dict[str, Any]) -> list[list[str]]:
         label = CATEGORY_LABELS.get(category, (category, category))[1]
         rows.append([label, earned, used, balance])
     return rows
-
-
-def _help_file(filename: str) -> Path:
-    candidates = [
-        Path(sys.argv[0]).resolve().parent / "help" / filename,
-        Path(__file__).resolve().parents[1] / "help" / filename,
-        Path.cwd() / "help" / filename,
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
