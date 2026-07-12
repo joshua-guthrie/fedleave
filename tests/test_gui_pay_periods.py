@@ -3,6 +3,7 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication, QGroupBox
+from PySide6.QtCore import Qt
 
 from fedleave_gui.main_window import MainWindow, _pay_period_rows
 
@@ -54,5 +55,6 @@ def test_gui_renders_separate_table_for_each_visible_pay_period(monkeypatch):
         "Used",
         "Balance",
     ]
+    assert table.horizontalHeader().defaultAlignment() & Qt.AlignLeft
     assert table.rowCount() == 2
     assert [table.item(0, column).text() for column in range(4)] == ["Annual Leave", "6", "2", "14"]

@@ -88,6 +88,10 @@ def _nonzero(value: Any) -> bool:
         return False
 
 
+def _set_table_header_alignment(table: QTableWidget) -> None:
+    table.horizontalHeader().setDefaultAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
+
 def _fmt(value: Any, *, signed: bool = False) -> str:
     try:
         number = float(value)
@@ -317,6 +321,7 @@ class SaveDayPreviewDialog(QDialog):
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Leave Type", "Existing", "New"])
         self.table.verticalHeader().setVisible(False)
+        _set_table_header_alignment(self.table)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
@@ -361,6 +366,7 @@ class AbbreviationsDialog(QDialog):
         self.table = QTableWidget(len(CATEGORY_LABELS), 2)
         self.table.setHorizontalHeaderLabels(["Abbreviation", "Leave Type"])
         self.table.verticalHeader().setVisible(False)
+        _set_table_header_alignment(self.table)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.setSelectionMode(QTableWidget.NoSelection)
@@ -571,6 +577,7 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(QLabel("As of Today"))
         self.balance_table = QTableWidget(0, 3)
         self.balance_table.setHorizontalHeaderLabels(["Category", "Balance", "Use or Lose"])
+        _set_table_header_alignment(self.balance_table)
         self.balance_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         root_layout.addWidget(self.balance_table, 1)
 
@@ -692,6 +699,7 @@ class MainWindow(QMainWindow):
             table = QTableWidget(len(rows), 4)
             table.setHorizontalHeaderLabels(["Type", "Earned", "Used", "Balance"])
             table.verticalHeader().setVisible(False)
+            _set_table_header_alignment(table)
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
             for column in range(1, 4):
                 table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)

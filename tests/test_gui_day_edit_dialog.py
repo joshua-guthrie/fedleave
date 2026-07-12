@@ -4,6 +4,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import Qt
 
 from fedleave_gui.main_window import DayEditDialog, MainWindow, SaveDayPreviewDialog
 
@@ -61,6 +62,7 @@ def test_save_day_preview_dialog_lists_existing_and_new_values_without_signs():
 
     assert dialog.windowTitle() == "Review Save for 2026-07-08"
     assert dialog.table.rowCount() == 3
+    assert dialog.table.horizontalHeader().defaultAlignment() & Qt.AlignLeft
     assert [dialog.table.item(0, column).text() for column in range(3)] == ["Annual Leave", "4 used", "5 earned"]
     assert [dialog.table.item(1, column).text() for column in range(3)] == ["Credit Hours", "2 earned", "0"]
     assert [dialog.table.item(2, column).text() for column in range(3)] == ["Sick Leave", "0", "1.5 used"]

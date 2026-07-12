@@ -22,6 +22,7 @@ def test_abbreviations_dialog_uses_complete_noneditable_table():
     assert table.columnCount() == 2
     assert table.horizontalHeaderItem(0).text() == "Abbreviation"
     assert table.horizontalHeaderItem(1).text() == "Leave Type"
+    assert table.horizontalHeader().defaultAlignment() & Qt.AlignLeft
     assert table.horizontalHeader().sectionResizeMode(0) == QHeaderView.ResizeToContents
     assert table.horizontalHeader().sectionResizeMode(1) == QHeaderView.Stretch
 
