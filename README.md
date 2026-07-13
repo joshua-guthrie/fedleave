@@ -12,7 +12,7 @@ The hope is that it is not only useful at the CLI, but could become the basis of
 
 Note:  In-case you're wondering... it was a 100% at home project.  None of it was done on company time!   It was also my first experiemnt into vibe coding.  So far, I'm impressed.
 
-This program was 100% vibe coded.  No humans were harmed in writing this software.  However, the load on the data centers might have raised the global temp a few degrees.
+This program was 100% vibe coded.  No humans were harmed in writing this software.  However, the load on the data centers might have raised the global temp a few degrees.  It is an experiement to see if I can have an AI, with modest resources 100% vibe code a functional appliction.  Right now, I've not written a single line of code in this application.
 
 It's a little program I'm using to serve as a back end to an AI agent and a dashboard and figured it may be useful to someone else.
 
