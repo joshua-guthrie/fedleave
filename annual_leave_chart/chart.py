@@ -16,6 +16,7 @@ from typing import Any
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
+from fedleave.executable_search import is_executable, iter_executable_candidates
 
 
 # Chart rendering constants (base dimensions)
@@ -76,50 +77,17 @@ def find_fedleave_app() -> Path:
     Raises:
         SystemExit: If fedleave cannot be found with helpful error message
     """
-    def _is_executable(candidate: Path) -> bool:
-        if not candidate.is_file():
-            return False
-        if sys.platform.startswith("win"):
-            return candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
-        return os.access(candidate, os.X_OK)
-
-    script_dir = Path(__file__).resolve().parent.parent
-    candidate_dirs: list[Path] = []
-
-    argv0 = Path(sys.argv[0]).expanduser()
-    if not argv0.is_absolute():
-        argv0 = (Path.cwd() / argv0).resolve()
-    else:
-        argv0 = argv0.resolve()
-    if argv0.exists():
-        candidate_dirs.append(argv0 if argv0.is_dir() else argv0.parent)
-
-    executable_path = Path(sys.executable).expanduser()
-    if not executable_path.is_absolute():
-        executable_path = (Path.cwd() / executable_path).resolve()
-    else:
-        executable_path = executable_path.resolve()
-    if executable_path.exists():
-        candidate_dirs.append(executable_path.parent)
-
-    candidate_dirs.extend([script_dir, script_dir / "dist", script_dir / "fedleave", script_dir.parent / "dist"])
-
-    seen_dirs: set[Path] = set()
-    for base_dir in candidate_dirs:
-        resolved_dir = base_dir.resolve() if base_dir.exists() else base_dir
-        if resolved_dir in seen_dirs:
-            continue
-        seen_dirs.add(resolved_dir)
-        candidate_names = ("fedleave.exe", "fedleave.bat", "fedleave.cmd") if sys.platform.startswith("win") else ("fedleave",)
-        for candidate_name in candidate_names:
-            candidate = resolved_dir / candidate_name
-            if _is_executable(candidate):
-                return candidate
+    searched: list[Path] = []
+    for candidate in iter_executable_candidates("fedleave"):
+        searched.append(candidate)
+        if is_executable(candidate):
+            return candidate
 
     fedleave_in_path = shutil.which("fedleave")
     if fedleave_in_path:
         return Path(fedleave_in_path)
 
+    details = "\n".join(f"  - {candidate}" for candidate in searched)
     raise SystemExit(
         f"""
         
@@ -129,9 +97,11 @@ The AnnualLeaveChartForTheYear application requires fedleave to be installed.
 
 To install fedleave, visit: {FEDLEAVE_REPO_URL}
 
-Or if you downloaded both applications together, ensure they are in the same directory:
-  - fedleave (or fedleave.exe on Windows)
-  - AnnualLeaveChartForTheYear (or AnnualLeaveChartForTheYear.exe on Windows)
+Searched:
+{details}
+
+If you downloaded both applications together, the backend should be inside the
+fedleave bundle directory next to this application.
         
 """
     )

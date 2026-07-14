@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import json
-import os
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from fedleave.executable_search import is_executable, iter_executable_candidates
 
 
 class BackendError(RuntimeError):
@@ -23,81 +24,56 @@ class BackendOptions:
     fedleave_path: str | None = None
     data_dir: str | None = None
 
-
-def _is_executable(path: Path) -> bool:
-    if not path.is_file():
-        return False
-    if sys.platform.startswith("win"):
-        return path.suffix.lower() in {".exe", ".bat", ".cmd"}
-    return os.access(path, os.X_OK)
-
-
 def find_fedleave(explicit: str | None = None) -> Path:
     if explicit:
         path = Path(explicit).expanduser()
-        if _is_executable(path):
+        if is_executable(path):
             return path
         raise BackendMissingError("fedleave backend executable was not found.")
 
-    names = ("fedleave.exe", "fedleave.bat", "fedleave.cmd") if sys.platform.startswith("win") else ("fedleave",)
-    candidate_dirs: list[Path] = []
-    for raw in (Path(sys.argv[0]), Path(sys.executable)):
-        path = raw if raw.is_absolute() else Path.cwd() / raw
-        resolved = path.resolve()
-        candidate_dirs.append(resolved if resolved.is_dir() else resolved.parent)
-    here = Path(__file__).resolve().parents[1]
-    candidate_dirs.extend([here, here / "dist", here.parent / "dist"])
-
-    seen: set[Path] = set()
-    for directory in candidate_dirs:
-        if directory in seen:
-            continue
-        seen.add(directory)
-        for name in names:
-            candidate = directory / name
-            if _is_executable(candidate):
-                return candidate
+    searched: list[Path] = []
+    for candidate in iter_executable_candidates("fedleave"):
+        searched.append(candidate)
+        if is_executable(candidate):
+            return candidate
 
     path_hit = shutil.which("fedleave")
     if path_hit:
         return Path(path_hit)
-    raise BackendMissingError("fedleave backend executable was not found.")
+
+    details = "\n".join(f"  - {candidate}" for candidate in searched)
+    raise BackendMissingError(
+        "fedleave backend executable was not found.\n\n"
+        f"Searched:\n{details}\n\n"
+        "Set the backend path in Preferences or place the fedleave bundle next "
+        "to this application."
+    )
 
 
 def find_month_report_graphic(explicit: str | None = None) -> Path:
     if explicit:
         path = Path(explicit).expanduser()
-        if _is_executable(path):
+        if is_executable(path):
             return path
         raise BackendMissingError("fedleaveMonthReportGraphic executable was not found.")
 
-    names = (
-        ("fedleaveMonthReportGraphic.exe", "fedleaveMonthReportGraphic.bat", "fedleaveMonthReportGraphic.cmd")
-        if sys.platform.startswith("win")
-        else ("fedleaveMonthReportGraphic",)
-    )
-    candidate_dirs: list[Path] = []
-    for raw in (Path(sys.argv[0]), Path(sys.executable)):
-        path = raw if raw.is_absolute() else Path.cwd() / raw
-        resolved = path.resolve()
-        candidate_dirs.append(resolved if resolved.is_dir() else resolved.parent)
-    here = Path(__file__).resolve().parents[1]
-    candidate_dirs.extend([here, here / "dist", here.parent / "dist"])
-
-    seen: set[Path] = set()
-    for directory in candidate_dirs:
-        if directory in seen:
-            continue
-        seen.add(directory)
-        for name in names:
-            candidate = directory / name
-            if _is_executable(candidate):
-                return candidate
+    searched: list[Path] = []
+    for candidate in iter_executable_candidates("fedleaveMonthReportGraphic"):
+        searched.append(candidate)
+        if is_executable(candidate):
+            return candidate
 
     path_hit = shutil.which("fedleaveMonthReportGraphic")
     if path_hit:
         return Path(path_hit)
-    raise BackendMissingError("fedleaveMonthReportGraphic executable was not found.")
+
+    details = "\n".join(f"  - {candidate}" for candidate in searched)
+    raise BackendMissingError(
+        "fedleaveMonthReportGraphic executable was not found.\n\n"
+        f"Searched:\n{details}\n\n"
+        "Place the month-report bundle next to this application or set the "
+        "graphic path in Preferences."
+    )
 
 
 class FedleaveBackend:

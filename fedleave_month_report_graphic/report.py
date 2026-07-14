@@ -18,6 +18,7 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 
 from fedleave.ledger import TRANSACTION_CATEGORIES
+from fedleave.executable_search import is_executable, iter_executable_candidates
 
 from . import __version__
 
@@ -199,45 +200,19 @@ def parse_args(argv: list[str] | None = None) -> Options:
     )
 
 
-def _is_executable(candidate: Path) -> bool:
-    if not candidate.is_file():
-        return False
-    if sys.platform.startswith("win"):
-        return candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
-    return os.access(candidate, os.X_OK)
-
-
 def find_fedleave(explicit: Path | None = None) -> Path:
     searched: list[Path] = []
     if explicit is not None:
         candidate = explicit.resolve()
         searched.append(candidate)
-        if _is_executable(candidate):
+        if is_executable(candidate):
             return candidate
         raise FedleaveMissingError(f"fedleave executable not found or not executable: {candidate}")
 
-    candidate_dirs: list[Path] = []
-    for raw in (Path(sys.argv[0]), Path(sys.executable)):
-        path = raw.expanduser()
-        if not path.is_absolute():
-            path = (Path.cwd() / path).resolve()
-        else:
-            path = path.resolve()
-        candidate_dirs.append(path if path.is_dir() else path.parent)
-    here = Path(__file__).resolve().parent.parent
-    candidate_dirs.extend([here, here / "dist", here.parent / "dist"])
-
-    names = ("fedleave.exe",) if sys.platform.startswith("win") else ("fedleave",)
-    seen: set[Path] = set()
-    for directory in candidate_dirs:
-        if directory in seen:
-            continue
-        seen.add(directory)
-        for name in names:
-            candidate = directory / name
-            searched.append(candidate)
-            if _is_executable(candidate):
-                return candidate
+    for candidate in iter_executable_candidates("fedleave"):
+        searched.append(candidate)
+        if is_executable(candidate):
+            return candidate
 
     path_hit = shutil.which("fedleave")
     if path_hit:

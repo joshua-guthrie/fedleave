@@ -11,47 +11,63 @@ $DIST_DIR = [System.IO.Path]::GetFullPath($Dist)
 $DIST_PARENT = Split-Path -Parent $DIST_DIR
 New-Item -ItemType Directory -Force -Path $DIST_PARENT | Out-Null
 Get-ChildItem -Force -Path $DIST_PARENT -File | Remove-Item -Force
-foreach ($LegacyPath in @(
-    (Join-Path $DIST_PARENT "FedLeaveCalendar-Ubuntu"),
-    (Join-Path $DIST_PARENT "FedLeaveCalendar-Windows"),
-    $DIST_DIR
+foreach ($BundlePath in @(
+    (Join-Path $DIST_DIR "fedleave"),
+    (Join-Path $DIST_DIR "AnnualLeaveChartForTheYear"),
+    (Join-Path $DIST_DIR "SickLeaveChartForTheYear"),
+    (Join-Path $DIST_DIR "fedleaveMonthReportGraphic")
 )) {
-    if (Test-Path $LegacyPath) {
-        Remove-Item -Recurse -Force $LegacyPath
+    if (Test-Path $BundlePath) {
+        Remove-Item -Recurse -Force $BundlePath
     }
 }
 
-function Move-BuildOutputToDist {
+function Build-App {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AppName,
+        [Parameter(Mandatory = $true)]
+        [string]$EntryPath,
+        [Parameter(Mandatory = $true)]
+        [string[]]$HiddenImports
+    )
+
+    $bundlePath = Join-Path $DIST_DIR $AppName
+    if (Test-Path $bundlePath) {
+        Remove-Item -Recurse -Force $bundlePath
+    }
+
+    $pyinstallerArgs = @(
+        '--noconfirm'
+        '--onedir'
+        '--name', $AppName
+        '--console'
+        '--distpath', $DIST_DIR
+        '--workpath', "$HERE\.pyinstaller-build"
+        '--specpath', "$HERE\.pyinstaller-spec"
+    )
+
+    foreach ($hiddenImport in $HiddenImports) {
+        $pyinstallerArgs += @('--hidden-import', $hiddenImport)
+    }
+
+    $pyinstallerArgs += $EntryPath
+
+    & "$VENV_DIR\Scripts\python.exe" -m PyInstaller @pyinstallerArgs
+
+    $expectedExe = Join-Path $bundlePath "$AppName.exe"
+    if (-not (Test-Path $expectedExe)) {
+        throw "Expected Windows executable was not created: $expectedExe"
+    }
+}
+
+function Assert-AppBundle {
     param(
         [Parameter(Mandatory = $true)]
         [string]$AppName
     )
 
-    $expectedExe = Join-Path $DIST_DIR "$AppName.exe"
-    if (Test-Path $expectedExe) {
-        return
-    }
-
-    $nestedExe = Join-Path (Join-Path $DIST_DIR $AppName) "$AppName.exe"
-    if (Test-Path $nestedExe) {
-        $nestedDir = Join-Path $DIST_DIR $AppName
-        Get-ChildItem -Force -Path $nestedDir | ForEach-Object {
-            if ($_.FullName -ne $nestedExe) {
-                Move-Item -Force -Path $_.FullName -Destination (Join-Path $DIST_DIR $_.Name)
-            }
-        }
-        Move-Item -Force -Path $nestedExe -Destination $expectedExe
-        Remove-Item -Force -Recurse -Path $nestedDir
-    }
-}
-
-function Assert-DistExecutable {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$AppName
-    )
-
-    $expectedExe = Join-Path $DIST_DIR "$AppName.exe"
+    $expectedExe = Join-Path (Join-Path $DIST_DIR $AppName) "$AppName.exe"
     if (-not (Test-Path $expectedExe)) {
         throw "Expected Windows executable was not created in dist: $expectedExe"
     }
@@ -71,20 +87,7 @@ if __name__ == '__main__':
     main()
 "@ | Set-Content -Path $ENTRY -Encoding utf8
 
-$PYINSTALLER_ARGS = @(
-    '--onefile'
-    '--name', 'fedleave'
-    '--console'
-    '--hidden-import', 'holidays'
-    '--hidden-import', 'icalendar'
-    '--distpath', "$DIST_DIR"
-    '--workpath', "$HERE\.pyinstaller-build"
-    '--specpath', "$HERE\.pyinstaller-spec"
-    "$ENTRY"
-)
-
-& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @PYINSTALLER_ARGS
-Move-BuildOutputToDist -AppName "fedleave"
+Build-App -AppName "fedleave" -EntryPath $ENTRY -HiddenImports @('holidays', 'icalendar')
 
 # Build AnnualLeaveChartForTheYear companion application
 $CHART_ENTRY = Join-Path $HERE ".pyinstaller_chart_entry.py"
@@ -95,23 +98,13 @@ if __name__ == '__main__':
     main()
 "@ | Set-Content -Path $CHART_ENTRY -Encoding utf8
 
-$CHART_ARGS = @(
-    '--onefile'
-    '--name', 'AnnualLeaveChartForTheYear'
-    '--console'
-    '--hidden-import', 'PIL'
-    '--hidden-import', 'PIL.Image'
-    '--hidden-import', 'PIL.ImageDraw'
-    '--hidden-import', 'PIL.ImageFont'
-    '--hidden-import', 'numpy'
-    '--distpath', "$DIST_DIR"
-    '--workpath', "$HERE\.pyinstaller-build"
-    '--specpath', "$HERE\.pyinstaller-spec"
-    "$CHART_ENTRY"
+Build-App -AppName "AnnualLeaveChartForTheYear" -EntryPath $CHART_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
 )
-
-& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @CHART_ARGS
-Move-BuildOutputToDist -AppName "AnnualLeaveChartForTheYear"
 
 # Build SickLeaveChartForTheYear companion application
 $SICK_CHART_ENTRY = Join-Path $HERE ".pyinstaller_sick_chart_entry.py"
@@ -122,23 +115,13 @@ if __name__ == '__main__':
     main()
 "@ | Set-Content -Path $SICK_CHART_ENTRY -Encoding utf8
 
-$SICK_CHART_ARGS = @(
-    '--onefile'
-    '--name', 'SickLeaveChartForTheYear'
-    '--console'
-    '--hidden-import', 'PIL'
-    '--hidden-import', 'PIL.Image'
-    '--hidden-import', 'PIL.ImageDraw'
-    '--hidden-import', 'PIL.ImageFont'
-    '--hidden-import', 'numpy'
-    '--distpath', "$DIST_DIR"
-    '--workpath', "$HERE\.pyinstaller-build"
-    '--specpath', "$HERE\.pyinstaller-spec"
-    "$SICK_CHART_ENTRY"
+Build-App -AppName "SickLeaveChartForTheYear" -EntryPath $SICK_CHART_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
 )
-
-& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @SICK_CHART_ARGS
-Move-BuildOutputToDist -AppName "SickLeaveChartForTheYear"
 
 # Build fedleaveMonthReportGraphic companion application
 $MONTH_REPORT_ENTRY = Join-Path $HERE ".pyinstaller_month_report_entry.py"
@@ -149,30 +132,20 @@ if __name__ == '__main__':
     main()
 "@ | Set-Content -Path $MONTH_REPORT_ENTRY -Encoding utf8
 
-$MONTH_REPORT_ARGS = @(
-    '--onefile'
-    '--name', 'fedleaveMonthReportGraphic'
-    '--console'
-    '--hidden-import', 'PIL'
-    '--hidden-import', 'PIL.Image'
-    '--hidden-import', 'PIL.ImageDraw'
-    '--hidden-import', 'PIL.ImageFont'
-    '--distpath', "$DIST_DIR"
-    '--workpath', "$HERE\.pyinstaller-build"
-    '--specpath', "$HERE\.pyinstaller-spec"
-    "$MONTH_REPORT_ENTRY"
+Build-App -AppName "fedleaveMonthReportGraphic" -EntryPath $MONTH_REPORT_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont'
 )
 
-& "$VENV_DIR\Scripts\python.exe" -m PyInstaller @MONTH_REPORT_ARGS
-Move-BuildOutputToDist -AppName "fedleaveMonthReportGraphic"
-
-Assert-DistExecutable -AppName "fedleave"
-Assert-DistExecutable -AppName "AnnualLeaveChartForTheYear"
-Assert-DistExecutable -AppName "SickLeaveChartForTheYear"
-Assert-DistExecutable -AppName "fedleaveMonthReportGraphic"
+Assert-AppBundle -AppName "fedleave"
+Assert-AppBundle -AppName "AnnualLeaveChartForTheYear"
+Assert-AppBundle -AppName "SickLeaveChartForTheYear"
+Assert-AppBundle -AppName "fedleaveMonthReportGraphic"
 
 Write-Host "Build complete. Binaries in $DIST_DIR"
-Write-Host "  - fedleave.exe"
-Write-Host "  - AnnualLeaveChartForTheYear.exe"
-Write-Host "  - SickLeaveChartForTheYear.exe"
-Write-Host "  - fedleaveMonthReportGraphic.exe"
+Write-Host "  - fedleave\fedleave.exe"
+Write-Host "  - AnnualLeaveChartForTheYear\AnnualLeaveChartForTheYear.exe"
+Write-Host "  - SickLeaveChartForTheYear\SickLeaveChartForTheYear.exe"
+Write-Host "  - fedleaveMonthReportGraphic\fedleaveMonthReportGraphic.exe"

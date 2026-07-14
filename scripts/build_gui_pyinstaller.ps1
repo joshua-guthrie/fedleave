@@ -18,26 +18,19 @@ python -m venv "$VENV_DIR"
 & "$VENV_DIR\Scripts\python.exe" -m pip install -r "$HERE\requirements-gui.txt"
 
 New-Item -ItemType Directory -Force -Path $DIST_PARENT | Out-Null
-Get-ChildItem -Force -Path $DIST_PARENT -File | Remove-Item -Force
-foreach ($LegacyPath in @(
-    (Join-Path $DIST_PARENT "FedLeaveCalendar-Ubuntu"),
-    (Join-Path $DIST_PARENT "FedLeaveCalendar-Windows")
-)) {
-    if (Test-Path $LegacyPath) {
-        Remove-Item -Recurse -Force $LegacyPath
-    }
-}
 
 if (-not $SkipBackendBuild) {
-    if (Test-Path $DIST_ROOT) {
-        Remove-Item -Recurse -Force $DIST_ROOT
-    }
     & "$HERE\scripts\build_pyinstaller_core.ps1" -Dist "$DIST_ROOT"
-} else {
-    $guiExe = Join-Path $DIST_ROOT "FedLeaveCalendar.exe"
-    if (Test-Path $guiExe) {
-        Remove-Item -Force $guiExe
-    }
+}
+
+$backendExe = Join-Path $DIST_ROOT "fedleave\fedleave.exe"
+if (-not (Test-Path $backendExe)) {
+    throw "Expected backend bundle was not found: $backendExe`nRun scripts\build_pyinstaller_core.ps1 first or omit -SkipBackendBuild."
+}
+
+$guiBundle = Join-Path $DIST_ROOT "FedLeaveCalendar"
+if (Test-Path $guiBundle) {
+    Remove-Item -Recurse -Force $guiBundle
 }
 
 $ENTRY = Join-Path $HERE ".pyinstaller_gui_entry.py"
@@ -50,7 +43,7 @@ if __name__ == '__main__':
 
 & "$VENV_DIR\Scripts\python.exe" -m PyInstaller `
     --noconfirm `
-    --onefile `
+    --onedir `
     --windowed `
     --name FedLeaveCalendar `
     --icon "$HERE\assets\fedleave-icon.ico" `
@@ -66,5 +59,5 @@ if __name__ == '__main__':
     "$ENTRY"
 
 Write-Host "GUI build complete: $DIST_ROOT"
-Write-Host "  - FedLeaveCalendar.exe"
-Write-Host "  - fedleave.exe (shared backend; not duplicated)"
+Write-Host "  - FedLeaveCalendar\FedLeaveCalendar.exe"
+Write-Host "  - backend bundle is left in place or created by the core build"

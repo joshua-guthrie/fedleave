@@ -3,6 +3,10 @@ import sys
 from pathlib import Path
 import types
 
+import pytest
+
+import fedleave.executable_search as executable_search
+import fedleave_gui.backend as backend_module
 from fedleave_gui.backend import BackendOptions, FedleaveBackend
 
 
@@ -53,6 +57,14 @@ else:
     return script
 
 
+def _bundle_executable(bundle_root: Path, app_name: str) -> Path:
+    bundle_root.mkdir(parents=True, exist_ok=True)
+    executable = bundle_root / (f"{app_name}.exe" if sys.platform.startswith("win") else app_name)
+    executable.write_text("#!/usr/bin/env sh\n", encoding="utf-8")
+    executable.chmod(0o755)
+    return executable
+
+
 def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     fake = _fake_fedleave(tmp_path / "fedleave")
     backend = FedleaveBackend(BackendOptions(fedleave_path=str(fake), data_dir=str(tmp_path / "data")))
@@ -82,6 +94,51 @@ def test_gui_backend_reports_version_and_executable_path(tmp_path: Path):
 
     assert backend.version() == "fedleave 0.2.0"
     assert backend.executable_path() == fake
+
+
+def test_find_fedleave_uses_bundled_backend_directory(tmp_path: Path, monkeypatch):
+    app_executable = _bundle_executable(tmp_path / "FedLeaveCalendar", "FedLeaveCalendar")
+    backend_executable = _bundle_executable(tmp_path / "fedleave", "fedleave")
+
+    monkeypatch.setattr(sys, "argv", [str(app_executable)])
+    monkeypatch.setattr(
+        executable_search,
+        "__file__",
+        str(tmp_path / "fedleave" / "executable_search.py"),
+    )
+    monkeypatch.setattr(backend_module.shutil, "which", lambda name: None)
+
+    assert backend_module.find_fedleave() == backend_executable
+
+
+def test_find_month_report_graphic_uses_bundled_backend_directory(tmp_path: Path, monkeypatch):
+    app_executable = _bundle_executable(tmp_path / "FedLeaveCalendar", "FedLeaveCalendar")
+    report_executable = _bundle_executable(tmp_path / "fedleaveMonthReportGraphic", "fedleaveMonthReportGraphic")
+
+    monkeypatch.setattr(sys, "argv", [str(app_executable)])
+    monkeypatch.setattr(
+        executable_search,
+        "__file__",
+        str(tmp_path / "fedleave" / "executable_search.py"),
+    )
+    monkeypatch.setattr(backend_module.shutil, "which", lambda name: None)
+
+    assert backend_module.find_month_report_graphic() == report_executable
+
+
+def test_find_fedleave_reports_search_paths_when_missing(tmp_path: Path, monkeypatch):
+    app_executable = _bundle_executable(tmp_path / "FedLeaveCalendar", "FedLeaveCalendar")
+
+    monkeypatch.setattr(sys, "argv", [str(app_executable)])
+    monkeypatch.setattr(
+        executable_search,
+        "__file__",
+        str(tmp_path / "fedleave" / "executable_search.py"),
+    )
+    monkeypatch.setattr(backend_module.shutil, "which", lambda name: None)
+
+    with pytest.raises(backend_module.BackendMissingError, match="Searched:"):
+        backend_module.find_fedleave()
 
 
 def test_gui_backend_hides_windows_console_when_launching_backend(monkeypatch, tmp_path: Path):

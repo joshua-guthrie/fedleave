@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pytest
 
+import fedleave.executable_search as executable_search
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -38,6 +40,14 @@ def _install_chart_import_stubs(monkeypatch):
     monkeypatch.setitem(sys.modules, "PIL.Image", image_module)
     monkeypatch.setitem(sys.modules, "PIL.ImageDraw", image_draw_module)
     monkeypatch.setitem(sys.modules, "PIL.ImageFont", image_font_module)
+
+
+def _make_bundle_executable(bundle_root: Path, app_name: str) -> Path:
+    bundle_root.mkdir(parents=True, exist_ok=True)
+    executable = bundle_root / (f"{app_name}.exe" if sys.platform.startswith("win") else app_name)
+    executable.write_text("#!/bin/sh\n", encoding="utf-8")
+    executable.chmod(0o755)
+    return executable
 
 
 @pytest.mark.parametrize(
@@ -94,9 +104,39 @@ def test_find_fedleave_app_ignores_package_directory(tmp_path, monkeypatch, modu
     monkeypatch.setattr(sys, "argv", [str(app_path)])
     monkeypatch.setattr(sys, "executable", str(python_path))
     monkeypatch.setattr(module, "__file__", str(tmp_path / "annual_leave_chart" / "chart.py"))
+    monkeypatch.setattr(
+        executable_search,
+        "__file__",
+        str(tmp_path / "fedleave" / "executable_search.py"),
+    )
     monkeypatch.setattr(module.shutil, "which", lambda name: str(path_fedleave))
 
     assert module.find_fedleave_app() == path_fedleave
+
+
+@pytest.mark.parametrize(
+    "module_name, app_name",
+    [
+        ("annual_leave_chart.chart", "AnnualLeaveChartForTheYear"),
+        ("sick_leave_chart.chart", "SickLeaveChartForTheYear"),
+    ],
+)
+def test_find_fedleave_app_uses_bundled_backend_directory(tmp_path, monkeypatch, module_name, app_name):
+    _install_chart_import_stubs(monkeypatch)
+    module = importlib.import_module(module_name)
+
+    app_path = _make_bundle_executable(tmp_path / app_name, app_name)
+    fedleave_path = _make_bundle_executable(tmp_path / "fedleave", "fedleave")
+
+    monkeypatch.setattr(sys, "argv", [str(app_path)])
+    monkeypatch.setattr(
+        executable_search,
+        "__file__",
+        str(tmp_path / "fedleave" / "executable_search.py"),
+    )
+    monkeypatch.setattr(module.shutil, "which", lambda name: None)
+
+    assert module.find_fedleave_app() == fedleave_path
 
 
 @pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])

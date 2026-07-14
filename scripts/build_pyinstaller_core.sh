@@ -7,7 +7,6 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 VENV_DIR="$HERE/.pyinstaller-venv"
 DIST_DIR="$HERE/dist/fedleave-Ubuntu"
-ONEFILE=--onefile
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -25,7 +24,11 @@ DIST_ROOT="$(dirname "$DIST_DIR")"
 
 mkdir -p "$DIST_ROOT"
 find "$DIST_ROOT" -maxdepth 1 -type f -delete
-rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar-Windows" "$DIST_DIR"
+rm -rf \
+  "$DIST_DIR/fedleave" \
+  "$DIST_DIR/AnnualLeaveChartForTheYear" \
+  "$DIST_DIR/SickLeaveChartForTheYear" \
+  "$DIST_DIR/fedleaveMonthReportGraphic"
 
 echo "Building fedleave with PyInstaller (venv: $VENV_DIR)"
 python3 -m venv "$VENV_DIR"
@@ -45,15 +48,33 @@ if __name__ == '__main__':
     main()
 PY
 
-pyinstaller $ONEFILE \
-  --name fedleave \
-  --console \
+build_app() {
+  local app_name="$1"
+  local entry_path="$2"
+  shift 2
+
+  rm -rf "$DIST_DIR/$app_name"
+  pyinstaller \
+    --noconfirm \
+    --onedir \
+    --name "$app_name" \
+    --console \
+    "$@" \
+    --distpath "$DIST_DIR" \
+    --workpath "$HERE/.pyinstaller-build" \
+    --specpath "$HERE/.pyinstaller-spec" \
+    "$entry_path"
+
+  local executable_path="$DIST_DIR/$app_name/$app_name"
+  if [[ ! -x "$executable_path" ]]; then
+    echo "Expected executable was not created: $executable_path" >&2
+    exit 1
+  fi
+}
+
+build_app fedleave "$ENTRY" \
   --hidden-import holidays \
-  --hidden-import icalendar \
-  --distpath "$DIST_DIR" \
-  --workpath "$HERE/.pyinstaller-build" \
-  --specpath "$HERE/.pyinstaller-spec" \
-  "$ENTRY"
+  --hidden-import icalendar
 
 # Build AnnualLeaveChartForTheYear companion application
 CHART_ENTRY="$HERE/.pyinstaller_chart_entry.py"
@@ -64,18 +85,12 @@ if __name__ == '__main__':
     main()
 PY
 
-pyinstaller $ONEFILE \
-  --name AnnualLeaveChartForTheYear \
-  --console \
+build_app AnnualLeaveChartForTheYear "$CHART_ENTRY" \
   --hidden-import PIL \
   --hidden-import PIL.Image \
   --hidden-import PIL.ImageDraw \
   --hidden-import PIL.ImageFont \
-  --hidden-import numpy \
-  --distpath "$DIST_DIR" \
-  --workpath "$HERE/.pyinstaller-build" \
-  --specpath "$HERE/.pyinstaller-spec" \
-  "$CHART_ENTRY"
+  --hidden-import numpy
 
 # Build SickLeaveChartForTheYear companion application
 SICK_CHART_ENTRY="$HERE/.pyinstaller_sick_chart_entry.py"
@@ -86,18 +101,12 @@ if __name__ == '__main__':
     main()
 PY
 
-pyinstaller $ONEFILE \
-  --name SickLeaveChartForTheYear \
-  --console \
+build_app SickLeaveChartForTheYear "$SICK_CHART_ENTRY" \
   --hidden-import PIL \
   --hidden-import PIL.Image \
   --hidden-import PIL.ImageDraw \
   --hidden-import PIL.ImageFont \
-  --hidden-import numpy \
-  --distpath "$DIST_DIR" \
-  --workpath "$HERE/.pyinstaller-build" \
-  --specpath "$HERE/.pyinstaller-spec" \
-  "$SICK_CHART_ENTRY"
+  --hidden-import numpy
 
 # Build fedleaveMonthReportGraphic companion application
 MONTH_REPORT_ENTRY="$HERE/.pyinstaller_month_report_entry.py"
@@ -108,20 +117,14 @@ if __name__ == '__main__':
     main()
 PY
 
-pyinstaller $ONEFILE \
-  --name fedleaveMonthReportGraphic \
-  --console \
+build_app fedleaveMonthReportGraphic "$MONTH_REPORT_ENTRY" \
   --hidden-import PIL \
   --hidden-import PIL.Image \
   --hidden-import PIL.ImageDraw \
-  --hidden-import PIL.ImageFont \
-  --distpath "$DIST_DIR" \
-  --workpath "$HERE/.pyinstaller-build" \
-  --specpath "$HERE/.pyinstaller-spec" \
-  "$MONTH_REPORT_ENTRY"
+  --hidden-import PIL.ImageFont
 
 echo "Build complete. Binaries in $DIST_DIR"
-echo "  - fedleave"
-echo "  - AnnualLeaveChartForTheYear"
-echo "  - SickLeaveChartForTheYear"
-echo "  - fedleaveMonthReportGraphic"
+echo "  - fedleave/fedleave"
+echo "  - AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear"
+echo "  - SickLeaveChartForTheYear/SickLeaveChartForTheYear"
+echo "  - fedleaveMonthReportGraphic/fedleaveMonthReportGraphic"

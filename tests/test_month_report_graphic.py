@@ -6,14 +6,15 @@ from datetime import date, datetime
 import pytest
 
 from fedleave.ledger import TRANSACTION_CATEGORIES
+from fedleave.executable_search import is_executable
 from fedleave_month_report_graphic.report import (
     ArgumentError,
     CATEGORY_LABELS,
+    find_fedleave,
     Options,
     OutputError,
     PAYDAY_STROKE,
     ReportData,
-    _is_executable,
     load_report_data,
     parse_args,
     parse_month,
@@ -124,6 +125,14 @@ def test_parse_args_rejects_existing_output_without_overwrite(tmp_path):
         parse_args(["--outputFile", str(output)])
 
 
+def test_find_fedleave_accepts_explicit_path(tmp_path):
+    fedleave = tmp_path / "fedleave"
+    fedleave.write_text("#!/bin/sh\n", encoding="utf-8")
+    fedleave.chmod(0o755)
+
+    assert find_fedleave(fedleave) == fedleave
+
+
 def test_windows_executable_detection_rejects_extensionless_binary(monkeypatch, tmp_path):
     monkeypatch.setattr("fedleave_month_report_graphic.report.sys.platform", "win32")
     linux_binary_name = tmp_path / "fedleave"
@@ -131,8 +140,8 @@ def test_windows_executable_detection_rejects_extensionless_binary(monkeypatch, 
     linux_binary_name.write_bytes(b"not a windows executable")
     windows_binary_name.write_bytes(b"fake exe")
 
-    assert _is_executable(linux_binary_name) is False
-    assert _is_executable(windows_binary_name) is True
+    assert is_executable(linux_binary_name) is False
+    assert is_executable(windows_binary_name) is True
 
 
 def test_render_svg_omits_private_transaction_fields_and_zero_values():

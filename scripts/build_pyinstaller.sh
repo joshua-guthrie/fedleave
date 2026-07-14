@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build the regular executable set and then the GUI using the shared backend artifacts.
+# Build the full bundle set and then the GUI using the shared backend bundle.
 # Usage: ./scripts/build_pyinstaller.sh [--dist dist]
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)

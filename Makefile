@@ -2,5 +2,5 @@ PYENV?=.venv
 
 .PHONY: build
 build:
-	@echo "Building standalone fedleave executable (PyInstaller)"
+	@echo "Building complete FedLeave PyInstaller bundles"
 	@./scripts/build_pyinstaller.sh

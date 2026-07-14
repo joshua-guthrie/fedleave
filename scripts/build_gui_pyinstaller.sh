@@ -32,15 +32,18 @@ python -m pip install -r "$HERE/requirements.txt"
 python -m pip install -r "$HERE/requirements-gui.txt"
 
 mkdir -p "$DIST_ROOT"
-find "$DIST_ROOT" -maxdepth 1 -type f -delete
-rm -rf "$DIST_ROOT/FedLeaveCalendar-Ubuntu" "$DIST_ROOT/FedLeaveCalendar-Windows"
 
 if [[ -z "$SKIP_BACKEND_BUILD" ]]; then
-  rm -rf "$DIST_DIR"
   "$HERE/scripts/build_pyinstaller_core.sh" --dist "$DIST_DIR"
-else
-  rm -f "$DIST_DIR/FedLeaveCalendar"
 fi
+
+if [[ ! -x "$DIST_DIR/fedleave/fedleave" ]]; then
+  echo "Expected backend bundle was not found: $DIST_DIR/fedleave/fedleave" >&2
+  echo "Run scripts/build_pyinstaller_core.sh first or omit --skip-backend-build." >&2
+  exit 1
+fi
+
+rm -rf "$DIST_DIR/FedLeaveCalendar"
 
 ENTRY="$HERE/.pyinstaller_gui_entry.py"
 cat > "$ENTRY" <<'PY'
@@ -52,7 +55,7 @@ PY
 
 pyinstaller \
   --noconfirm \
-  --onefile \
+  --onedir \
   --windowed \
   --name FedLeaveCalendar \
   --icon "$HERE/assets/fedleave-icon.ico" \
@@ -68,5 +71,5 @@ pyinstaller \
   "$ENTRY"
 
 echo "GUI build complete: $DIST_DIR"
-echo "  - FedLeaveCalendar"
-echo "  - fedleave (shared backend; not duplicated)"
+echo "  - FedLeaveCalendar/FedLeaveCalendar"
+echo "  - backend bundle is left in place or created by the core build"

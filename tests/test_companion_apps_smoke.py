@@ -1,7 +1,8 @@
 import json
-import shutil
 import subprocess
 import sys
+
+from fedleave.config import init_config
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
@@ -15,27 +16,22 @@ def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 
 def test_companion_chart_apps_generate_pngs_from_source(tmp_path):
-    fedleave = shutil.which("fedleave")
-    assert fedleave is not None
-
     data_dir = tmp_path / "data"
-    _run(
-        [
-            fedleave,
-            "init",
-            "--year",
-            "2026",
-            "--leave-year-start",
-            "2026-01-11",
-            "--annual-accrual",
-            "6",
-            "--annual-start",
-            "120",
-            "--sick-start",
-            "180",
-            "--data-dir",
-            str(data_dir),
-        ]
+    init_config(
+        year=2026,
+        leave_year_start="2026-01-11",
+        annual_accrual=6.0,
+        starting_balances={
+            "annual": 120.0,
+            "sick": 180.0,
+            "comp": 0.0,
+            "credit": 0.0,
+            "travel_comp": 0.0,
+            "time_off_award": 0.0,
+            "religious_comp": 0.0,
+            "restored_annual": 0.0,
+        },
+        data_dir=data_dir,
     )
 
     apps = [

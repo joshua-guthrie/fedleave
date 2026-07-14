@@ -108,6 +108,7 @@ Older leave-year files are migrated automatically. Voided transactions and store
 FedLeave Calendar is a cross-platform PySide6 desktop GUI for the `fedleave` backend. It displays the current month, calendar day values, pay days, pay-period endings, pay-period summaries, and as-of-today balances using `fedleave month --json`.
 
 The GUI does not read or edit leave JSON files directly. Reads and writes go through the selected `fedleave` executable. Day edits call `fedleave set-day --authoritative --json`, then the month is reloaded from the backend.
+In packaged builds, the GUI looks for `fedleave` in the sibling `fedleave` application directory inside the same platform tree, or in any explicit backend path you configure.
 
 Screenshots:
 
@@ -140,14 +141,14 @@ Linux GUI build:
 
 ```bash
 scripts/build_gui_pyinstaller.sh
-./dist/fedleave-Ubuntu/FedLeaveCalendar
+./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
 ```
 
 Windows GUI build:
 
 ```powershell
 .\scripts\build_gui_pyinstaller.ps1
-.\dist\fedleave-Windows\FedLeaveCalendar.exe
+.\dist\fedleave-Windows\FedLeaveCalendar\FedLeaveCalendar.exe
 ```
 
 Windows command prompt or double-click launchers:
@@ -156,11 +157,11 @@ Windows command prompt or double-click launchers:
 scripts\build_gui_pyinstaller.bat
 ```
 
-Both GUI build scripts place all executables in platform-specific subfolders
-under `dist/` such as `dist/fedleave-Ubuntu` and `dist/fedleave-Windows`. The
-GUI uses the sibling `fedleave` executable as its backend, so only one backend
-binary is built per platform folder instead of being duplicated in a GUI
-bundle.
+Both GUI build scripts place each application in its own bundle directory under
+`dist/` such as `dist/fedleave-Ubuntu/FedLeaveCalendar` and
+`dist/fedleave-Windows/FedLeaveCalendar`. The GUI uses the sibling
+`fedleave` bundle as its backend, so the backend is not duplicated inside the
+GUI bundle.
 
 Install/uninstall helpers:
 
@@ -180,6 +181,12 @@ Windows command prompt or double-click launchers:
 scripts\install_gui_windows.bat
 scripts\uninstall_gui_windows.bat
 ```
+
+The Linux installer copies the application tree into `~/.local/share/fedleave-app`
+and creates command links in `~/.local/bin`. The Windows installer copies the
+application tree under `%LOCALAPPDATA%\Programs\FedLeave` and adds the bundled
+`fedleave` directory to the user PATH so the backend remains callable from a
+terminal.
 
 ## Companion Application: AnnualLeaveChartForTheYear
 
@@ -215,7 +222,7 @@ The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the `dist/fedleave-Ubuntu/` directory alongside this application (when built from source)
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -254,7 +261,7 @@ The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of t
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the `dist/fedleave-Ubuntu/` directory alongside this application (when built from source)
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -305,7 +312,7 @@ The `fedleaveMonthReportGraphic` application requires `fedleave` to be available
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the `dist/fedleave-Ubuntu/` directory alongside this application when built from source
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
 
 If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
 
@@ -1511,10 +1518,10 @@ Daily and as-of queries:
 
 	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
 
-Building a standalone `fedleave` binary
---------------------------------------
+Building the bundled executables
+---------------------------------
 
-If you'd rather have a single `fedleave` executable you can build a platform-specific binary using PyInstaller. The repository includes a helper script and Makefile target.
+If you'd rather build the portable application bundles, the repository includes a helper script and Makefile target. The resulting directories remain portable as a unit; do not copy the inner executables out of their bundle directories.
 
 1. Prepare a clean build environment (recommended):
 
@@ -1549,15 +1556,17 @@ If you prefer not to open PowerShell manually, the `scripts\*.bat` launchers cal
 3. Output:
 
 - The built executables will appear in platform-specific subfolders under `dist/`. Build on the target platform or use an appropriate builder.
-- The regular build scripts produce the CLI tools, the month report graphic, and `FedLeaveCalendar` in the same platform-specific `dist/` folder.
-- On Windows, the PowerShell build script verifies these files exist directly in `dist/fedleave-Windows/`: `fedleave.exe`, `AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear.exe`, `fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar.exe`.
+- The regular build scripts produce a complete platform tree with one bundle directory per application.
+- On Windows, the PowerShell build script verifies these files exist directly in `dist/fedleave-Windows/`: `fedleave/fedleave.exe`, `AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear/SickLeaveChartForTheYear.exe`, `fedleaveMonthReportGraphic/fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar/FedLeaveCalendar.exe`.
 - On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
 
 ```bash
-chmod +x ./dist/fedleave-Ubuntu/fedleave ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic ./dist/fedleave-Ubuntu/FedLeaveCalendar
+chmod +x ./dist/fedleave-Ubuntu/fedleave/fedleave ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear/SickLeaveChartForTheYear ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic/fedleaveMonthReportGraphic ./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
 ```
 
 Notes and caveats:
 
+- The target machine does not need Python, PyInstaller, or a compiler. Those are build-time requirements only.
+- The complete bundle directory must remain intact. Copying only the inner executable out of the bundle is unsupported.
 - PyInstaller build installs PyInstaller and your package into a temporary venv under `.pyinstaller-venv`.
 - The produced binary is not cross-platform; build on the OS you intend to run on.
