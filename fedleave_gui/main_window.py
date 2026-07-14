@@ -164,6 +164,10 @@ def _format_value_summary(value: Any) -> str:
     return f"{text} {direction}"
 
 
+def _review_save_value_text(value: Any) -> str:
+    return f"     {_format_value_summary(value)}"
+
+
 def _category_display_text(category: str) -> str:
     return CATEGORY_LABELS.get(category, (category, category))[1]
 
@@ -394,8 +398,8 @@ class SaveDayPreviewDialog(QDialog):
         for row, category in enumerate(rows):
             values = [
                 (_category_display_text(category), TABLE_TEXT_ALIGNMENT),
-                (_format_value_summary(self._existing_values.get(category, 0.0)), TABLE_NUMBER_ALIGNMENT),
-                (_format_value_summary(self._new_values.get(category, 0.0)), TABLE_NUMBER_ALIGNMENT),
+                (_review_save_value_text(self._existing_values.get(category, 0.0)), TABLE_NUMBER_ALIGNMENT),
+                (_review_save_value_text(self._new_values.get(category, 0.0)), TABLE_NUMBER_ALIGNMENT),
             ]
             for column, (value, alignment) in enumerate(values):
                 self.table.setItem(row, column, _table_item(value, alignment))
