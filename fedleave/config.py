@@ -145,6 +145,9 @@ def get_default_data_dir(data_dir: Path | None = None) -> Path:
         local_appdata = os.getenv("LOCALAPPDATA")
         if local_appdata:
             return Path(local_appdata) / "fedleave"
+        xdg_data_home = os.getenv("XDG_DATA_HOME")
+        if xdg_data_home:
+            return Path(xdg_data_home) / "fedleave"
         return Path.home() / "AppData" / "Local" / "fedleave"
 
     xdg_data_home = os.getenv("XDG_DATA_HOME")

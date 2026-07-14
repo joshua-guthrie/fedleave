@@ -182,6 +182,14 @@ def _month_toolbar_font(widget: QWidget) -> QFont:
     return font
 
 
+def _section_heading(text: str) -> QLabel:
+    label = QLabel(text)
+    font = QFont(label.font())
+    font.setBold(True)
+    label.setFont(font)
+    return label
+
+
 class DayCell(QPushButton):
     def __init__(self, day: dict[str, Any], settings: GuiSettings) -> None:
         super().__init__()
@@ -527,6 +535,37 @@ class StartYearDialog(QDialog):
         return spinner
 
 
+class SelectMonthDialog(QDialog):
+    def __init__(self, year: int, month: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Select Month")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.year_input = QSpinBox()
+        self.year_input.setRange(1900, 9999)
+        self.year_input.setValue(year)
+        form.addRow("Year", self.year_input)
+
+        self.month_input = QComboBox()
+        for month_number in range(1, 13):
+            self.month_input.addItem(calendar.month_name[month_number], month_number)
+        self.month_input.setCurrentIndex(max(0, month - 1))
+        form.addRow("Month", self.month_input)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected_year_month(self) -> tuple[int, int]:
+        return self.year_input.value(), int(self.month_input.currentData())
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -609,7 +648,8 @@ class MainWindow(QMainWindow):
         self.calendar_layout.setSpacing(4)
         top.addWidget(self.calendar_widget, 3)
         side = QVBoxLayout()
-        side.addWidget(QLabel("Pay Periods"))
+        self.pay_periods_label = _section_heading("Pay Periods")
+        side.addWidget(self.pay_periods_label)
         self.pay_period_scroll = QScrollArea()
         self.pay_period_scroll.setWidgetResizable(True)
         self.pay_period_widget = QWidget()
@@ -621,7 +661,8 @@ class MainWindow(QMainWindow):
         side.addWidget(self.pay_period_scroll)
         top.addLayout(side, 1)
         root_layout.addLayout(top, 4)
-        root_layout.addWidget(QLabel("As of Today"))
+        self.as_of_today_label = _section_heading("As of Today")
+        root_layout.addWidget(self.as_of_today_label)
         self.balance_table = QTableWidget(0, 3)
         self.balance_table.setHorizontalHeaderLabels(["Category", "Balance", "Use or Lose"])
         _set_table_header_alignments(self.balance_table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
@@ -640,6 +681,7 @@ class MainWindow(QMainWindow):
         view_menu = self.menuBar().addMenu("View")
         self._action(view_menu, "Previous Month", self.previous_month)
         self._action(view_menu, "Next Month", self.next_month)
+        self._action(view_menu, "Select Month...", self.select_month)
         self._action(view_menu, "Today", self.go_today)
         leave_charts_menu = view_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
@@ -834,6 +876,13 @@ class MainWindow(QMainWindow):
         self.today = date.today()
         self.year = self.today.year
         self.month = self.today.month
+        self.refresh()
+
+    def select_month(self) -> None:
+        dialog = SelectMonthDialog(self.year, self.month, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        self.year, self.month = dialog.selected_year_month()
         self.refresh()
 
     def preferences(self) -> None:

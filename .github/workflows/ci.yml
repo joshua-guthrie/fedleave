@@ -23,7 +23,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install Python deps
+        shell: bash
         run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y libegl1
+          fi
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r requirements-gui.txt

@@ -205,6 +205,8 @@ def find_fedleave(explicit: Path | None = None) -> Path:
     if explicit is not None:
         candidate = explicit.resolve()
         searched.append(candidate)
+        if sys.platform.startswith("win") and candidate.is_file():
+            return candidate
         if is_executable(candidate):
             return candidate
         raise FedleaveMissingError(f"fedleave executable not found or not executable: {candidate}")

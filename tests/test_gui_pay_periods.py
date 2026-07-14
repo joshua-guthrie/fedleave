@@ -61,3 +61,12 @@ def test_gui_renders_separate_table_for_each_visible_pay_period(monkeypatch):
     assert [table.item(0, column).text() for column in range(4)] == ["Annual Leave", "6", "2", "14"]
     assert table.item(0, 0).textAlignment() & Qt.AlignLeft
     assert all(table.item(0, column).textAlignment() & Qt.AlignRight for column in range(1, 4))
+
+
+def test_section_headings_are_bold(monkeypatch):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    window = MainWindow()
+
+    assert window.pay_periods_label.font().bold() is True
+    assert window.as_of_today_label.font().bold() is True

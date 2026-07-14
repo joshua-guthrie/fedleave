@@ -31,7 +31,7 @@ def test_about_backend_displays_version_and_executable(monkeypatch):
 
     assert captured == {
         "title": "About fedleave Backend",
-        "text": "fedleave 0.2.0\n\nExecutable: /opt/fedleave/fedleave",
+        "text": f"fedleave 0.2.0\n\nExecutable: {Path('/opt/fedleave/fedleave')}",
     }
 
 
