@@ -4,6 +4,7 @@ import calendar
 import html
 import os
 import sys
+import tempfile
 from datetime import datetime
 import webbrowser
 from dataclasses import dataclass
@@ -12,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QByteArray, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter
+from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -44,6 +45,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import __version__
+from .chart_windows import LeaveChartDialog
 from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
 from .resources import help_base_url, help_file, window_icon
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
@@ -73,6 +75,15 @@ CATEGORY_LABELS = {
 }
 
 EDITABLE_CATEGORIES = list(CATEGORY_LABELS)
+
+LEAVE_CHARTS = [
+    ("Annual Leave Balance", "AnnualLeaveChartForTheYear"),
+    ("Sick Leave Balance", "SickLeaveChartForTheYear"),
+    ("Credit Hours Balance", "CreditHoursChartForTheYear"),
+    ("Comp Time Balance", "CompTimeChartForTheYear"),
+    ("Travel Comp Balance", "TravelCompChartForTheYear"),
+    ("Time Off Award Balance", "TimeOffAwardChartForTheYear"),
+]
 
 
 @dataclass
@@ -502,6 +513,7 @@ class MainWindow(QMainWindow):
         self.month = self.today.month
         self.month_json: dict[str, Any] | None = None
         self.use_or_lose_json: dict[str, Any] | None = None
+        self._leave_chart_windows: list[LeaveChartDialog] = []
         self.setWindowTitle("FedLeave Calendar")
         self.resize(1320, 860)
         self._build_ui()
@@ -604,6 +616,9 @@ class MainWindow(QMainWindow):
         self._action(view_menu, "Previous Month", self.previous_month)
         self._action(view_menu, "Next Month", self.next_month)
         self._action(view_menu, "Today", self.go_today)
+        leave_charts_menu = view_menu.addMenu("Leave Charts")
+        for label, app_name in LEAVE_CHARTS:
+            self._action(leave_charts_menu, label, lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label))
         self._toggle(view_menu, "Show Automatic Accruals in Day Cells", self.settings.show_auto_accruals, "show_auto_accruals")
         self._toggle(view_menu, "Show Holidays", self.settings.show_holidays, "show_holidays")
         self._toggle(view_menu, "Show Pay-Day Highlight", self.settings.show_paydays, "show_paydays")
@@ -857,6 +872,35 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Import Failed", str(exc))
             return
         self.refresh()
+
+    def open_leave_chart(self, app_name: str, label: str) -> None:
+        year = self.month_json.get("year") if isinstance(self.month_json, dict) else self.year
+        data_dir = self.settings.data_dir or None
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            output_file = Path(temp_dir_name) / f"{app_name}.png"
+            try:
+                self.backend.run_chart_app(
+                    app_name,
+                    output_file=output_file,
+                    year=int(year) if year is not None else None,
+                    data_dir=data_dir,
+                )
+            except BackendError as exc:
+                QMessageBox.warning(self, f"{label} Chart", str(exc))
+                return
+            pixmap = QPixmap(str(output_file))
+            if pixmap.isNull():
+                QMessageBox.warning(self, f"{label} Chart", "Chart image could not be loaded.")
+                return
+            dialog = LeaveChartDialog(label, pixmap, self)
+            self._leave_chart_windows.append(dialog)
+
+            def _cleanup() -> None:
+                if dialog in self._leave_chart_windows:
+                    self._leave_chart_windows.remove(dialog)
+
+            dialog.finished.connect(lambda _: _cleanup())
+            dialog.show()
 
     def _month_report_data(self) -> MonthReportData:
         if not self.month_json:

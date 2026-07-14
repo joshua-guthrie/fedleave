@@ -7,6 +7,10 @@ rm -f \
   "${HOME}/.local/bin/FedLeaveCalendar" \
   "${HOME}/.local/bin/AnnualLeaveChartForTheYear" \
   "${HOME}/.local/bin/SickLeaveChartForTheYear" \
+  "${HOME}/.local/bin/CreditHoursChartForTheYear" \
+  "${HOME}/.local/bin/CompTimeChartForTheYear" \
+  "${HOME}/.local/bin/TravelCompChartForTheYear" \
+  "${HOME}/.local/bin/TimeOffAwardChartForTheYear" \
   "${HOME}/.local/bin/fedleaveMonthReportGraphic" \
   "${HOME}/.local/bin/fedleave-calendar"
 rm -f "${HOME}/.local/share/applications/fedleave-calendar.desktop"

@@ -51,7 +51,9 @@ function Add-UserPathEntry {
     }
 }
 
-Add-UserPathEntry -Entry $FEDLEAVE_BUNDLE
+Get-ChildItem -Force -Path $INSTALL_ROOT -Directory | ForEach-Object {
+    Add-UserPathEntry -Entry $_.FullName
+}
 
 $shell = New-Object -ComObject WScript.Shell
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\FedLeave Calendar.lnk"

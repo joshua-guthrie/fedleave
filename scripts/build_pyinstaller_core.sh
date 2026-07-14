@@ -28,6 +28,10 @@ rm -rf \
   "$DIST_DIR/fedleave" \
   "$DIST_DIR/AnnualLeaveChartForTheYear" \
   "$DIST_DIR/SickLeaveChartForTheYear" \
+  "$DIST_DIR/CreditHoursChartForTheYear" \
+  "$DIST_DIR/CompTimeChartForTheYear" \
+  "$DIST_DIR/TravelCompChartForTheYear" \
+  "$DIST_DIR/TimeOffAwardChartForTheYear" \
   "$DIST_DIR/fedleaveMonthReportGraphic"
 
 echo "Building fedleave with PyInstaller (venv: $VENV_DIR)"
@@ -108,6 +112,70 @@ build_app SickLeaveChartForTheYear "$SICK_CHART_ENTRY" \
   --hidden-import PIL.ImageFont \
   --hidden-import numpy
 
+# Build CreditHoursChartForTheYear companion application
+CREDIT_CHART_ENTRY="$HERE/.pyinstaller_credit_hours_chart_entry.py"
+cat > "$CREDIT_CHART_ENTRY" <<'PY'
+from credit_hours_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app CreditHoursChartForTheYear "$CREDIT_CHART_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build CompTimeChartForTheYear companion application
+COMP_CHART_ENTRY="$HERE/.pyinstaller_comp_time_chart_entry.py"
+cat > "$COMP_CHART_ENTRY" <<'PY'
+from comp_time_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app CompTimeChartForTheYear "$COMP_CHART_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build TravelCompChartForTheYear companion application
+TRAVEL_CHART_ENTRY="$HERE/.pyinstaller_travel_comp_chart_entry.py"
+cat > "$TRAVEL_CHART_ENTRY" <<'PY'
+from travel_comp_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app TravelCompChartForTheYear "$TRAVEL_CHART_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build TimeOffAwardChartForTheYear companion application
+TIME_OFF_CHART_ENTRY="$HERE/.pyinstaller_time_off_award_chart_entry.py"
+cat > "$TIME_OFF_CHART_ENTRY" <<'PY'
+from time_off_award_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app TimeOffAwardChartForTheYear "$TIME_OFF_CHART_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
 # Build fedleaveMonthReportGraphic companion application
 MONTH_REPORT_ENTRY="$HERE/.pyinstaller_month_report_entry.py"
 cat > "$MONTH_REPORT_ENTRY" <<'PY'
@@ -127,4 +195,8 @@ echo "Build complete. Binaries in $DIST_DIR"
 echo "  - fedleave/fedleave"
 echo "  - AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear"
 echo "  - SickLeaveChartForTheYear/SickLeaveChartForTheYear"
+echo "  - CreditHoursChartForTheYear/CreditHoursChartForTheYear"
+echo "  - CompTimeChartForTheYear/CompTimeChartForTheYear"
+echo "  - TravelCompChartForTheYear/TravelCompChartForTheYear"
+echo "  - TimeOffAwardChartForTheYear/TimeOffAwardChartForTheYear"
 echo "  - fedleaveMonthReportGraphic/fedleaveMonthReportGraphic"

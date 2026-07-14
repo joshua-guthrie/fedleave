@@ -123,6 +123,8 @@ Current GUI features:
 - Separate Type/Earned/Used/Balance tables for pay periods touching the displayed month
 - As-of-today balance table
 - Authoritative day editing with explicit Use/Earn controls and positive hour entry
+- View > Leave Charts launches the annual, sick, credit hours, comp time, travel comp, and time-off award chart companion apps in their own windows
+- Leave chart windows include Save PNG, Save PDF, and Print actions
 - Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
 - Help and About dialogs
 - Print preview, printer output, and PDF export now use the same landscape month-report graphic layout as `fedleaveMonthReportGraphic`
@@ -183,142 +185,10 @@ scripts\uninstall_gui_windows.bat
 ```
 
 The Linux installer copies the application tree into `~/.local/share/fedleave-app`
-and creates command links in `~/.local/bin`. The Windows installer copies the
-application tree under `%LOCALAPPDATA%\Programs\FedLeave` and adds the bundled
-`fedleave` directory to the user PATH so the backend remains callable from a
-terminal.
-
-## Companion Application: AnnualLeaveChartForTheYear
-
-A companion application that generates a PNG chart of annual leave balances throughout the leave year. It polls data from the `fedleave` application and renders a visual representation with:
-
-- Annual leave balance line chart
-- Pay period markers on the X-axis
-- Use-or-lose threshold line (240 hours)
-- Grid lines for easy reading
-- Smooth curve interpolation
-
-Sample output:
-
-![Annual leave chart sample](examples/annual-leave-chart-sample.png)
-
-### Usage
-
-```bash
-AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png
-AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png --resolution 3220
-```
-
-### Options
-
-- `--year YYYY`: Leave year (required if no current leave year can be inferred)
-- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
-- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
-- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
-
-### Requirements
-
-The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of the following locations:
-
-1. Same directory as the executable
-2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
-
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
-
-## Companion Application: SickLeaveChartForTheYear
-
-A companion application that generates a PNG chart of sick leave balances throughout the leave year. Like AnnualLeaveChartForTheYear, it polls data from the `fedleave` application and renders a visual representation with:
-
-- Sick leave balance line chart
-- Pay period markers on the X-axis
-- Smooth curve interpolation
-- **Dynamic Y-axis**: Range is 0 to the maximum balance rounded up to the nearest 100 hours
-
-For example, if the maximum sick leave balance is 605 hours, the Y-axis will scale to 0-700.
-
-Sample output:
-
-![Sick leave chart sample](examples/sick-leave-chart-sample.png)
-
-### Usage
-
-```bash
-SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png
-SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png --resolution 3220
-```
-
-### Options
-
-- `--year YYYY`: Leave year (required if no current leave year can be inferred)
-- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
-- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
-- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
-
-### Requirements
-
-The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of the following locations:
-
-1. Same directory as the executable
-2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
-
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
-
-## Companion Application: fedleaveMonthReportGraphic
-
-A companion application that generates a landscape 16:9 graphical month report. It treats `fedleave` as the data source, calls the public CLI commands, and does not read leave-year data files directly. PNG is the primary output format and SVG is also supported.
-
-The report includes:
-
-- Calendar grid with leave entries, holidays, pay days, pay-period-end markers, and today marker
-- Pay-period table for periods touching the displayed month, including earned, used, and ending balance columns
-- As-of-today balance table with use-or-lose values
-- Leave category abbreviation table covering all supported leave types
-
-The report queries `fedleave use-or-lose` directly for the year-end projection used in the balance table. That keeps the use-or-lose value independent from the month payload’s projected balance field.
-
-Transaction IDs, descriptions, sources, statuses, and data file paths are intentionally omitted from the report.
-
-Sample output:
-
-![Month report graphic sample](examples/month-report-sample.png)
-
-### Usage
-
-```bash
-fedleaveMonthReportGraphic --year 2026 --month July --outputFile july-report.png
-fedleaveMonthReportGraphic --year 2026 --month 7 --outputFile july-report.svg
-fedleaveMonthReportGraphic --outputFile current-month.png --resolution 3840
-```
-
-If both `--year` and `--month` are omitted, the current local year and month are used. If either one is provided, both are required.
-
-### Options
-
-- `--outputFile PATH`: Output file path (required; must end with `.png` or `.svg`)
-- `--year YYYY`: Calendar year to report
-- `--month MONTH`: Month number (`1` through `12`) or full English month name such as `July`
-- `--resolution PIXELS`: Output image width in pixels; height is 16:9 landscape (default: 1920, minimum: 800, maximum: 7680)
-- `--data-dir PATH`: Optional `fedleave` data directory override
-- `--fedleave PATH`: Explicit path to the `fedleave` executable
-- `--overwrite`: Replace an existing output file
-- `--verbose`: Print diagnostic information after rendering
-- `--quiet`: Suppress non-error output
-
-### Requirements
-
-The `fedleaveMonthReportGraphic` application requires `fedleave` to be available in one of these locations:
-
-1. Same directory as the executable
-2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
-
-If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
-
-### Pay Days
-
-New leave-year files store a `pay_date` on each pay period. Existing leave-year files remain supported; when `pay_date` is missing, fedleave infers it as six days after the pay period end date, which matches the every-other-Friday pay date for the standard Sunday-through-Saturday biweekly pay periods generated from the OPM leave-year schedule. OPM notes that some agency payroll systems use different pay-period schedules, so manually edited or imported data may provide explicit `pay_date` values when needed.
+and creates command links in `~/.local/bin` for every bundled executable. The
+Windows installer copies the application tree under
+`%LOCALAPPDATA%\Programs\FedLeave` and adds each bundle directory to the user
+PATH so the backend and companion apps remain callable from a terminal.
 
 ## CLI Detailed Help
 
@@ -561,6 +431,263 @@ Global notes:
 		4   File read/write error
 
 For the full project specification and rules, see the project documentation or the repository spec.
+
+## Companion Applications
+
+The chart companion applications use the same styling, fonts, and color palette. Their Y-axis scales from 0 to the maximum leave balance, rounded up to the nearest 10 hours, so the scale stays readable without clipping the highest point.
+
+Supported leave chart apps:
+
+- `AnnualLeaveChartForTheYear`
+- `SickLeaveChartForTheYear`
+- `CreditHoursChartForTheYear`
+- `CompTimeChartForTheYear`
+- `TravelCompChartForTheYear`
+- `TimeOffAwardChartForTheYear`
+
+The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Military Leave, Court Leave, Religious Comp, Restored Annual, or Overtime.
+
+### Companion Application: AnnualLeaveChartForTheYear
+
+A companion application that generates a PNG chart of annual leave balances throughout the leave year. It polls data from the `fedleave` application and renders a visual representation with:
+
+- Annual leave balance line chart
+- Pay period markers on the X-axis
+- Use-or-lose threshold line (240 hours)
+- Grid lines for easy reading
+- Smooth curve interpolation
+
+Sample output:
+
+![Annual leave chart sample](examples/annual-leave-chart-sample.png)
+
+### Usage
+
+```bash
+AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png
+AnnualLeaveChartForTheYear --year 2026 --outputFile chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
+
+### Requirements
+
+The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
+### Companion Application: SickLeaveChartForTheYear
+
+A companion application that generates a PNG chart of sick leave balances throughout the leave year. Like AnnualLeaveChartForTheYear, it polls data from the `fedleave` application and renders a visual representation with:
+
+- Sick leave balance line chart
+- Pay period markers on the X-axis
+- Smooth curve interpolation
+- Dynamic Y-axis scaling from 0 to the maximum balance rounded up to the nearest 10 hours
+
+Sample output:
+
+![Sick leave chart sample](examples/sick-leave-chart-sample.png)
+
+### Usage
+
+```bash
+SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png
+SickLeaveChartForTheYear --year 2026 --outputFile sick_chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
+
+### Requirements
+
+The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
+### Companion Application: CreditHoursChartForTheYear
+
+A companion application that generates a PNG chart of credit hour balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
+
+### Usage
+
+```bash
+CreditHoursChartForTheYear --year 2026 --outputFile credit_hours_chart.png
+CreditHoursChartForTheYear --year 2026 --outputFile credit_hours_chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
+
+### Requirements
+
+The `CreditHoursChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
+### Companion Application: CompTimeChartForTheYear
+
+A companion application that generates a PNG chart of comp time balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
+
+### Usage
+
+```bash
+CompTimeChartForTheYear --year 2026 --outputFile comp_time_chart.png
+CompTimeChartForTheYear --year 2026 --outputFile comp_time_chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
+
+### Requirements
+
+The `CompTimeChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
+### Companion Application: TravelCompChartForTheYear
+
+A companion application that generates a PNG chart of travel comp balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
+
+### Usage
+
+```bash
+TravelCompChartForTheYear --year 2026 --outputFile travel_comp_chart.png
+TravelCompChartForTheYear --year 2026 --outputFile travel_comp_chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
+
+### Requirements
+
+The `TravelCompChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
+### Companion Application: TimeOffAwardChartForTheYear
+
+A companion application that generates a PNG chart of time-off award balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
+
+### Usage
+
+```bash
+TimeOffAwardChartForTheYear --year 2026 --outputFile time_off_award_chart.png
+TimeOffAwardChartForTheYear --year 2026 --outputFile time_off_award_chart.png --resolution 3220
+```
+
+### Options
+
+- `--year YYYY`: Leave year (required if no current leave year can be inferred)
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override. If omitted, the chart app uses the same default data directory as `fedleave`: `~/.local/share/fedleave` on Linux/macOS, or `%LOCALAPPDATA%\fedleave` on Windows.
+
+### Requirements
+
+The `TimeOffAwardChartForTheYear` application requires `fedleave` to be in one of the following locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+
+## Companion Application: fedleaveMonthReportGraphic
+
+A companion application that generates a landscape 16:9 graphical month report. It treats `fedleave` as the data source, calls the public CLI commands, and does not read leave-year data files directly. PNG is the primary output format and SVG is also supported.
+
+The report includes:
+
+- Calendar grid with leave entries, holidays, pay days, pay-period-end markers, and today marker
+- Pay-period table for periods touching the displayed month, including earned, used, and ending balance columns
+- As-of-today balance table with use-or-lose values
+- Leave category abbreviation table covering all supported leave types
+
+The report queries `fedleave use-or-lose` directly for the year-end projection used in the balance table. That keeps the use-or-lose value independent from the month payload’s projected balance field.
+
+Transaction IDs, descriptions, sources, statuses, and data file paths are intentionally omitted from the report.
+
+Sample output:
+
+![Month report graphic sample](examples/month-report-sample.png)
+
+### Usage
+
+```bash
+fedleaveMonthReportGraphic --year 2026 --month July --outputFile july-report.png
+fedleaveMonthReportGraphic --year 2026 --month 7 --outputFile july-report.svg
+fedleaveMonthReportGraphic --outputFile current-month.png --resolution 3840
+```
+
+If both `--year` and `--month` are omitted, the current local year and month are used. If either one is provided, both are required.
+
+### Options
+
+- `--outputFile PATH`: Output file path (required; must end with `.png` or `.svg`)
+- `--year YYYY`: Calendar year to report
+- `--month MONTH`: Month number (`1` through `12`) or full English month name such as `July`
+- `--resolution PIXELS`: Output image width in pixels; height is 16:9 landscape (default: 1920, minimum: 800, maximum: 7680)
+- `--data-dir PATH`: Optional `fedleave` data directory override
+- `--fedleave PATH`: Explicit path to the `fedleave` executable
+- `--overwrite`: Replace an existing output file
+- `--verbose`: Print diagnostic information after rendering
+- `--quiet`: Suppress non-error output
+
+### Requirements
+
+The `fedleaveMonthReportGraphic` application requires `fedleave` to be available in one of these locations:
+
+1. Same directory as the executable
+2. In the system PATH
+3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+
+If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
+
+### Pay Days
+
+New leave-year files store a `pay_date` on each pay period. Existing leave-year files remain supported; when `pay_date` is missing, fedleave infers it as six days after the pay period end date, which matches the every-other-Friday pay date for the standard Sunday-through-Saturday biweekly pay periods generated from the OPM leave-year schedule. OPM notes that some agency payroll systems use different pay-period schedules, so manually edited or imported data may provide explicit `pay_date` values when needed.
 
 ## JSON Output Reference
 
@@ -1557,11 +1684,11 @@ If you prefer not to open PowerShell manually, the `scripts\*.bat` launchers cal
 
 - The built executables will appear in platform-specific subfolders under `dist/`. Build on the target platform or use an appropriate builder.
 - The regular build scripts produce a complete platform tree with one bundle directory per application.
-- On Windows, the PowerShell build script verifies these files exist directly in `dist/fedleave-Windows/`: `fedleave/fedleave.exe`, `AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear/SickLeaveChartForTheYear.exe`, `fedleaveMonthReportGraphic/fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar/FedLeaveCalendar.exe`.
+- On Windows, the PowerShell build script verifies these files exist directly in `dist/fedleave-Windows/`: `fedleave/fedleave.exe`, `AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear/SickLeaveChartForTheYear.exe`, `CreditHoursChartForTheYear/CreditHoursChartForTheYear.exe`, `CompTimeChartForTheYear/CompTimeChartForTheYear.exe`, `TravelCompChartForTheYear/TravelCompChartForTheYear.exe`, `TimeOffAwardChartForTheYear/TimeOffAwardChartForTheYear.exe`, `fedleaveMonthReportGraphic/fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar/FedLeaveCalendar.exe`.
 - On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
 
 ```bash
-chmod +x ./dist/fedleave-Ubuntu/fedleave/fedleave ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear/SickLeaveChartForTheYear ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic/fedleaveMonthReportGraphic ./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
+chmod +x ./dist/fedleave-Ubuntu/fedleave/fedleave ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear/SickLeaveChartForTheYear ./dist/fedleave-Ubuntu/CreditHoursChartForTheYear/CreditHoursChartForTheYear ./dist/fedleave-Ubuntu/CompTimeChartForTheYear/CompTimeChartForTheYear ./dist/fedleave-Ubuntu/TravelCompChartForTheYear/TravelCompChartForTheYear ./dist/fedleave-Ubuntu/TimeOffAwardChartForTheYear/TimeOffAwardChartForTheYear ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic/fedleaveMonthReportGraphic ./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
 ```
 
 Notes and caveats:

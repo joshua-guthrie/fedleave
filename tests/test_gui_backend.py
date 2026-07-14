@@ -126,6 +126,42 @@ def test_find_month_report_graphic_uses_bundled_backend_directory(tmp_path: Path
     assert backend_module.find_month_report_graphic() == report_executable
 
 
+def test_run_chart_app_uses_bundled_companion_executable(tmp_path: Path, monkeypatch):
+    chart_executable = _bundle_executable(tmp_path / "CreditHoursChartForTheYear", "CreditHoursChartForTheYear")
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return types.SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(backend_module, "find_companion_app", lambda name, explicit=None: chart_executable)
+    monkeypatch.setattr(backend_module.subprocess, "run", fake_run)
+
+    backend = FedleaveBackend(BackendOptions(data_dir=str(tmp_path / "data")))
+    backend.run_chart_app(
+        "CreditHoursChartForTheYear",
+        output_file=tmp_path / "chart.png",
+        year=2026,
+        data_dir=str(tmp_path / "data"),
+    )
+
+    assert captured["command"] == [
+        str(chart_executable),
+        "--outputFile",
+        str(tmp_path / "chart.png"),
+        "--resolution",
+        "1920",
+        "--year",
+        "2026",
+        "--data-dir",
+        str(tmp_path / "data"),
+    ]
+    assert captured["kwargs"]["text"] is True
+    assert captured["kwargs"]["capture_output"] is True
+    assert captured["kwargs"]["check"] is False
+
+
 def test_find_fedleave_reports_search_paths_when_missing(tmp_path: Path, monkeypatch):
     app_executable = _bundle_executable(tmp_path / "FedLeaveCalendar", "FedLeaveCalendar")
 

@@ -24,55 +24,45 @@ class BackendOptions:
     fedleave_path: str | None = None
     data_dir: str | None = None
 
-def find_fedleave(explicit: str | None = None) -> Path:
+def _find_companion_app(app_name: str, *, explicit: str | None = None, description: str) -> Path:
     if explicit:
         path = Path(explicit).expanduser()
         if is_executable(path):
             return path
-        raise BackendMissingError("fedleave backend executable was not found.")
+        raise BackendMissingError(f"{description} executable was not found.")
 
     searched: list[Path] = []
-    for candidate in iter_executable_candidates("fedleave"):
+    for candidate in iter_executable_candidates(app_name):
         searched.append(candidate)
         if is_executable(candidate):
             return candidate
 
-    path_hit = shutil.which("fedleave")
+    path_hit = shutil.which(app_name)
     if path_hit:
         return Path(path_hit)
 
     details = "\n".join(f"  - {candidate}" for candidate in searched)
     raise BackendMissingError(
-        "fedleave backend executable was not found.\n\n"
+        f"{description} executable was not found.\n\n"
         f"Searched:\n{details}\n\n"
-        "Set the backend path in Preferences or place the fedleave bundle next "
+        "Set the backend path in Preferences or place the companion bundle next "
         "to this application."
     )
 
 
+def find_fedleave(explicit: str | None = None) -> Path:
+    return _find_companion_app("fedleave", explicit=explicit, description="fedleave backend")
+
+
+def find_companion_app(app_name: str, explicit: str | None = None) -> Path:
+    return _find_companion_app(app_name, explicit=explicit, description=app_name)
+
+
 def find_month_report_graphic(explicit: str | None = None) -> Path:
-    if explicit:
-        path = Path(explicit).expanduser()
-        if is_executable(path):
-            return path
-        raise BackendMissingError("fedleaveMonthReportGraphic executable was not found.")
-
-    searched: list[Path] = []
-    for candidate in iter_executable_candidates("fedleaveMonthReportGraphic"):
-        searched.append(candidate)
-        if is_executable(candidate):
-            return candidate
-
-    path_hit = shutil.which("fedleaveMonthReportGraphic")
-    if path_hit:
-        return Path(path_hit)
-
-    details = "\n".join(f"  - {candidate}" for candidate in searched)
-    raise BackendMissingError(
-        "fedleaveMonthReportGraphic executable was not found.\n\n"
-        f"Searched:\n{details}\n\n"
-        "Place the month-report bundle next to this application or set the "
-        "graphic path in Preferences."
+    return _find_companion_app(
+        "fedleaveMonthReportGraphic",
+        explicit=explicit,
+        description="fedleaveMonthReportGraphic",
     )
 
 
@@ -174,6 +164,35 @@ class FedleaveBackend:
 
     def validate(self) -> dict[str, Any]:
         return self.run_json(["validate", "--json"])
+
+    def run_chart_app(
+        self,
+        app_name: str,
+        *,
+        output_file: Path,
+        year: int | None = None,
+        resolution: int = 1920,
+        data_dir: str | None = None,
+    ) -> None:
+        chart_app = find_companion_app(app_name)
+        command = [
+            str(chart_app),
+            "--outputFile",
+            str(output_file),
+            "--resolution",
+            str(resolution),
+        ]
+        if year is not None:
+            command.extend(["--year", str(year)])
+        if data_dir:
+            command.extend(["--data-dir", data_dir])
+        kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
+        if sys.platform.startswith("win"):
+            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+        result = subprocess.run(command, **kwargs)
+        if result.returncode != 0:
+            message = (result.stderr or result.stdout or f"{app_name} command failed").strip()
+            raise BackendError(message)
 
 
 def run_month_report_graphic(

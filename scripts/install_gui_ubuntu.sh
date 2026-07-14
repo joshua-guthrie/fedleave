@@ -16,8 +16,12 @@ rm -rf "$INSTALL_DIR"
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR"
 cp -a "$APP_SRC"/. "$INSTALL_DIR"/
 
-for app in fedleave FedLeaveCalendar AnnualLeaveChartForTheYear SickLeaveChartForTheYear fedleaveMonthReportGraphic; do
-  ln -sf "$INSTALL_DIR/$app/$app" "$BIN_DIR/$app"
+for bundle in "$INSTALL_DIR"/*; do
+  [[ -d "$bundle" ]] || continue
+  app="$(basename "$bundle")"
+  if [[ -x "$bundle/$app" ]]; then
+    ln -sf "$bundle/$app" "$BIN_DIR/$app"
+  fi
 done
 ln -sf "$INSTALL_DIR/FedLeaveCalendar/FedLeaveCalendar" "$BIN_DIR/fedleave-calendar"
 

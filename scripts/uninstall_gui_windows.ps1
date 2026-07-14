@@ -2,7 +2,6 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $INSTALL_ROOT = Join-Path $env:LOCALAPPDATA "Programs\FedLeave"
-$FEDLEAVE_BUNDLE = Join-Path $INSTALL_ROOT "fedleave"
 $startMenu = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\FedLeave Calendar.lnk"
 $desktop = Join-Path ([Environment]::GetFolderPath("Desktop")) "FedLeave Calendar.lnk"
 
@@ -27,7 +26,9 @@ function Remove-UserPathEntry {
     }) -join ';'
 }
 
-Remove-UserPathEntry -Entry $FEDLEAVE_BUNDLE
+Get-ChildItem -Force -Path $INSTALL_ROOT -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+    Remove-UserPathEntry -Entry $_.FullName
+}
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $INSTALL_ROOT
 Remove-Item -Force -ErrorAction SilentlyContinue $startMenu
 Remove-Item -Force -ErrorAction SilentlyContinue $desktop

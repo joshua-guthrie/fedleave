@@ -15,6 +15,10 @@ foreach ($BundlePath in @(
     (Join-Path $DIST_DIR "fedleave"),
     (Join-Path $DIST_DIR "AnnualLeaveChartForTheYear"),
     (Join-Path $DIST_DIR "SickLeaveChartForTheYear"),
+    (Join-Path $DIST_DIR "CreditHoursChartForTheYear"),
+    (Join-Path $DIST_DIR "CompTimeChartForTheYear"),
+    (Join-Path $DIST_DIR "TravelCompChartForTheYear"),
+    (Join-Path $DIST_DIR "TimeOffAwardChartForTheYear"),
     (Join-Path $DIST_DIR "fedleaveMonthReportGraphic")
 )) {
     if (Test-Path $BundlePath) {
@@ -123,6 +127,74 @@ Build-App -AppName "SickLeaveChartForTheYear" -EntryPath $SICK_CHART_ENTRY -Hidd
     'numpy'
 )
 
+# Build CreditHoursChartForTheYear companion application
+$CREDIT_CHART_ENTRY = Join-Path $HERE ".pyinstaller_credit_hours_chart_entry.py"
+@"
+from credit_hours_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $CREDIT_CHART_ENTRY -Encoding utf8
+
+Build-App -AppName "CreditHoursChartForTheYear" -EntryPath $CREDIT_CHART_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build CompTimeChartForTheYear companion application
+$COMP_CHART_ENTRY = Join-Path $HERE ".pyinstaller_comp_time_chart_entry.py"
+@"
+from comp_time_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $COMP_CHART_ENTRY -Encoding utf8
+
+Build-App -AppName "CompTimeChartForTheYear" -EntryPath $COMP_CHART_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build TravelCompChartForTheYear companion application
+$TRAVEL_CHART_ENTRY = Join-Path $HERE ".pyinstaller_travel_comp_chart_entry.py"
+@"
+from travel_comp_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $TRAVEL_CHART_ENTRY -Encoding utf8
+
+Build-App -AppName "TravelCompChartForTheYear" -EntryPath $TRAVEL_CHART_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build TimeOffAwardChartForTheYear companion application
+$TIME_OFF_CHART_ENTRY = Join-Path $HERE ".pyinstaller_time_off_award_chart_entry.py"
+@"
+from time_off_award_chart.__main__ import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $TIME_OFF_CHART_ENTRY -Encoding utf8
+
+Build-App -AppName "TimeOffAwardChartForTheYear" -EntryPath $TIME_OFF_CHART_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
 # Build fedleaveMonthReportGraphic companion application
 $MONTH_REPORT_ENTRY = Join-Path $HERE ".pyinstaller_month_report_entry.py"
 @"
@@ -142,10 +214,18 @@ Build-App -AppName "fedleaveMonthReportGraphic" -EntryPath $MONTH_REPORT_ENTRY -
 Assert-AppBundle -AppName "fedleave"
 Assert-AppBundle -AppName "AnnualLeaveChartForTheYear"
 Assert-AppBundle -AppName "SickLeaveChartForTheYear"
+Assert-AppBundle -AppName "CreditHoursChartForTheYear"
+Assert-AppBundle -AppName "CompTimeChartForTheYear"
+Assert-AppBundle -AppName "TravelCompChartForTheYear"
+Assert-AppBundle -AppName "TimeOffAwardChartForTheYear"
 Assert-AppBundle -AppName "fedleaveMonthReportGraphic"
 
 Write-Host "Build complete. Binaries in $DIST_DIR"
 Write-Host "  - fedleave\fedleave.exe"
 Write-Host "  - AnnualLeaveChartForTheYear\AnnualLeaveChartForTheYear.exe"
 Write-Host "  - SickLeaveChartForTheYear\SickLeaveChartForTheYear.exe"
+Write-Host "  - CreditHoursChartForTheYear\CreditHoursChartForTheYear.exe"
+Write-Host "  - CompTimeChartForTheYear\CompTimeChartForTheYear.exe"
+Write-Host "  - TravelCompChartForTheYear\TravelCompChartForTheYear.exe"
+Write-Host "  - TimeOffAwardChartForTheYear\TimeOffAwardChartForTheYear.exe"
 Write-Host "  - fedleaveMonthReportGraphic\fedleaveMonthReportGraphic.exe"

@@ -37,6 +37,10 @@ def test_companion_chart_apps_generate_pngs_from_source(tmp_path):
     apps = [
         ("annual_leave_chart", tmp_path / "annual.png", "annual-leave-chart-png"),
         ("sick_leave_chart", tmp_path / "sick.png", "sick-leave-chart-png"),
+        ("credit_hours_chart", tmp_path / "credit.png", "credit-hours-chart-png"),
+        ("comp_time_chart", tmp_path / "comp.png", "comp-time-chart-png"),
+        ("travel_comp_chart", tmp_path / "travel.png", "travel-comp-chart-png"),
+        ("time_off_award_chart", tmp_path / "toa.png", "time-off-award-chart-png"),
     ]
     for module, output, product in apps:
         result = _run(

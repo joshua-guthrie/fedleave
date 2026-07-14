@@ -37,13 +37,13 @@ def test_gui_installers_copy_the_shared_backend_from_dist_root():
     assert 'APP_SRC="$HERE/dist/fedleave-Ubuntu"' in linux
     assert 'INSTALL_DIR="${HOME}/.local/share/fedleave-app"' in linux
     assert 'cp -a "$APP_SRC"/. "$INSTALL_DIR"/' in linux
-    assert 'for app in fedleave FedLeaveCalendar AnnualLeaveChartForTheYear SickLeaveChartForTheYear fedleaveMonthReportGraphic; do' in linux
+    assert 'for bundle in "$INSTALL_DIR"/*; do' in linux
     assert 'Exec=$INSTALL_DIR/FedLeaveCalendar/FedLeaveCalendar' in linux
     assert '$APP_SRC = Join-Path $HERE "dist\\fedleave-Windows"' in windows
     assert '$INSTALL_ROOT = Join-Path $env:LOCALAPPDATA "Programs\\FedLeave"' in windows
     assert 'Get-ChildItem -Force -Path $APP_SRC -Directory | ForEach-Object {' in windows
-    assert 'Add-UserPathEntry -Entry $FEDLEAVE_BUNDLE' in windows
-    assert '$FEDLEAVE_BUNDLE = Join-Path $INSTALL_ROOT "fedleave"' in windows
+    assert 'Get-ChildItem -Force -Path $INSTALL_ROOT -Directory | ForEach-Object {' in windows
+    assert 'Add-UserPathEntry -Entry $_.FullName' in windows
     assert 'Join-Path $INSTALL_ROOT "FedLeaveCalendar\\FedLeaveCalendar.exe"' in windows
     assert 'Join-Path $APP_SRC "fedleave\\fedleave.exe"' in windows
 
@@ -67,3 +67,12 @@ def test_about_page_mentions_the_logo_asset():
 
     assert "../assets/fedleave-logo.png" in about
     assert "Version 0.2.0" in about
+
+
+def test_pyproject_includes_new_chart_entry_points():
+    pyproject = (ROOT / "pyproject.toml").read_text()
+
+    assert "CreditHoursChartForTheYear" in pyproject
+    assert "CompTimeChartForTheYear" in pyproject
+    assert "TravelCompChartForTheYear" in pyproject
+    assert "TimeOffAwardChartForTheYear" in pyproject
