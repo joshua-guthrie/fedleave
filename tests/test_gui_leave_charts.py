@@ -66,3 +66,27 @@ def test_leave_chart_dialog_prints_landscape_pdf(tmp_path):
 
     assert output.exists()
     assert output.stat().st_size > 0
+
+
+def test_leave_chart_dialog_rescales_to_fit_resize():
+    app = _application()
+    pixmap = QPixmap(1600, 800)
+    pixmap.fill(Qt.white)
+    dialog = LeaveChartDialog("Credit Hours Balance", pixmap)
+
+    dialog.resize(400, 300)
+    dialog.show()
+    app.processEvents()
+    first_size = dialog.image_label.pixmap().size()
+    first_viewport = dialog.scroll_area.viewport().size()
+
+    dialog.resize(240, 520)
+    app.processEvents()
+    second_size = dialog.image_label.pixmap().size()
+    second_viewport = dialog.scroll_area.viewport().size()
+
+    assert first_size.width() <= first_viewport.width()
+    assert first_size.height() <= first_viewport.height()
+    assert second_size.width() <= second_viewport.width()
+    assert second_size.height() <= second_viewport.height()
+    assert first_size != second_size

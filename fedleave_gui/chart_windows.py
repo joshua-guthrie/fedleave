@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor, QPixmap, QPainter
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -32,7 +32,6 @@ class LeaveChartDialog(QDialog):
         self.scroll_area.setWidgetResizable(True)
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setPixmap(self._pixmap)
         self.scroll_area.setWidget(self.image_label)
         layout.addWidget(self.scroll_area, 1)
 
@@ -51,6 +50,23 @@ class LeaveChartDialog(QDialog):
         self.close_button.clicked.connect(self.close)
         button_row.addWidget(self.close_button)
         layout.addLayout(button_row)
+        self._fit_pixmap_to_viewport()
+
+    def showEvent(self, event: QEvent) -> None:
+        super().showEvent(event)
+        self._fit_pixmap_to_viewport()
+
+    def resizeEvent(self, event: QEvent) -> None:
+        super().resizeEvent(event)
+        self._fit_pixmap_to_viewport()
+
+    def _fit_pixmap_to_viewport(self) -> None:
+        viewport_size = self.scroll_area.viewport().size()
+        if viewport_size.width() <= 0 or viewport_size.height() <= 0:
+            return
+        self.image_label.setPixmap(
+            self._pixmap.scaled(viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
 
     def save_png(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
