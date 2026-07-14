@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QByteArray, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap
+from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap, QResizeEvent
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -327,6 +327,8 @@ class DayEditDialog(QDialog):
 
 
 class SaveDayPreviewDialog(QDialog):
+    _COLUMN_WEIGHT_SUM = 5
+
     def __init__(self, day: dict[str, Any], existing_values: dict[str, float], new_values: dict[str, float], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Review Save for {day['date']}")
@@ -347,20 +349,34 @@ class SaveDayPreviewDialog(QDialog):
         self.table.setHorizontalHeaderLabels(["Leave Type", "Existing", "New"])
         self.table.verticalHeader().setVisible(False)
         _set_table_header_alignments(self.table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
         self.table.setSelectionMode(QTableWidget.NoSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         layout.addWidget(self.table)
 
         self._populate_table()
+        self._apply_column_widths()
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Save).setText("Save Changes")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._apply_column_widths()
+
+    def _apply_column_widths(self) -> None:
+        total_width = self.table.viewport().width()
+        if total_width <= 0:
+            return
+        leave_type_width = total_width // self._COLUMN_WEIGHT_SUM
+        value_width = (total_width - leave_type_width) // 2
+        new_width = total_width - leave_type_width - value_width
+        self.table.setColumnWidth(0, leave_type_width)
+        self.table.setColumnWidth(1, value_width)
+        self.table.setColumnWidth(2, new_width)
 
     def _populate_table(self) -> None:
         categories = sorted({*self._existing_values, *self._new_values})
