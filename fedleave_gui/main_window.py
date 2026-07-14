@@ -12,7 +12,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtCore import QByteArray, QTimer, Qt
 from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap, QResizeEvent
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
@@ -350,12 +350,13 @@ class SaveDayPreviewDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         _set_table_header_alignments(self.table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.table.horizontalHeader().setStretchLastSection(False)
         self.table.setSelectionMode(QTableWidget.NoSelection)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         layout.addWidget(self.table)
 
         self._populate_table()
-        self._apply_column_widths()
+        QTimer.singleShot(0, self._apply_column_widths)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.button(QDialogButtonBox.Save).setText("Save Changes")
@@ -365,6 +366,10 @@ class SaveDayPreviewDialog(QDialog):
 
     def resizeEvent(self, event: QResizeEvent) -> None:
         super().resizeEvent(event)
+        self._apply_column_widths()
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
         self._apply_column_widths()
 
     def _apply_column_widths(self) -> None:
