@@ -39,6 +39,65 @@ def test_view_menu_includes_select_month_action(monkeypatch):
     assert "Select Month..." in labels
 
 
+def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    window = MainWindow()
+    (tmp_path / "leave_years").mkdir()
+    (tmp_path / "leave_years" / "2024.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "leave_years" / "2026.json").write_text("{}", encoding="utf-8")
+    window.settings.data_dir = str(tmp_path)
+
+    file_action = next(action for action in window.menuBar().actions() if action.text() == "File")
+    labels = [action.text() for action in file_action.menu().actions() if action.text()]
+
+    assert "Change Leave Year..." in labels
+
+
+def test_change_leave_year_action_updates_displayed_year(monkeypatch, tmp_path):
+    _application()
+    refreshed: list[int] = []
+
+    def fake_refresh(self):
+        refreshed.append(self.year)
+
+    monkeypatch.setattr(MainWindow, "refresh", fake_refresh)
+    window = MainWindow()
+    (tmp_path / "leave_years").mkdir()
+    (tmp_path / "leave_years" / "2024.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "leave_years" / "2026.json").write_text("{}", encoding="utf-8")
+    window.settings.data_dir = str(tmp_path)
+
+    class FakeChangeLeaveYearDialog:
+        def __init__(self, years, current_year, parent=None):
+            assert years == [2024, 2026]
+            assert current_year == window.year
+
+        def exec(self):
+            return QDialog.Accepted
+
+        def selected_year(self):
+            return 2024
+
+    monkeypatch.setattr("fedleave_gui.main_window.ChangeLeaveYearDialog", FakeChangeLeaveYearDialog)
+
+    window.change_leave_year()
+
+    assert window.year == 2024
+    assert refreshed[-1] == 2024
+
+
+def test_help_menu_hides_backend_about_action(monkeypatch):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    window = MainWindow()
+
+    help_action = next(action for action in window.menuBar().actions() if action.text() == "Help")
+    labels = [action.text() for action in help_action.menu().actions() if action.text()]
+
+    assert labels == ["Help Contents", "Leave Abbreviations", "About FedLeave Calendar"]
+
+
 def test_select_month_action_updates_displayed_month(monkeypatch):
     _application()
     refreshed: list[tuple[int, int]] = []

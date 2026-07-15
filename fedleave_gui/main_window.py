@@ -12,8 +12,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QByteArray, QTimer, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap, QResizeEvent
+from PySide6.QtCore import QByteArray, QTimer, Qt, QUrl
+from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap, QResizeEvent, QTextDocument
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -47,7 +47,8 @@ from PySide6.QtWidgets import (
 from . import __version__
 from .chart_windows import LeaveChartDialog
 from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
-from .resources import help_base_url, help_file, window_icon
+from .resources import asset_file, help_base_url, help_file, window_icon
+from fedleave.config import get_default_data_dir
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
 from fedleave_month_report_graphic.report import ReportData as MonthReportData
 from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
@@ -592,6 +593,46 @@ class SelectMonthDialog(QDialog):
         return self.year_input.value(), int(self.month_input.currentData())
 
 
+class ChangeLeaveYearDialog(QDialog):
+    def __init__(self, years: list[int], current_year: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Change Leave Year")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.year_input = QComboBox()
+        for year in years:
+            self.year_input.addItem(str(year), year)
+        if years:
+            index = self.year_input.findData(current_year)
+            self.year_input.setCurrentIndex(index if index >= 0 else 0)
+        form.addRow("Leave year", self.year_input)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected_year(self) -> int:
+        return int(self.year_input.currentData())
+
+
+def _available_leave_years(data_dir: str | None) -> list[int]:
+    base_dir = get_default_data_dir(Path(data_dir) if data_dir else None)
+    year_dir = base_dir / "leave_years"
+    if not year_dir.exists():
+        return []
+    years: list[int] = []
+    for path in sorted(year_dir.glob("*.json")):
+        if path.stem.isdigit():
+            years.append(int(path.stem))
+    return years
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -698,6 +739,7 @@ class MainWindow(QMainWindow):
     def _build_menus(self) -> None:
         file_menu = self.menuBar().addMenu("File")
         self._action(file_menu, "New Leave Year...", self.new_leave_year)
+        self._action(file_menu, "Change Leave Year...", self.change_leave_year)
         self._action(file_menu, "Refresh", self.refresh)
         self._action(file_menu, "Print Preview...", self.print_preview)
         self._action(file_menu, "Print Month...", self.print_month)
@@ -724,7 +766,6 @@ class MainWindow(QMainWindow):
         self._action(help_menu, "Help Contents", self.show_help)
         self._action(help_menu, "Leave Abbreviations", self.show_abbreviations)
         self._action(help_menu, "About FedLeave Calendar", self.about_gui)
-        self._action(help_menu, "About fedleave Backend", self.about_backend)
 
     def _action(self, menu: Any, text: str, callback: Any) -> QAction:
         action = QAction(text, self)
@@ -915,6 +956,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             self.settings = dialog.apply()
             save_settings(self.settings)
+            self.backend = self._backend()
             self.refresh()
 
     def new_leave_year(self) -> None:
@@ -1069,12 +1111,30 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(dialog)
         browser = QTextBrowser()
         if path.exists():
+            if filename == "about-fedleave-calendar.html":
+                browser.document().addResource(
+                    QTextDocument.ImageResource,
+                    QUrl("qrc:/about-fedleave-calendar-logo"),
+                    QPixmap(str(asset_file("fedleave-logo.png"))),
+                )
             browser.document().setBaseUrl(help_base_url(filename))
             browser.setHtml(path.read_text(encoding="utf-8"))
         else:
             browser.setHtml(f"<h1>{html.escape(title)}</h1><p>Help file was not found.</p>")
         layout.addWidget(browser)
         dialog.exec()
+
+    def change_leave_year(self) -> None:
+        years = _available_leave_years(self.settings.data_dir or None)
+        if not years:
+            QMessageBox.warning(self, "Change Leave Year", "No leave year files were found.")
+            return
+
+        dialog = ChangeLeaveYearDialog(years, self.year, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        self.year = dialog.selected_year()
+        self.refresh()
 
     def show_abbreviations(self) -> None:
         AbbreviationsDialog(self).exec()

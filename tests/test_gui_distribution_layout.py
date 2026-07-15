@@ -65,8 +65,10 @@ def test_regular_build_scripts_include_gui_build():
 def test_about_page_mentions_the_logo_asset():
     about = (ROOT / "help" / "about-fedleave-calendar.html").read_text()
 
-    assert "../assets/fedleave-logo.png" in about
+    assert "qrc:/about-fedleave-calendar-logo" in about
     assert "Version 0.2.0" in about
+    assert "experiment" in about
+    assert "not use it for anything critical" in about
 
 
 def test_pyproject_includes_new_chart_entry_points():
