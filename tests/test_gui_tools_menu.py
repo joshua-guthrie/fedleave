@@ -24,9 +24,8 @@ def test_tools_menu_hides_internal_data_folder(monkeypatch):
         "Validate Data",
         "Export Data...",
         "Import Data...",
-        "Open Preferences Folder",
     ]
-    assert "Open Data Folder" not in labels
+    assert "Open Preferences Folder" not in labels
 
 
 def test_view_menu_includes_select_month_action(monkeypatch):

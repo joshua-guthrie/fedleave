@@ -694,7 +694,6 @@ class MainWindow(QMainWindow):
         self._action(tools_menu, "Validate Data", self.validate_data)
         self._action(tools_menu, "Export Data...", self.export_data)
         self._action(tools_menu, "Import Data...", self.import_data)
-        self._action(tools_menu, "Open Preferences Folder", lambda: webbrowser.open(settings_path().parent.as_uri()))
         help_menu = self.menuBar().addMenu("Help")
         self._action(help_menu, "Help Contents", self.show_help)
         self._action(help_menu, "Leave Abbreviations", self.show_abbreviations)
