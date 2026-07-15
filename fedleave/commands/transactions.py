@@ -53,6 +53,7 @@ def _set_day_values(
     *,
     date: str,
     values: dict[str, float | None],
+    comments: dict[str, str | None],
     authoritative: bool,
     data_dir: Path | None,
 ) -> dict:
@@ -79,6 +80,16 @@ def _set_day_values(
             for transaction in transactions
             if transaction.get("date") == date and transaction.get("category") == category
         ]
+        existing_comment = next(
+            (str(transaction.get("description", "")).strip() for transaction in replaced if str(transaction.get("description", "")).strip()),
+            "",
+        )
+        raw_comment = comments.get(category)
+        if raw_comment is None:
+            comment = existing_comment
+        else:
+            comment = sanitize_text(raw_comment, field_name=f"{category} comment")
+
         removed_ids.extend(str(transaction.get("id", "")) for transaction in replaced)
         transactions[:] = [transaction for transaction in transactions if transaction not in replaced]
 
@@ -89,7 +100,7 @@ def _set_day_values(
                 category=category,
                 direction=direction,
                 hours=hours,
-                description="Authoritative day value",
+                description=comment,
                 status="reconciled",
                 source="set-day",
                 existing_ids=existing_ids,
@@ -105,6 +116,7 @@ def _set_day_values(
                 "value": value,
                 "direction": direction if hours else None,
                 "hours": hours,
+                "comment": comment,
                 "transaction_id": new_id,
             }
         )
@@ -241,22 +253,39 @@ def set_day(
     authoritative: bool = typer.Option(False, help="Replace active transactions for supplied categories on this date."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     annual: float | None = typer.Option(None, help="Signed annual leave hours."),
+    annual_comment: str | None = typer.Option(None, help="Annual leave comment."),
     sick: float | None = typer.Option(None, help="Signed sick leave hours."),
+    sick_comment: str | None = typer.Option(None, help="Sick leave comment."),
     credit: float | None = typer.Option(None, help="Signed credit hours."),
+    credit_comment: str | None = typer.Option(None, help="Credit hours comment."),
     comp: float | None = typer.Option(None, help="Signed comp time hours."),
+    comp_comment: str | None = typer.Option(None, help="Comp time comment."),
     travel_comp: float | None = typer.Option(None, "--travel-comp", help="Signed travel comp hours."),
+    travel_comp_comment: str | None = typer.Option(None, "--travel-comp-comment", help="Travel comp comment."),
     overtime: float | None = typer.Option(None, help="Signed overtime hours."),
+    overtime_comment: str | None = typer.Option(None, help="Overtime comment."),
     admin: float | None = typer.Option(None, help="Signed admin leave hours."),
+    admin_comment: str | None = typer.Option(None, help="Admin leave comment."),
     lwop: float | None = typer.Option(None, help="Signed LWOP hours."),
+    lwop_comment: str | None = typer.Option(None, help="LWOP comment."),
     military: float | None = typer.Option(None, help="Signed military leave hours."),
+    military_comment: str | None = typer.Option(None, help="Military leave comment."),
     court: float | None = typer.Option(None, help="Signed court leave hours."),
+    court_comment: str | None = typer.Option(None, help="Court leave comment."),
     religious_comp: float | None = typer.Option(None, "--religious-comp", help="Signed religious comp hours."),
+    religious_comp_comment: str | None = typer.Option(None, "--religious-comp-comment", help="Religious comp comment."),
     time_off_award: float | None = typer.Option(None, "--time-off-award", help="Signed time-off award hours."),
+    time_off_award_comment: str | None = typer.Option(None, "--time-off-award-comment", help="Time-off award comment."),
     excused: float | None = typer.Option(None, help="Signed excused leave hours."),
+    excused_comment: str | None = typer.Option(None, help="Excused leave comment."),
     holiday: float | None = typer.Option(None, help="Signed holiday hours."),
+    holiday_comment: str | None = typer.Option(None, help="Holiday comment."),
     flex: float | None = typer.Option(None, help="Signed flex hours."),
+    flex_comment: str | None = typer.Option(None, help="Flex comment."),
     other: float | None = typer.Option(None, help="Signed other leave hours."),
+    other_comment: str | None = typer.Option(None, help="Other leave comment."),
     restored_annual: float | None = typer.Option(None, "--restored-annual", help="Signed restored annual leave hours."),
+    restored_annual_comment: str | None = typer.Option(None, "--restored-annual-comment", help="Restored annual leave comment."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     if not isinstance(authoritative, bool):
@@ -265,6 +294,40 @@ def set_day(
         json_output = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
+    if isinstance(annual_comment, OptionInfo):
+        annual_comment = None
+    if isinstance(sick_comment, OptionInfo):
+        sick_comment = None
+    if isinstance(credit_comment, OptionInfo):
+        credit_comment = None
+    if isinstance(comp_comment, OptionInfo):
+        comp_comment = None
+    if isinstance(travel_comp_comment, OptionInfo):
+        travel_comp_comment = None
+    if isinstance(overtime_comment, OptionInfo):
+        overtime_comment = None
+    if isinstance(admin_comment, OptionInfo):
+        admin_comment = None
+    if isinstance(lwop_comment, OptionInfo):
+        lwop_comment = None
+    if isinstance(military_comment, OptionInfo):
+        military_comment = None
+    if isinstance(court_comment, OptionInfo):
+        court_comment = None
+    if isinstance(religious_comp_comment, OptionInfo):
+        religious_comp_comment = None
+    if isinstance(time_off_award_comment, OptionInfo):
+        time_off_award_comment = None
+    if isinstance(excused_comment, OptionInfo):
+        excused_comment = None
+    if isinstance(holiday_comment, OptionInfo):
+        holiday_comment = None
+    if isinstance(flex_comment, OptionInfo):
+        flex_comment = None
+    if isinstance(other_comment, OptionInfo):
+        other_comment = None
+    if isinstance(restored_annual_comment, OptionInfo):
+        restored_annual_comment = None
 
     values = {
         "annual": annual,
@@ -285,13 +348,38 @@ def set_day(
         "other": other,
         "restored_annual": restored_annual,
     }
+    comments = {
+        "annual": annual_comment,
+        "sick": sick_comment,
+        "credit": credit_comment,
+        "comp": comp_comment,
+        "travel_comp": travel_comp_comment,
+        "overtime": overtime_comment,
+        "admin": admin_comment,
+        "lwop": lwop_comment,
+        "military": military_comment,
+        "court": court_comment,
+        "religious_comp": religious_comp_comment,
+        "time_off_award": time_off_award_comment,
+        "excused": excused_comment,
+        "holiday": holiday_comment,
+        "flex": flex_comment,
+        "other": other_comment,
+        "restored_annual": restored_annual_comment,
+    }
     values = {key: value for key, value in values.items() if not isinstance(value, OptionInfo)}
     if all(value is None for value in values.values()):
         console.print("[red]ERROR:[/red] At least one leave category value is required.")
         raise typer.Exit(code=2)
 
     try:
-        result = _set_day_values(date=date, values=values, authoritative=authoritative, data_dir=data_dir)
+        result = _set_day_values(
+            date=date,
+            values=values,
+            comments=comments,
+            authoritative=authoritative,
+            data_dir=data_dir,
+        )
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)

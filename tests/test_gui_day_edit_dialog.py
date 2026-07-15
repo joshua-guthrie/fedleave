@@ -19,8 +19,8 @@ def test_existing_values_use_explicit_direction_and_positive_hours():
         {
             "date": "2026-07-08",
             "entries": [
-                {"category": "annual", "hours": 4, "direction": "used"},
-                {"category": "credit", "hours": 2, "direction": "earned"},
+                {"category": "annual", "hours": 4, "direction": "used", "description": "Appointment"},
+                {"category": "credit", "hours": 2, "direction": "earned", "description": "Stayed late"},
             ],
         }
     )
@@ -28,8 +28,10 @@ def test_existing_values_use_explicit_direction_and_positive_hours():
     assert dialog.inputs["annual"].minimum() == 0
     assert dialog.inputs["annual"].value() == 4
     assert dialog.directions["annual"].currentData() == "use"
+    assert dialog.comment_inputs["annual"].text() == "Appointment"
     assert dialog.inputs["credit"].value() == 2
     assert dialog.directions["credit"].currentData() == "earn"
+    assert dialog.comment_inputs["credit"].text() == "Stayed late"
     assert dialog.values() == {"annual": -4.0, "credit": 2.0}
 
 
@@ -43,6 +45,7 @@ def test_new_leave_type_defaults_to_use_and_never_accepts_negative_hours():
 
     assert dialog.directions["annual"].currentData() == "use"
     assert dialog.inputs["annual"].minimum() == 0
+    assert dialog.comment_inputs["annual"].text() == ""
     dialog.inputs["annual"].setValue(-3)
     assert dialog.inputs["annual"].value() == 0
     dialog.inputs["annual"].setValue(3)
@@ -50,6 +53,24 @@ def test_new_leave_type_defaults_to_use_and_never_accepts_negative_hours():
 
     dialog.directions["annual"].setCurrentIndex(dialog.directions["annual"].findData("earn"))
     assert dialog.values()["annual"] == 3.0
+
+
+def test_day_edit_dialog_returns_comments_for_existing_and_new_rows():
+    _application()
+    dialog = DayEditDialog(
+        {
+            "date": "2026-07-08",
+            "entries": [{"category": "annual", "hours": 4, "direction": "used", "description": "Appointment"}],
+        }
+    )
+    credit_index = dialog.add_category.findData("credit")
+    dialog.add_category.setCurrentIndex(credit_index)
+    dialog._add_selected_category()
+
+    dialog.comment_inputs["annual"].setText("Updated appointment")
+    dialog.comment_inputs["credit"].setText("Late night")
+
+    assert dialog.comments() == {"annual": "Updated appointment", "credit": "Late night"}
 
 
 def test_save_day_preview_dialog_lists_existing_and_new_values_without_signs():
@@ -76,10 +97,10 @@ def test_edit_day_requires_preview_confirmation(monkeypatch):
 
     class FakeBackend:
         def __init__(self) -> None:
-            self.calls: list[tuple[str, dict[str, float]]] = []
+            self.calls: list[tuple[str, dict[str, float], dict[str, str] | None]] = []
 
-        def set_day(self, day: str, values: dict[str, float]) -> None:
-            self.calls.append((day, values))
+        def set_day(self, day: str, values: dict[str, float], comments: dict[str, str] | None = None) -> None:
+            self.calls.append((day, values, comments))
 
     fake_backend = FakeBackend()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
@@ -89,12 +110,16 @@ def test_edit_day_requires_preview_confirmation(monkeypatch):
     class FakeEditDialog:
         def __init__(self, day, parent=None):
             self._values = {"annual": -3.0}
+            self._comments = {"annual": "Doctor visit"}
 
         def exec(self):
             return 1
 
         def values(self):
             return self._values
+
+        def comments(self):
+            return self._comments
 
     class FakePreviewDialog:
         def __init__(self, day, existing_values, new_values, parent=None):
@@ -120,4 +145,4 @@ def test_edit_day_requires_preview_confirmation(monkeypatch):
 
     window.edit_day({"date": "2026-07-08", "entries": [{"category": "annual", "direction": "used", "hours": 2.0}]})
 
-    assert fake_backend.calls == [("2026-07-08", {"annual": -3.0})]
+    assert fake_backend.calls == [("2026-07-08", {"annual": -3.0}, {"annual": "Doctor visit"})]

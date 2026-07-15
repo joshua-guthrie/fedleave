@@ -77,14 +77,22 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     assert projection["year"] == 2026
     assert projection["use_or_lose"]["use_or_lose"] == 0.0
 
-    result = backend.set_day("2026-07-08", {"annual": -5.0, "credit": 2.0})
+    result = backend.set_day(
+        "2026-07-08",
+        {"annual": -5.0, "credit": 2.0},
+        comments={"annual": "Leave", "credit": "Late"},
+    )
     args = result["args"]
     assert args[:4] == ["set-day", "--date", "2026-07-08", "--authoritative"]
     assert "--json" in args
     assert "--annual" in args
     assert "-5" in args
+    assert "--annual-comment" in args
+    assert "Leave" in args
     assert "--credit" in args
     assert "2" in args
+    assert "--credit-comment" in args
+    assert "Late" in args
     assert args[-2:] == ["--data-dir", str(tmp_path / "data")]
 
 

@@ -152,6 +152,18 @@ def _day_values_by_category(day: dict[str, Any]) -> dict[str, float]:
     return values
 
 
+def _day_comments_by_category(day: dict[str, Any]) -> dict[str, str]:
+    comments: dict[str, str] = {}
+    for entry in day.get("entries", []):
+        value = _entry_value(entry)
+        if value is None:
+            continue
+        description = str(entry.get("description", "")).strip()
+        if description and value.category not in comments:
+            comments[value.category] = description
+    return comments
+
+
 def _format_value_summary(value: Any) -> str:
     if not _nonzero(value):
         return "0"
@@ -271,7 +283,9 @@ class DayEditDialog(QDialog):
         self.day = day
         self.inputs: dict[str, QDoubleSpinBox] = {}
         self.directions: dict[str, QComboBox] = {}
+        self.comment_inputs: dict[str, QLineEdit] = {}
         values = _day_values_by_category(day)
+        comments = _day_comments_by_category(day)
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose Use or Earn for each leave type, then enter positive hours."))
@@ -280,7 +294,7 @@ class DayEditDialog(QDialog):
             current = values.get(category, 0.0)
             if not _nonzero(current):
                 continue
-            form.addRow(label, self._input_row(category, current))
+            form.addRow(label, self._input_row(category, current, comments.get(category, "")))
         self.add_category = QComboBox()
         for category, (_, label) in CATEGORY_LABELS.items():
             if category not in self.inputs:
@@ -306,7 +320,7 @@ class DayEditDialog(QDialog):
         spinner.setValue(abs(value))
         return spinner
 
-    def _input_row(self, category: str, value: float = 0.0) -> QWidget:
+    def _input_row(self, category: str, value: float = 0.0, comment: str = "") -> QWidget:
         direction = QComboBox()
         direction.addItem("Use", "use")
         direction.addItem("Earn", "earn")
@@ -316,11 +330,20 @@ class DayEditDialog(QDialog):
         self.directions[category] = direction
         self.inputs[category] = spinner
 
+        comment_input = QLineEdit()
+        comment_input.setPlaceholderText("Comment")
+        comment_input.setText(comment)
+        self.comment_inputs[category] = comment_input
+
         row = QWidget()
-        row_layout = QHBoxLayout(row)
+        row_layout = QVBoxLayout(row)
         row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.addWidget(direction)
-        row_layout.addWidget(spinner, 1)
+        top_row = QHBoxLayout()
+        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.addWidget(direction)
+        top_row.addWidget(spinner, 1)
+        row_layout.addLayout(top_row)
+        row_layout.addWidget(comment_input)
         return row
 
     def _add_selected_category(self) -> None:
@@ -336,6 +359,9 @@ class DayEditDialog(QDialog):
             category: (-widget.value() if self.directions[category].currentData() == "use" else widget.value())
             for category, widget in self.inputs.items()
         }
+
+    def comments(self) -> dict[str, str]:
+        return {category: widget.text().strip() for category, widget in self.comment_inputs.items()}
 
 
 class SaveDayPreviewDialog(QDialog):
@@ -851,7 +877,7 @@ class MainWindow(QMainWindow):
         if preview.exec() != QDialog.Accepted:
             return
         try:
-            self.backend.set_day(str(day["date"]), values)
+            self.backend.set_day(str(day["date"]), values, comments=dialog.comments())
         except BackendError as exc:
             QMessageBox.warning(self, "Save Failed", str(exc))
             return

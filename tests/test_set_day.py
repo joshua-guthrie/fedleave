@@ -31,7 +31,9 @@ def test_set_day_authoritatively_replaces_supplied_categories(tmp_path: Path, ca
         authoritative=True,
         json_output=True,
         annual=-5.0,
+        annual_comment="Appointment",
         credit=2.0,
+        credit_comment="Stayed late",
         data_dir=data_dir,
     )
     first = _json_output(capsys)
@@ -49,6 +51,7 @@ def test_set_day_authoritatively_replaces_supplied_categories(tmp_path: Path, ca
     second = _json_output(capsys)
     assert len(second["removed_transaction_ids"]) == 2
     assert len(second["created_transaction_ids"]) == 1
+    assert second["changed"][0]["comment"] == "Appointment"
 
     leave_year = load_json(year_file)
     manual = [transaction for transaction in leave_year["transactions"] if transaction.get("source") == "set-day"]
@@ -56,3 +59,4 @@ def test_set_day_authoritatively_replaces_supplied_categories(tmp_path: Path, ca
     assert manual[0]["category"] == "annual"
     assert manual[0]["direction"] == "used"
     assert manual[0]["hours"] == 3.0
+    assert manual[0]["description"] == "Appointment"

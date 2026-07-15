@@ -24,6 +24,7 @@ class BackendOptions:
     fedleave_path: str | None = None
     data_dir: str | None = None
 
+
 def _find_companion_app(app_name: str, *, explicit: str | None = None, description: str) -> Path:
     if explicit:
         path = Path(explicit).expanduser()
@@ -119,10 +120,13 @@ class FedleaveBackend:
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])
 
-    def set_day(self, day: str, values: dict[str, float]) -> dict[str, Any]:
+    def set_day(self, day: str, values: dict[str, float], comments: dict[str, str] | None = None) -> dict[str, Any]:
         args = ["set-day", "--date", day, "--authoritative", "--json"]
         for category, value in values.items():
-            args.extend([f"--{category.replace('_', '-')}", _format_number(value)])
+            option = f"--{category.replace('_', '-')}"
+            args.extend([option, _format_number(value)])
+            if comments is not None:
+                args.extend([f"{option}-comment", comments.get(category, "")])
         return self.run_json(args)
 
     def init_year(
