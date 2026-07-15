@@ -245,6 +245,7 @@ def pay_period_end_date(period_data: Any) -> date:
 def load_font(size: int, bold: bool = False, scale: float = 1.0) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     """Load TrueType font or fall back to default."""
     scaled_size = int(size * scale)
+    windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
     candidates = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         if bold
@@ -252,6 +253,9 @@ def load_font(size: int, bold: bool = False, scale: float = 1.0) -> ImageFont.Fr
         "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
         if bold
         else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        windows_fonts / ("arialbd.ttf" if bold else "arial.ttf"),
+        windows_fonts / ("segoeuib.ttf" if bold else "segoeui.ttf"),
+        windows_fonts / ("calibrib.ttf" if bold else "calibri.ttf"),
     ]
     for candidate in candidates:
         path = Path(candidate)

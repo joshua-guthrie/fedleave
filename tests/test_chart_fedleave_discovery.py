@@ -29,8 +29,12 @@ def _install_chart_import_stubs(monkeypatch):
     class _DummyFont:
         pass
 
+    def _truetype(*args, **kwargs):
+        return _DummyFont()
+
     image_font_module.FreeTypeFont = _DummyFont
     image_font_module.ImageFont = _DummyFont
+    image_font_module.truetype = _truetype
 
     pil_module.Image = image_module
     pil_module.ImageDraw = image_draw_module
@@ -156,6 +160,59 @@ def test_run_fedleave_uses_subcommand_arguments(monkeypatch, module_name):
     module.run_fedleave(["balance", "--year", "2026", "--json"])
 
     assert captured["cmd"] == [str(Path("/tmp/fedleave")), "balance", "--year", "2026", "--json"]
+
+
+def test_balance_chart_font_loader_uses_windows_fonts(monkeypatch):
+    _install_chart_import_stubs(monkeypatch)
+    module = importlib.import_module("fedleave.charting")
+    monkeypatch.setattr(module.sys, "platform", "win32")
+    monkeypatch.setenv("WINDIR", "C:/Windows")
+
+    chosen: dict[str, object] = {}
+
+    def fake_exists(self):
+        return str(self).lower().endswith("arialbd.ttf")
+
+    def fake_truetype(path, size):
+        chosen["path"] = path
+        chosen["size"] = size
+        return module.ImageFont.FreeTypeFont()
+
+    monkeypatch.setattr(module.Path, "exists", fake_exists, raising=False)
+    monkeypatch.setattr(module.ImageFont, "truetype", fake_truetype)
+
+    font = module.load_font(18, bold=True)
+
+    assert isinstance(font, module.ImageFont.FreeTypeFont)
+    assert str(chosen["path"]).lower().endswith("arialbd.ttf")
+    assert chosen["size"] == 18
+
+
+@pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])
+def test_legacy_chart_font_loader_uses_windows_fonts(monkeypatch, module_name):
+    _install_chart_import_stubs(monkeypatch)
+    module = importlib.import_module(module_name)
+    monkeypatch.setattr(module.sys, "platform", "win32")
+    monkeypatch.setenv("WINDIR", "C:/Windows")
+
+    chosen: dict[str, object] = {}
+
+    def fake_exists(self):
+        return str(self).lower().endswith("segoeui.ttf")
+
+    def fake_truetype(path, size):
+        chosen["path"] = path
+        chosen["size"] = size
+        return module.ImageFont.FreeTypeFont()
+
+    monkeypatch.setattr(module.Path, "exists", fake_exists, raising=False)
+    monkeypatch.setattr(module.ImageFont, "truetype", fake_truetype)
+
+    font = module.load_font(18, scale=1.0)
+
+    assert isinstance(font, module.ImageFont.FreeTypeFont)
+    assert str(chosen["path"]).lower().endswith("segoeui.ttf")
+    assert chosen["size"] == 18
 
 
 @pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])
