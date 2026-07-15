@@ -666,3 +666,62 @@ def daily_activity(
         used = activity['used'].get(category, 0.0)
         net = activity['net'].get(category, 0.0)
         console.print(f"  {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
+
+
+@app.command(name="compare-leave-balances")
+def compare_leave_balances(
+    category: str = typer.Option(..., help="Leave category to compare across all available leave years."),
+    as_of: str = typer.Option("today", "--as-of", help="Comparison date YYYY-MM-DD or today."),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    if isinstance(category, OptionInfo):
+        raise typer.Exit(code=2)
+    if isinstance(as_of, OptionInfo):
+        as_of = "today"
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    from ..charting import COMPARISON_CATEGORY_LABELS, comparison_chart_points
+
+    if category not in COMPARISON_CATEGORY_LABELS:
+        console.print(
+            f"[red]ERROR:[/red] Invalid category: {category}. Valid categories: {', '.join(COMPARISON_CATEGORY_LABELS)}"
+        )
+        raise typer.Exit(code=2)
+
+    try:
+        points, max_value, resolved_as_of = comparison_chart_points(category, as_of, data_dir)
+    except FileNotFoundError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=1)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    title = COMPARISON_CATEGORY_LABELS[category]
+    y_rounding = 50 if category in {"annual", "sick"} else 10
+    y_max = int((float(max_value) + (49 if y_rounding == 50 else 9)) // y_rounding * y_rounding) if max_value else 10
+
+    if json_output:
+        _print_json(
+            {
+                "ok": True,
+                "category": category,
+                "title": title,
+                "as_of": resolved_as_of,
+                "y_axis": {"min": 0, "max": y_max},
+                "point_count": len(points),
+                "max_value_hours": float(max_value),
+                "years": [point["year"] for point in points],
+                "points": points,
+            }
+        )
+        return
+
+    console.print(f"{title} as of {resolved_as_of}:")
+    for point in points:
+        display_value = f"{float(point['value']):.2f}".rstrip("0").rstrip(".")
+        console.print(f"  {point['year']}\t{display_value}")

@@ -15,6 +15,9 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+from .cli_helpers import load_leave_year, parse_iso_date
+from .config import get_default_data_dir as resolve_default_data_dir
+from .ledger import calculate_balances
 from .executable_search import is_executable, iter_executable_candidates
 
 
@@ -47,6 +50,27 @@ class LeaveChartSpec:
     point_field: str = "balance_hours"
 
 
+@dataclass(frozen=True)
+class ComparisonChartSpec:
+    app_name: str
+    title: str
+    category: str
+    product: str
+    value_field: str = "balance_hours"
+    y_rounding: int = 10
+
+
+COMPARISON_CATEGORY_LABELS = {
+    "annual": "Annual Leave",
+    "sick": "Sick Leave",
+    "overtime": "Overtime Worked",
+    "credit": "Credit Hours",
+    "comp": "Comp Time",
+    "travel_comp": "Travel Comp",
+    "time_off_award": "Time-Off Award",
+}
+
+
 class ChartDimensions:
     def __init__(self, width_pixels: int = BASE_WIDTH, y_max: Decimal = Decimal("10")):
         self.width = width_pixels
@@ -67,7 +91,18 @@ def round_up_to_nearest_ten(value: Decimal) -> Decimal:
     return ((value + 9) // 10) * 10
 
 
+def round_up_to_nearest_fifty(value: Decimal) -> Decimal:
+    if value <= 0:
+        return Decimal("0")
+    return ((value + 49) // 50) * 50
+
+
 def y_tick_step(y_max: Decimal) -> Decimal:
+    target = max(y_max / Decimal("5"), Decimal("10"))
+    return max(Decimal("10"), round_up_to_nearest_ten(target))
+
+
+def comparison_y_tick_step(y_max: Decimal) -> Decimal:
     target = max(y_max / Decimal("5"), Decimal("10"))
     return max(Decimal("10"), round_up_to_nearest_ten(target))
 
@@ -377,6 +412,120 @@ def render_balance_chart(
     image.save(output, format="PNG")
 
 
+def comparison_chart_points(
+    category: str,
+    as_of: str,
+    data_dir: Path | None = None,
+) -> tuple[list[dict[str, Any]], Decimal, str]:
+    base_dir = resolve_default_data_dir(data_dir)
+    year_dir = base_dir / "leave_years"
+    if not year_dir.exists():
+        raise FileNotFoundError(f"Leave year directory not found: {year_dir}")
+
+    target_date = parse_iso_date(as_of).isoformat()
+    points: list[dict[str, Any]] = []
+    max_value = Decimal("0")
+
+    for path in sorted(year_dir.glob("*.json")):
+        if not path.stem.isdigit():
+            continue
+        year = int(path.stem)
+        try:
+            leave_year = load_leave_year(year, data_dir)
+        except FileNotFoundError:
+            continue
+        balances = calculate_balances(leave_year, until_date=target_date)
+        value = Decimal(str(balances.get(category, 0.0)))
+        max_value = max(max_value, value)
+        points.append(
+            {
+                "year": year,
+                "value": float(value),
+                "leave_year_start": leave_year.get("leave_year_start"),
+                "leave_year_end": leave_year.get("leave_year_end"),
+            }
+        )
+
+    if not points:
+        raise FileNotFoundError(f"No readable leave-year files found in {year_dir}")
+
+    points.sort(key=lambda entry: int(entry["year"]))
+    return points, max_value, target_date
+
+
+def render_comparison_chart(
+    title: str,
+    points: list[dict[str, Any]],
+    output: Path,
+    dims: ChartDimensions,
+    y_step: Decimal,
+    x_label: str,
+) -> None:
+    image = Image.new("RGB", (dims.width, dims.height), BACKGROUND)
+    draw = ImageDraw.Draw(image)
+
+    title_font = load_font(50, scale=dims.scale)
+    tick_font = load_font(22, scale=dims.scale)
+    x_font = load_font(21, scale=dims.scale)
+
+    draw.rectangle((4, 6, dims.width - 5, dims.height - 10), outline=BORDER, width=2)
+
+    title_box = draw.textbbox((0, 0), title, font=title_font)
+    draw.text(
+        ((dims.width - (title_box[2] - title_box[0])) / 2, 39),
+        title,
+        font=title_font,
+        fill=TEXT,
+    )
+
+    draw.rectangle((dims.plot_left, dims.plot_top, dims.plot_right, dims.plot_bottom), outline=BORDER, width=2)
+
+    y_labels = list(range(int(dims.y_min), int(dims.y_max) + 1, int(y_step)))
+    if not y_labels:
+        y_labels = [0]
+    if y_labels[-1] != int(dims.y_max):
+        y_labels.append(int(dims.y_max))
+    for y_value in y_labels:
+        y = round(y_to_px(Decimal(y_value), dims))
+        draw.line((dims.plot_left, y, dims.plot_right, y), fill=GRID_MAJOR, width=2)
+        label = str(y_value)
+        box = draw.textbbox((0, 0), label, font=tick_font)
+        draw.text(
+            (dims.plot_left - 22 - (box[2] - box[0]), y - (box[3] - box[1]) / 2 - 2),
+            label,
+            font=tick_font,
+            fill=TEXT,
+        )
+
+    xs = x_positions(len(points), dims)
+    for x in xs:
+        draw.line((round(x), dims.plot_top, round(x), dims.plot_bottom), fill=GRID_MINOR, width=2)
+
+    raw_line = [(xs[index], y_to_px(Decimal(str(point["value"])), dims)) for index, point in enumerate(points)]
+    smooth = catmull_rom(raw_line)
+    draw.line([(round(x), round(y)) for x, y in smooth], fill=BLUE, width=5, joint="curve")
+
+    for x, y in raw_line:
+        draw_diamond(draw, x, y, 9)
+
+    for index, point in enumerate(points):
+        rendered = rotated_label(str(point["year"]), x_font)
+        x = round(xs[index] - rendered.width / 2)
+        y = dims.plot_bottom + 16
+        image.paste(rendered, (x, y), rendered)
+
+    x_label_box = draw.textbbox((0, 0), x_label, font=tick_font)
+    draw.text(
+        (dims.plot_right - (x_label_box[2] - x_label_box[0]) - 10, dims.plot_bottom + 86),
+        x_label,
+        font=tick_font,
+        fill=TEXT,
+    )
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    image.save(output, format="PNG")
+
+
 def run_fedleave(args: list[str]) -> Any:
     try:
         fedleave = find_companion_app("fedleave")
@@ -445,6 +594,74 @@ def run_chart_app(spec: LeaveChartSpec) -> None:
                     {"pay_period_end": day.isoformat(), spec.point_field: format_hours(value)}
                     for day, value in points
                 ],
+            },
+            indent=2,
+        )
+    )
+
+
+def run_comparison_chart_app(spec: ComparisonChartSpec) -> None:
+    parser = argparse.ArgumentParser(description=f"Create {spec.title.lower()} PNG using fedleave data.")
+    parser.add_argument("--as-of", default="today", help="Comparison date YYYY-MM-DD or today.")
+    parser.add_argument("--outputFile", required=True, help="Output PNG file path")
+    parser.add_argument(
+        "--resolution",
+        type=int,
+        default=BASE_WIDTH,
+        help=f"Image width in pixels (default: {BASE_WIDTH}). Height is scaled maintaining aspect ratio.",
+    )
+    parser.add_argument("--data-dir", help="fedleave data directory (default: ~/.local/share/fedleave)")
+    args = parser.parse_args()
+
+    output_path = Path(args.outputFile).expanduser()
+    if output_path.suffix.lower() != ".png":
+        raise SystemExit(f"Error: Output file must have .png extension. Got: {output_path}")
+    if args.resolution <= 0:
+        raise SystemExit(f"Error: Resolution must be a positive number of pixels. Got: {args.resolution}")
+
+    data_dir = Path(args.data_dir).expanduser() if args.data_dir else get_default_data_dir()
+
+    try:
+        payload = run_fedleave(
+            [
+                "compare-leave-balances",
+                "--category",
+                spec.category,
+                "--as-of",
+                args.as_of,
+                "--json",
+                "--data-dir",
+                str(data_dir),
+            ]
+        )
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+
+    points = list(payload.get("points", []))
+    as_of = str(payload.get("as_of", args.as_of))
+    y_axis = payload.get("y_axis", {}) if isinstance(payload.get("y_axis"), dict) else {}
+    y_max = Decimal(str(y_axis.get("max", 10)))
+    y_step = comparison_y_tick_step(y_max)
+    output = output_path.resolve()
+    dims = ChartDimensions(width_pixels=args.resolution, y_max=y_max)
+    render_comparison_chart(spec.title, points, output, dims, y_step, as_of)
+
+    print(
+        json.dumps(
+            {
+                "ok": True,
+                "agent": f"{spec.title} Yearly Comparison",
+                "source_of_truth": "fedleave",
+                "product": spec.product,
+                "category": spec.category,
+                "as_of": as_of,
+                "point_count": len(points),
+                "resolution_pixels": args.resolution,
+                "image_dimensions": {"width": dims.width, "height": dims.height},
+                "y_axis": {"min": int(dims.y_min), "max": int(dims.y_max)},
+                "max_value_hours": payload.get("max_value_hours"),
+                "output_png": str(output),
+                "points": points,
             },
             indent=2,
         )

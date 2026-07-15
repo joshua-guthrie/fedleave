@@ -124,6 +124,7 @@ Current GUI features:
 - As-of-today balance table
 - Authoritative day editing with explicit Use/Earn controls and positive hour entry
 - View > Leave Charts launches the annual, sick, credit hours, comp time, travel comp, and time-off award chart companion apps in their own windows
+- View > Yearly Leave Comparison launches the annual, sick, credit hours, comp time, travel comp, time-off award, and overtime yearly comparison chart companion apps in their own windows
 - Leave chart windows include Save PNG, Save PDF, and Print actions
 - Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
 - Help and About dialogs
@@ -362,6 +363,21 @@ Commands and common options:
 		- `--json` emits balances, use-or-lose values, and automatic accrual posting details.
 		- Federal employees earn annual and sick leave automatically each pay period; this tool uses the leave year pay periods and configured accrual rates to create and project those accrual rows.
 
+  compare-leave-balances
+    Compare one leave category across every leave year that has data.
+
+    Syntax:
+      fedleave compare-leave-balances --category CATEGORY [--as-of YYYY-MM-DD|today] [--json] [--data-dir PATH]
+
+    Notes:
+      - `--category` selects the leave type to compare across all years with data.
+      - `--as-of` defaults to today and determines the balance date used for each year.
+      - Overtime is compared as worked hours rather than a leave balance.
+      - `--json` emits the year/value series and axis metadata used by the GUI comparison charts.
+
+    Example:
+      fedleave compare-leave-balances --category annual --as-of 2026-07-14 --json
+
 	use-or-lose
 		Show year-end annual carryover and use-or-lose for a leave year.
 
@@ -434,7 +450,7 @@ For the full project specification and rules, see the project documentation or t
 
 ## Companion Applications
 
-The chart companion applications use the same styling, fonts, and color palette. Their Y-axis scales from 0 to the maximum leave balance, rounded up to the nearest 10 hours, so the scale stays readable without clipping the highest point.
+The chart companion applications use the same styling, fonts, and color palette. The traditional leave balance charts scale their Y-axis from 0 to the maximum leave balance, rounded up to the nearest 10 hours, so the scale stays readable without clipping the highest point. The yearly comparison charts use the same visual style, but they round the Y-axis up to the nearest 10 hours for most categories and to the nearest 50 hours for annual and sick leave.
 
 Supported leave chart apps:
 
@@ -445,7 +461,17 @@ Supported leave chart apps:
 - `TravelCompChartForTheYear`
 - `TimeOffAwardChartForTheYear`
 
-The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Military Leave, Court Leave, Religious Comp, Restored Annual, or Overtime.
+Yearly comparison apps:
+
+- `AnnualLeaveYearlyComparison`
+- `SickLeaveYearlyComparison`
+- `CreditHoursYearlyComparison`
+- `CompTimeYearlyComparison`
+- `TravelCompYearlyComparison`
+- `TimeOffAwardYearlyComparison`
+- `OvertimeYearlyComparison`
+
+The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Military Leave, Court Leave, Religious Comp, or Restored Annual.
 
 ### Companion Application: AnnualLeaveChartForTheYear
 
@@ -634,6 +660,117 @@ The `TimeOffAwardChartForTheYear` application requires `fedleave` to be in one o
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
+## Yearly Comparison Companion Applications
+
+These companion applications compare one leave category across every leave year with data. They use the same visual style as the regular chart apps, but their X-axis is the leave year and the selected date is controlled by `--as-of`.
+
+Shared options:
+
+- `--as-of YYYY-MM-DD|today`: Comparison date; defaults to today.
+- `--outputFile PATH`: Output PNG file path (required; must end with `.png`)
+- `--resolution PIXELS`: Image width in pixels; height is scaled maintaining aspect ratio (default: 1610). Common values: 1610 (standard), 3220 (double resolution), 805 (half resolution)
+- `--data-dir PATH`: Optional fedleave data directory override.
+
+The yearly comparison charts round their Y-axis up to the nearest 10 hours for most categories and to the nearest 50 hours for annual and sick leave.
+
+### Companion Application: AnnualLeaveYearlyComparison
+
+A companion application that compares annual leave balances across every leave year with data.
+
+Sample output:
+
+![Annual yearly comparison chart sample](examples/annual-leave-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+AnnualLeaveYearlyComparison --as-of 2026-07-14 --outputFile annual_yearly_comparison.png
+```
+
+### Companion Application: SickLeaveYearlyComparison
+
+A companion application that compares sick leave balances across every leave year with data.
+
+Sample output:
+
+![Sick yearly comparison chart sample](examples/sick-leave-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+SickLeaveYearlyComparison --as-of 2026-07-14 --outputFile sick_yearly_comparison.png
+```
+
+### Companion Application: CreditHoursYearlyComparison
+
+A companion application that compares credit hour balances across every leave year with data.
+
+Sample output:
+
+![Credit hours yearly comparison chart sample](examples/credit-hours-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+CreditHoursYearlyComparison --as-of 2026-07-14 --outputFile credit_hours_yearly_comparison.png
+```
+
+### Companion Application: CompTimeYearlyComparison
+
+A companion application that compares comp time balances across every leave year with data.
+
+Sample output:
+
+![Comp time yearly comparison chart sample](examples/comp-time-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+CompTimeYearlyComparison --as-of 2026-07-14 --outputFile comp_time_yearly_comparison.png
+```
+
+### Companion Application: TravelCompYearlyComparison
+
+A companion application that compares travel comp balances across every leave year with data.
+
+Sample output:
+
+![Travel comp yearly comparison chart sample](examples/travel-comp-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+TravelCompYearlyComparison --as-of 2026-07-14 --outputFile travel_comp_yearly_comparison.png
+```
+
+### Companion Application: TimeOffAwardYearlyComparison
+
+A companion application that compares time-off award balances across every leave year with data.
+
+Sample output:
+
+![Time off award yearly comparison chart sample](examples/time-off-award-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+TimeOffAwardYearlyComparison --as-of 2026-07-14 --outputFile time_off_award_yearly_comparison.png
+```
+
+### Companion Application: OvertimeYearlyComparison
+
+A companion application that compares overtime worked across every leave year with data.
+
+Sample output:
+
+![Overtime yearly comparison chart sample](examples/overtime-yearly-comparison-sample.png)
+
+Usage:
+
+```bash
+OvertimeYearlyComparison --as-of 2026-07-14 --outputFile overtime_yearly_comparison.png
+```
+
 ## Companion Application: fedleaveMonthReportGraphic
 
 A companion application that generates a landscape 16:9 graphical month report. It treats `fedleave` as the data source, calls the public CLI commands, and does not read leave-year data files directly. PNG is the primary output format and SVG is also supported.
@@ -721,6 +858,7 @@ Commands with native JSON output:
 - `activity`
 - `validate`
 - `rollover`
+- `compare-leave-balances`
 
 Commands without `--json`:
 

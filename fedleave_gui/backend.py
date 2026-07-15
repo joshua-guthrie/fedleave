@@ -175,6 +175,7 @@ class FedleaveBackend:
         *,
         output_file: Path,
         year: int | None = None,
+        as_of: str | None = None,
         resolution: int = 1920,
         data_dir: str | None = None,
     ) -> None:
@@ -188,6 +189,8 @@ class FedleaveBackend:
         ]
         if year is not None:
             command.extend(["--year", str(year)])
+        if as_of is not None:
+            command.extend(["--as-of", as_of])
         if data_dir:
             command.extend(["--data-dir", data_dir])
         kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}

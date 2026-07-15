@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 
 from fedleave_gui.chart_windows import LeaveChartDialog
 from fedleave_gui.main_window import MainWindow
+from fedleave_gui.settings import GuiSettings
 
 
 def _application() -> QApplication:
@@ -34,6 +35,46 @@ def test_view_menu_includes_leave_charts_submenu(monkeypatch):
         "Travel Comp Balance",
         "Time Off Award Balance",
     ]
+
+
+def test_view_menu_includes_yearly_leave_comparison_submenu(monkeypatch):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    window = MainWindow()
+
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    yearly_comparison_action = next(
+        action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
+    )
+    labels = [action.text() for action in yearly_comparison_action.menu().actions()]
+
+    assert labels == [
+        "Annual Leave Comparison",
+        "Sick Leave Comparison",
+        "Credit Hours Comparison",
+        "Comp Time Comparison",
+        "Travel Comp Comparison",
+        "Time Off Award Comparison",
+        "Overtime Worked Comparison",
+    ]
+
+
+def test_yearly_leave_comparison_submenu_is_disabled_with_one_leave_year(monkeypatch, tmp_path):
+    _application()
+    leave_years = tmp_path / "leave_years"
+    leave_years.mkdir()
+    (leave_years / "2026.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr("fedleave_gui.main_window.load_settings", lambda: GuiSettings(data_dir=str(tmp_path)))
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+
+    window = MainWindow()
+
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    yearly_comparison_action = next(
+        action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
+    )
+
+    assert yearly_comparison_action.menu().isEnabled() is False
 
 
 def test_leave_chart_dialog_can_save_png(monkeypatch, tmp_path):

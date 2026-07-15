@@ -36,6 +36,8 @@ Primary commands:
     pay-period  Show earned, used, overtime totals, and balances for a pay period
     pay-periods Show earned, used, overtime totals, and balances for every pay period
     month       Show calendar-day leave entries and pay periods for a month
+    compare-leave-balances
+                Compare the balance for one category across every leave year
     export-data Export config, leave years, and holiday cache to a JSON archive
     import-data Import a JSON archive created by export-data or a single leave-year backup
     correct     Update a transaction in place

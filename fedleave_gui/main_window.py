@@ -12,7 +12,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QByteArray, QTimer, Qt, QUrl
+from PySide6.QtCore import QByteArray, QDate, QTimer, Qt, QUrl
 from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap, QResizeEvent, QTextDocument
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QDateEdit,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -84,6 +85,16 @@ LEAVE_CHARTS = [
     ("Comp Time Balance", "CompTimeChartForTheYear"),
     ("Travel Comp Balance", "TravelCompChartForTheYear"),
     ("Time Off Award Balance", "TimeOffAwardChartForTheYear"),
+]
+
+YEARLY_COMPARISON_CHARTS = [
+    ("Annual Leave", "AnnualLeaveYearlyComparison", "annual"),
+    ("Sick Leave", "SickLeaveYearlyComparison", "sick"),
+    ("Credit Hours", "CreditHoursYearlyComparison", "credit"),
+    ("Comp Time", "CompTimeYearlyComparison", "comp"),
+    ("Travel Comp", "TravelCompYearlyComparison", "travel_comp"),
+    ("Time Off Award", "TimeOffAwardYearlyComparison", "time_off_award"),
+    ("Overtime Worked", "OvertimeYearlyComparison", "overtime"),
 ]
 
 
@@ -593,6 +604,32 @@ class SelectMonthDialog(QDialog):
         return self.year_input.value(), int(self.month_input.currentData())
 
 
+class SelectDateDialog(QDialog):
+    def __init__(self, title: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.date_input = QDateEdit()
+        self.date_input.setCalendarPopup(True)
+        self.date_input.setDisplayFormat("yyyy-MM-dd")
+        self.date_input.setDate(QDate.currentDate())
+        form.addRow("Date", self.date_input)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected_date(self) -> str:
+        return self.date_input.date().toString("yyyy-MM-dd")
+
+
 class ChangeLeaveYearDialog(QDialog):
     def __init__(self, years: list[int], current_year: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -754,6 +791,14 @@ class MainWindow(QMainWindow):
         leave_charts_menu = view_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self._action(leave_charts_menu, label, lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label))
+        yearly_comparison_menu = view_menu.addMenu("Yearly Leave Comparison")
+        yearly_comparison_menu.setEnabled(len(_available_leave_years(self.settings.data_dir or None)) > 1)
+        for label, app_name, category in YEARLY_COMPARISON_CHARTS:
+            self._action(
+                yearly_comparison_menu,
+                f"{label} Comparison",
+                lambda _checked=False, app_name=app_name, label=label, category=category: self.open_yearly_leave_comparison(app_name, label, category),
+            )
         self._toggle(view_menu, "Show Automatic Accruals in Day Cells", self.settings.show_auto_accruals, "show_auto_accruals")
         self._toggle(view_menu, "Show Holidays", self.settings.show_holidays, "show_holidays")
         self._toggle(view_menu, "Show Pay-Day Highlight", self.settings.show_paydays, "show_paydays")
@@ -785,6 +830,14 @@ class MainWindow(QMainWindow):
         setattr(self.settings, name, bool(value))
         save_settings(self.settings)
         self.render_month()
+
+    def preferences(self) -> None:
+        dialog = PreferencesDialog(self.settings, self)
+        if dialog.exec() == QDialog.Accepted:
+            self.settings = dialog.apply()
+            save_settings(self.settings)
+            self.backend = self._backend()
+            self.refresh()
 
     def refresh(self) -> None:
         try:
@@ -951,14 +1004,6 @@ class MainWindow(QMainWindow):
         self.year, self.month = dialog.selected_year_month()
         self.refresh()
 
-    def preferences(self) -> None:
-        dialog = PreferencesDialog(self.settings, self)
-        if dialog.exec() == QDialog.Accepted:
-            self.settings = dialog.apply()
-            save_settings(self.settings)
-            self.backend = self._backend()
-            self.refresh()
-
     def new_leave_year(self) -> None:
         dialog = StartYearDialog(self)
         if dialog.exec() != QDialog.Accepted:
@@ -1042,6 +1087,38 @@ class MainWindow(QMainWindow):
 
             dialog.finished.connect(lambda _: _cleanup())
             dialog.show()
+
+    def open_yearly_leave_comparison(self, app_name: str, label: str, _category: str) -> None:
+        dialog = SelectDateDialog(f"{label} Comparison", self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        data_dir = self.settings.data_dir or None
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            output_file = Path(temp_dir_name) / f"{app_name}.png"
+            try:
+                self.backend.run_chart_app(
+                    app_name,
+                    output_file=output_file,
+                    as_of=dialog.selected_date(),
+                    data_dir=data_dir,
+                )
+            except BackendError as exc:
+                QMessageBox.warning(self, f"{label} Comparison", str(exc))
+                return
+            pixmap = QPixmap(str(output_file))
+            if pixmap.isNull():
+                QMessageBox.warning(self, f"{label} Comparison", "Chart image could not be loaded.")
+                return
+            chart_dialog = LeaveChartDialog(f"{label} Comparison", pixmap, self)
+            self._leave_chart_windows.append(chart_dialog)
+
+            def _cleanup() -> None:
+                if chart_dialog in self._leave_chart_windows:
+                    self._leave_chart_windows.remove(chart_dialog)
+
+            chart_dialog.finished.connect(lambda _: _cleanup())
+            chart_dialog.show()
 
     def _month_report_data(self) -> MonthReportData:
         if not self.month_json:
