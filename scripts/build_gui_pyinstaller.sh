@@ -65,6 +65,9 @@ pyinstaller \
   --hidden-import PySide6.QtGui \
   --hidden-import PySide6.QtWidgets \
   --hidden-import PySide6.QtPrintSupport \
+  --hidden-import shiboken6 \
+  --hidden-import shiboken6.Shiboken \
+  --collect-all shiboken6 \
   --distpath "$DIST_DIR" \
   --workpath "$HERE/.pyinstaller-build" \
   --specpath "$HERE/.pyinstaller-spec" \

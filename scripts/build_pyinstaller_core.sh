@@ -32,6 +32,13 @@ rm -rf \
   "$DIST_DIR/CompTimeChartForTheYear" \
   "$DIST_DIR/TravelCompChartForTheYear" \
   "$DIST_DIR/TimeOffAwardChartForTheYear" \
+  "$DIST_DIR/AnnualLeaveYearlyComparison" \
+  "$DIST_DIR/SickLeaveYearlyComparison" \
+  "$DIST_DIR/CreditHoursYearlyComparison" \
+  "$DIST_DIR/CompTimeYearlyComparison" \
+  "$DIST_DIR/TravelCompYearlyComparison" \
+  "$DIST_DIR/TimeOffAwardYearlyComparison" \
+  "$DIST_DIR/OvertimeYearlyComparison" \
   "$DIST_DIR/fedleaveMonthReportGraphic"
 
 echo "Building fedleave with PyInstaller (venv: $VENV_DIR)"
@@ -176,6 +183,118 @@ build_app TimeOffAwardChartForTheYear "$TIME_OFF_CHART_ENTRY" \
   --hidden-import PIL.ImageFont \
   --hidden-import numpy
 
+# Build AnnualLeaveYearlyComparison companion application
+ANNUAL_YEARLY_ENTRY="$HERE/.pyinstaller_annual_yearly_comparison_entry.py"
+cat > "$ANNUAL_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.annual import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app AnnualLeaveYearlyComparison "$ANNUAL_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build SickLeaveYearlyComparison companion application
+SICK_YEARLY_ENTRY="$HERE/.pyinstaller_sick_yearly_comparison_entry.py"
+cat > "$SICK_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.sick import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app SickLeaveYearlyComparison "$SICK_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build CreditHoursYearlyComparison companion application
+CREDIT_YEARLY_ENTRY="$HERE/.pyinstaller_credit_yearly_comparison_entry.py"
+cat > "$CREDIT_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.credit import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app CreditHoursYearlyComparison "$CREDIT_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build CompTimeYearlyComparison companion application
+COMP_YEARLY_ENTRY="$HERE/.pyinstaller_comp_yearly_comparison_entry.py"
+cat > "$COMP_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.comp import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app CompTimeYearlyComparison "$COMP_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build TravelCompYearlyComparison companion application
+TRAVEL_YEARLY_ENTRY="$HERE/.pyinstaller_travel_yearly_comparison_entry.py"
+cat > "$TRAVEL_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.travel_comp import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app TravelCompYearlyComparison "$TRAVEL_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build TimeOffAwardYearlyComparison companion application
+TIME_OFF_YEARLY_ENTRY="$HERE/.pyinstaller_time_off_yearly_comparison_entry.py"
+cat > "$TIME_OFF_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.time_off_award import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app TimeOffAwardYearlyComparison "$TIME_OFF_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
+# Build OvertimeYearlyComparison companion application
+OVERTIME_YEARLY_ENTRY="$HERE/.pyinstaller_overtime_yearly_comparison_entry.py"
+cat > "$OVERTIME_YEARLY_ENTRY" <<'PY'
+from yearly_leave_comparison_chart.overtime import main
+
+if __name__ == '__main__':
+    main()
+PY
+
+build_app OvertimeYearlyComparison "$OVERTIME_YEARLY_ENTRY" \
+  --hidden-import PIL \
+  --hidden-import PIL.Image \
+  --hidden-import PIL.ImageDraw \
+  --hidden-import PIL.ImageFont \
+  --hidden-import numpy
+
 # Build fedleaveMonthReportGraphic companion application
 MONTH_REPORT_ENTRY="$HERE/.pyinstaller_month_report_entry.py"
 cat > "$MONTH_REPORT_ENTRY" <<'PY'
@@ -199,4 +318,11 @@ echo "  - CreditHoursChartForTheYear/CreditHoursChartForTheYear"
 echo "  - CompTimeChartForTheYear/CompTimeChartForTheYear"
 echo "  - TravelCompChartForTheYear/TravelCompChartForTheYear"
 echo "  - TimeOffAwardChartForTheYear/TimeOffAwardChartForTheYear"
+echo "  - AnnualLeaveYearlyComparison/AnnualLeaveYearlyComparison"
+echo "  - SickLeaveYearlyComparison/SickLeaveYearlyComparison"
+echo "  - CreditHoursYearlyComparison/CreditHoursYearlyComparison"
+echo "  - CompTimeYearlyComparison/CompTimeYearlyComparison"
+echo "  - TravelCompYearlyComparison/TravelCompYearlyComparison"
+echo "  - TimeOffAwardYearlyComparison/TimeOffAwardYearlyComparison"
+echo "  - OvertimeYearlyComparison/OvertimeYearlyComparison"
 echo "  - fedleaveMonthReportGraphic/fedleaveMonthReportGraphic"

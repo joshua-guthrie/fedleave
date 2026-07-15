@@ -19,6 +19,13 @@ foreach ($BundlePath in @(
     (Join-Path $DIST_DIR "CompTimeChartForTheYear"),
     (Join-Path $DIST_DIR "TravelCompChartForTheYear"),
     (Join-Path $DIST_DIR "TimeOffAwardChartForTheYear"),
+    (Join-Path $DIST_DIR "AnnualLeaveYearlyComparison"),
+    (Join-Path $DIST_DIR "SickLeaveYearlyComparison"),
+    (Join-Path $DIST_DIR "CreditHoursYearlyComparison"),
+    (Join-Path $DIST_DIR "CompTimeYearlyComparison"),
+    (Join-Path $DIST_DIR "TravelCompYearlyComparison"),
+    (Join-Path $DIST_DIR "TimeOffAwardYearlyComparison"),
+    (Join-Path $DIST_DIR "OvertimeYearlyComparison"),
     (Join-Path $DIST_DIR "fedleaveMonthReportGraphic")
 )) {
     if (Test-Path $BundlePath) {
@@ -195,6 +202,125 @@ Build-App -AppName "TimeOffAwardChartForTheYear" -EntryPath $TIME_OFF_CHART_ENTR
     'numpy'
 )
 
+# Build AnnualLeaveYearlyComparison companion application
+$ANNUAL_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_annual_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.annual import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $ANNUAL_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "AnnualLeaveYearlyComparison" -EntryPath $ANNUAL_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build SickLeaveYearlyComparison companion application
+$SICK_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_sick_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.sick import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $SICK_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "SickLeaveYearlyComparison" -EntryPath $SICK_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build CreditHoursYearlyComparison companion application
+$CREDIT_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_credit_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.credit import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $CREDIT_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "CreditHoursYearlyComparison" -EntryPath $CREDIT_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build CompTimeYearlyComparison companion application
+$COMP_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_comp_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.comp import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $COMP_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "CompTimeYearlyComparison" -EntryPath $COMP_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build TravelCompYearlyComparison companion application
+$TRAVEL_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_travel_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.travel_comp import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $TRAVEL_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "TravelCompYearlyComparison" -EntryPath $TRAVEL_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build TimeOffAwardYearlyComparison companion application
+$TIME_OFF_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_time_off_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.time_off_award import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $TIME_OFF_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "TimeOffAwardYearlyComparison" -EntryPath $TIME_OFF_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
+# Build OvertimeYearlyComparison companion application
+$OVERTIME_YEARLY_ENTRY = Join-Path $HERE ".pyinstaller_overtime_yearly_comparison_entry.py"
+@"
+from yearly_leave_comparison_chart.overtime import main
+
+if __name__ == '__main__':
+    main()
+"@ | Set-Content -Path $OVERTIME_YEARLY_ENTRY -Encoding utf8
+
+Build-App -AppName "OvertimeYearlyComparison" -EntryPath $OVERTIME_YEARLY_ENTRY -HiddenImports @(
+    'PIL',
+    'PIL.Image',
+    'PIL.ImageDraw',
+    'PIL.ImageFont',
+    'numpy'
+)
+
 # Build fedleaveMonthReportGraphic companion application
 $MONTH_REPORT_ENTRY = Join-Path $HERE ".pyinstaller_month_report_entry.py"
 @"
@@ -218,6 +344,13 @@ Assert-AppBundle -AppName "CreditHoursChartForTheYear"
 Assert-AppBundle -AppName "CompTimeChartForTheYear"
 Assert-AppBundle -AppName "TravelCompChartForTheYear"
 Assert-AppBundle -AppName "TimeOffAwardChartForTheYear"
+Assert-AppBundle -AppName "AnnualLeaveYearlyComparison"
+Assert-AppBundle -AppName "SickLeaveYearlyComparison"
+Assert-AppBundle -AppName "CreditHoursYearlyComparison"
+Assert-AppBundle -AppName "CompTimeYearlyComparison"
+Assert-AppBundle -AppName "TravelCompYearlyComparison"
+Assert-AppBundle -AppName "TimeOffAwardYearlyComparison"
+Assert-AppBundle -AppName "OvertimeYearlyComparison"
 Assert-AppBundle -AppName "fedleaveMonthReportGraphic"
 
 Write-Host "Build complete. Binaries in $DIST_DIR"
@@ -228,4 +361,11 @@ Write-Host "  - CreditHoursChartForTheYear\CreditHoursChartForTheYear.exe"
 Write-Host "  - CompTimeChartForTheYear\CompTimeChartForTheYear.exe"
 Write-Host "  - TravelCompChartForTheYear\TravelCompChartForTheYear.exe"
 Write-Host "  - TimeOffAwardChartForTheYear\TimeOffAwardChartForTheYear.exe"
+Write-Host "  - AnnualLeaveYearlyComparison\AnnualLeaveYearlyComparison.exe"
+Write-Host "  - SickLeaveYearlyComparison\SickLeaveYearlyComparison.exe"
+Write-Host "  - CreditHoursYearlyComparison\CreditHoursYearlyComparison.exe"
+Write-Host "  - CompTimeYearlyComparison\CompTimeYearlyComparison.exe"
+Write-Host "  - TravelCompYearlyComparison\TravelCompYearlyComparison.exe"
+Write-Host "  - TimeOffAwardYearlyComparison\TimeOffAwardYearlyComparison.exe"
+Write-Host "  - OvertimeYearlyComparison\OvertimeYearlyComparison.exe"
 Write-Host "  - fedleaveMonthReportGraphic\fedleaveMonthReportGraphic.exe"

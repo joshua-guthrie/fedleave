@@ -13,6 +13,9 @@ def test_linux_gui_build_uses_onedir_bundle_layout():
     assert 'fedleave-Ubuntu' in script
     assert '--icon "$HERE/assets/fedleave-icon.ico"' in script
     assert '--add-data "$HERE/assets:assets"' in script
+    assert '--hidden-import shiboken6' in script
+    assert '--hidden-import shiboken6.Shiboken' in script
+    assert '--collect-all shiboken6' in script
     assert 'rm -rf "$DIST_DIR/FedLeaveCalendar"' in script
     assert 'echo "  - FedLeaveCalendar/FedLeaveCalendar"' in script
 
@@ -26,6 +29,9 @@ def test_windows_gui_build_uses_onedir_bundle_layout():
     assert "fedleave-Windows" in script
     assert '--icon "$HERE\\assets\\fedleave-icon.ico"' in script
     assert '--add-data "$HERE\\assets;assets"' in script
+    assert '--hidden-import shiboken6' in script
+    assert '--hidden-import shiboken6.Shiboken' in script
+    assert '--collect-all shiboken6' in script
     assert 'Remove-Item -Recurse -Force $guiBundle' in script
     assert 'Write-Host "  - FedLeaveCalendar\\FedLeaveCalendar.exe"' in script
 
@@ -60,6 +66,23 @@ def test_regular_build_scripts_include_gui_build():
     assert "build_pyinstaller_core.ps1" in windows
     assert "build_gui_pyinstaller.ps1" in windows
     assert "-SkipBackendBuild" in windows
+
+
+def test_core_build_scripts_include_yearly_comparison_companions():
+    linux = (ROOT / "scripts" / "build_pyinstaller_core.sh").read_text()
+    windows = (ROOT / "scripts" / "build_pyinstaller_core.ps1").read_text()
+
+    for app_name in [
+        "AnnualLeaveYearlyComparison",
+        "SickLeaveYearlyComparison",
+        "CreditHoursYearlyComparison",
+        "CompTimeYearlyComparison",
+        "TravelCompYearlyComparison",
+        "TimeOffAwardYearlyComparison",
+        "OvertimeYearlyComparison",
+    ]:
+        assert app_name in linux
+        assert app_name in windows
 
 
 def test_about_page_mentions_the_logo_asset():
