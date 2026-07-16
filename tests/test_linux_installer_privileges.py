@@ -45,6 +45,7 @@ def _make_options(module):
 def test_linux_install_prompts_for_sudo_instead_of_failing(tmp_path, monkeypatch):
     module = _load_engine_module()
     options = _make_options(module)
+    monkeypatch.setattr(module.InstallerEngine, "_build_workspace_needs_repair", lambda self: False)
     engine = module.InstallerEngine(ROOT, options)
     monkeypatch.setattr(module.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(module.InstallerEngine, "_project_version", lambda self: "9.9.9")
@@ -78,6 +79,7 @@ def test_linux_install_requires_privilege_in_unattended_mode(tmp_path, monkeypat
     module = _load_engine_module()
     options = _make_options(module)
     options.unattended = True
+    monkeypatch.setattr(module.InstallerEngine, "_build_workspace_needs_repair", lambda self: False)
     engine = module.InstallerEngine(ROOT, options)
     monkeypatch.setattr(module.os, "geteuid", lambda: 1000)
 
@@ -102,11 +104,14 @@ def test_linux_install_repairs_existing_build_workspace_ownership(tmp_path, monk
     engine.log = lambda message: None
 
     engine.build_root.mkdir(parents=True)
+    stale_entry = engine.build_root / "entries" / "fedleave.py"
+    stale_entry.parent.mkdir(parents=True)
+    stale_entry.write_text("print('stale')\n")
 
     captured: dict[str, object] = {}
 
     def fake_access(path, mode):
-        if Path(path) == engine.build_root:
+        if Path(path) in {engine.build_root, stale_entry}:
             return False
         return True
 

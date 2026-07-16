@@ -141,7 +141,7 @@ class InstallerEngine:
         if not self.build_root.exists():
             return
 
-        if os.access(self.build_root, os.W_OK | os.X_OK):
+        if not self._build_workspace_needs_repair():
             return
 
         if self.options.unattended:
@@ -150,12 +150,30 @@ class InstallerEngine:
                 EXIT_PERMISSION,
             )
 
-        self.log(f"Repairing build workspace ownership for {self.build_root}")
+        print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Repairing build workspace ownership for {self.build_root}")
         self._run_privileged_python(
             self._linux_chown_helper_code(),
             [str(self.build_root), str(os.getuid()), str(os.getgid())],
             "Build workspace repair",
         )
+
+    def _build_workspace_needs_repair(self) -> bool:
+        current_uid = os.getuid()
+        paths = [self.build_root]
+        paths.extend(sorted(self.build_root.rglob("*")))
+        for path in paths:
+            try:
+                stat_result = path.stat()
+            except FileNotFoundError:
+                continue
+            if stat_result.st_uid != current_uid:
+                return True
+            if path.is_dir():
+                if not os.access(path, os.W_OK | os.X_OK):
+                    return True
+            elif not os.access(path, os.W_OK):
+                return True
+        return False
 
     def _ensure_python(self) -> None:
         if sys.version_info < (3, 11):
