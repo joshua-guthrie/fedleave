@@ -140,56 +140,32 @@ pip install -e .
 FedLeaveCalendar
 ```
 
-Linux GUI build:
+Consolidated build/install entry points:
 
 ```bash
-scripts/build_gui_pyinstaller.sh
+./scripts/LinuxInstall.sh
+```
+
+```bat
+scripts\WindowsInstall.bat
+```
+
+Build-only mode (useful for CI or local packaging validation):
+
+```bash
+./scripts/LinuxInstall.sh --unattended --build-only --verbose
 ./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
 ```
 
-Windows GUI build:
-
-```powershell
-.\scripts\build_gui_pyinstaller.ps1
-.\dist\fedleave-Windows\FedLeaveCalendar\FedLeaveCalendar.exe
-```
-
-Windows command prompt or double-click launchers:
-
 ```bat
-scripts\build_gui_pyinstaller.bat
+scripts\WindowsInstall.bat --unattended --build-only --verbose
+dist\fedleave-Windows\FedLeaveCalendar\FedLeaveCalendar.exe
 ```
 
-Both GUI build scripts place each application in its own bundle directory under
-`dist/` such as `dist/fedleave-Ubuntu/FedLeaveCalendar` and
-`dist/fedleave-Windows/FedLeaveCalendar`. The GUI uses the sibling
-`fedleave` bundle as its backend, so the backend is not duplicated inside the
-GUI bundle.
-
-Install/uninstall helpers:
-
-```bash
-scripts/install_gui_ubuntu.sh
-scripts/uninstall_gui_ubuntu.sh
-```
-
-```powershell
-.\scripts\install_gui_windows.ps1
-.\scripts\uninstall_gui_windows.ps1
-```
-
-Windows command prompt or double-click launchers:
-
-```bat
-scripts\install_gui_windows.bat
-scripts\uninstall_gui_windows.bat
-```
-
-The Linux installer copies the application tree into `~/.local/share/fedleave-app`
-and creates command links in `~/.local/bin` for every bundled executable. The
-Windows installer copies the application tree under
-`%LOCALAPPDATA%\Programs\FedLeave` and adds each bundle directory to the user
-PATH so the backend and companion apps remain callable from a terminal.
+The consolidated scripts place each application in its own bundle directory
+under `dist/` (for example `dist/fedleave-Ubuntu/FedLeaveCalendar` and
+`dist/fedleave-Windows/FedLeaveCalendar`). The GUI uses the sibling `fedleave`
+bundle as its backend, so the backend is not duplicated inside the GUI bundle.
 
 ## CLI Detailed Help
 
@@ -1783,55 +1759,83 @@ Daily and as-of queries:
 
 	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
 
-Building the bundled executables
----------------------------------
+Building and Installing FedLeave
+--------------------------------
 
-If you'd rather build the portable application bundles, the repository includes a helper script and Makefile target. The resulting directories remain portable as a unit; do not copy the inner executables out of their bundle directories.
+FedLeave now uses two platform entry scripts only:
 
-1. Prepare a clean build environment (recommended):
+- `scripts/LinuxInstall.sh`
+- `scripts/WindowsInstall.bat`
 
-```bash
-python -m venv .build-venv
-source .build-venv/bin/activate
-pip install --upgrade pip
-```
+These scripts handle build, install, repair, rollback, activation, and uninstall flows.
 
-2. Build using the Makefile or the platform-appropriate script:
-
-Linux / macOS:
+Linux interactive installation:
 
 ```bash
-make build
-# or:
-./scripts/build_pyinstaller.sh
+git clone https://github.com/joshua-guthrie/fedleave.git
+cd fedleave
+chmod +x scripts/LinuxInstall.sh
+./scripts/LinuxInstall.sh
 ```
 
-Windows PowerShell:
+Windows interactive installation (elevated Command Prompt):
 
-```powershell
-python -m venv .build-venv
-.\.build-venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install pyinstaller
-.\scripts\build_pyinstaller.ps1
+```bat
+git clone https://github.com/joshua-guthrie/fedleave.git
+cd fedleave
+scripts\WindowsInstall.bat
 ```
 
-If you prefer not to open PowerShell manually, the `scripts\*.bat` launchers call the same PowerShell scripts for you.
-
-3. Output:
-
-- The built executables will appear in platform-specific subfolders under `dist/`. Build on the target platform or use an appropriate builder.
-- The regular build scripts produce a complete platform tree with one bundle directory per application.
-- On Windows, the PowerShell build script verifies these files exist directly in `dist/fedleave-Windows/`: `fedleave/fedleave.exe`, `AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear.exe`, `SickLeaveChartForTheYear/SickLeaveChartForTheYear.exe`, `CreditHoursChartForTheYear/CreditHoursChartForTheYear.exe`, `CompTimeChartForTheYear/CompTimeChartForTheYear.exe`, `TravelCompChartForTheYear/TravelCompChartForTheYear.exe`, `TimeOffAwardChartForTheYear/TimeOffAwardChartForTheYear.exe`, `fedleaveMonthReportGraphic/fedleaveMonthReportGraphic.exe`, and `FedLeaveCalendar/FedLeaveCalendar.exe`.
-- On Linux/macOS, downloaded or copied files in `./dist` may need the executable bit restored before running:
+Automated and unattended installation:
 
 ```bash
-chmod +x ./dist/fedleave-Ubuntu/fedleave/fedleave ./dist/fedleave-Ubuntu/AnnualLeaveChartForTheYear/AnnualLeaveChartForTheYear ./dist/fedleave-Ubuntu/SickLeaveChartForTheYear/SickLeaveChartForTheYear ./dist/fedleave-Ubuntu/CreditHoursChartForTheYear/CreditHoursChartForTheYear ./dist/fedleave-Ubuntu/CompTimeChartForTheYear/CompTimeChartForTheYear ./dist/fedleave-Ubuntu/TravelCompChartForTheYear/TravelCompChartForTheYear ./dist/fedleave-Ubuntu/TimeOffAwardChartForTheYear/TimeOffAwardChartForTheYear ./dist/fedleave-Ubuntu/fedleaveMonthReportGraphic/fedleaveMonthReportGraphic ./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
+./scripts/LinuxInstall.sh --unattended
 ```
 
-Notes and caveats:
+```bat
+scripts\WindowsInstall.bat --unattended
+```
 
-- The target machine does not need Python, PyInstaller, or a compiler. Those are build-time requirements only.
-- The complete bundle directory must remain intact. Copying only the inner executable out of the bundle is unsupported.
-- PyInstaller build installs PyInstaller and your package into a temporary venv under `.pyinstaller-venv`.
-- The produced binary is not cross-platform; build on the OS you intend to run on.
+Build-only mode (no system install):
+
+```bash
+./scripts/LinuxInstall.sh --unattended --build-only --verbose
+```
+
+```bat
+scripts\WindowsInstall.bat --unattended --build-only --verbose
+```
+
+Common options:
+
+- `--help`
+- `--unattended`
+- `--build-only`
+- `--install-only PATH`
+- `--repair`
+- `--rollback`
+- `--activate-version VERSION`
+- `--uninstall`
+- `--clean`
+- `--keep-build`
+- `--keep-versions COUNT`
+- `--desktop`
+- `--allow-downgrade`
+- `--python-installer PATH`
+- `--offline`
+- `--verbose`
+
+Output and installation behavior:
+
+- Build output is generated under `.build/<platform>/dist/` and copied to `dist/fedleave-Ubuntu/` or `dist/fedleave-Windows/`.
+- Runtime binaries remain PyInstaller one-folder bundles (do not copy inner executables out of their bundle directories).
+- Linux system-wide installation target is `/opt/fedleave` with command wrappers in `/usr/local/bin`.
+- Linux desktop integration is installed under `/usr/local/share/applications`.
+- Windows installer is batch-based and does not invoke PowerShell.
+- Unattended mode is verbose, non-interactive, and emits a final JSON result.
+
+Notes:
+
+- Python is a build dependency, not a FedLeave runtime dependency after packaging.
+- Uninstall removes application files and integration, but does not remove user-created application data.
+- Build artifacts are platform-specific; build on the platform you intend to run.

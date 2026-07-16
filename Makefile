@@ -3,4 +3,4 @@ PYENV?=.venv
 .PHONY: build
 build:
 	@echo "Building complete FedLeave PyInstaller bundles"
-	@./scripts/build_pyinstaller.sh
+	@./scripts/LinuxInstall.sh --unattended --build-only --verbose

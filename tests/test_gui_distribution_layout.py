@@ -4,75 +4,42 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_linux_gui_build_uses_onedir_bundle_layout():
-    script = (ROOT / "scripts" / "build_gui_pyinstaller.sh").read_text()
-
-    assert "--skip-backend-build" in script
-    assert "--onedir" in script
-    assert 'build_pyinstaller_core.sh' in script
-    assert 'fedleave-Ubuntu' in script
-    assert '--icon "$HERE/assets/fedleave-icon.ico"' in script
-    assert '--add-data "$HERE/assets:assets"' in script
-    assert '--hidden-import shiboken6' in script
-    assert '--hidden-import shiboken6.Shiboken' in script
-    assert '--collect-all shiboken6' in script
-    assert 'rm -rf "$DIST_DIR/FedLeaveCalendar"' in script
-    assert 'echo "  - FedLeaveCalendar/FedLeaveCalendar"' in script
+def test_scripts_root_contains_only_platform_entry_points():
+    scripts = ROOT / "scripts"
+    direct_files = sorted(p.name for p in scripts.iterdir() if p.is_file())
+    assert direct_files == ["LinuxInstall.sh", "WindowsInstall.bat"]
 
 
-def test_windows_gui_build_uses_onedir_bundle_layout():
-    script = (ROOT / "scripts" / "build_gui_pyinstaller.ps1").read_text()
+def test_linux_entry_point_calls_installer_engine_from_repo_root():
+    script = (ROOT / "scripts" / "LinuxInstall.sh").read_text(encoding="utf-8")
 
-    assert "[switch]$SkipBackendBuild" in script
-    assert "--onedir" in script
-    assert "build_pyinstaller_core.ps1" in script
-    assert "fedleave-Windows" in script
-    assert '--icon "$HERE\\assets\\fedleave-icon.ico"' in script
-    assert '--add-data "$HERE\\assets;assets"' in script
-    assert '--hidden-import shiboken6' in script
-    assert '--hidden-import shiboken6.Shiboken' in script
-    assert '--collect-all shiboken6' in script
-    assert 'Remove-Item -Recurse -Force $guiBundle' in script
-    assert 'Write-Host "  - FedLeaveCalendar\\FedLeaveCalendar.exe"' in script
+    assert "installer_engine.py" in script
+    assert "--platform linux" in script
+    assert "REPO_ROOT" in script
+    assert "python3" in script
 
 
-def test_gui_installers_copy_the_shared_backend_from_dist_root():
-    linux = (ROOT / "scripts" / "install_gui_ubuntu.sh").read_text()
-    windows = (ROOT / "scripts" / "install_gui_windows.ps1").read_text()
+def test_windows_entry_point_avoids_powershell_and_calls_engine():
+    script = (ROOT / "scripts" / "WindowsInstall.bat").read_text(encoding="utf-8")
 
-    assert 'APP_SRC="$HERE/dist/fedleave-Ubuntu"' in linux
-    assert 'INSTALL_DIR="${HOME}/.local/share/fedleave-app"' in linux
-    assert 'cp -a "$APP_SRC"/. "$INSTALL_DIR"/' in linux
-    assert 'for bundle in "$INSTALL_DIR"/*; do' in linux
-    assert 'Exec=$INSTALL_DIR/FedLeaveCalendar/FedLeaveCalendar' in linux
-    assert '$APP_SRC = Join-Path $HERE "dist\\fedleave-Windows"' in windows
-    assert '$INSTALL_ROOT = Join-Path $env:LOCALAPPDATA "Programs\\FedLeave"' in windows
-    assert 'Get-ChildItem -Force -Path $APP_SRC -Directory | ForEach-Object {' in windows
-    assert 'Get-ChildItem -Force -Path $INSTALL_ROOT -Directory | ForEach-Object {' in windows
-    assert 'Add-UserPathEntry -Entry $_.FullName' in windows
-    assert 'Join-Path $INSTALL_ROOT "FedLeaveCalendar\\FedLeaveCalendar.exe"' in windows
-    assert 'Join-Path $APP_SRC "fedleave\\fedleave.exe"' in windows
+    assert "powershell" not in script.lower()
+    assert "installer_engine.py" in script
+    assert "--platform windows" in script
 
 
-def test_regular_build_scripts_include_gui_build():
-    linux = (ROOT / "scripts" / "build_pyinstaller.sh").read_text()
-    windows = (ROOT / "scripts" / "build_pyinstaller.ps1").read_text()
+def test_manifest_lists_all_project_scripts():
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    manifest = (ROOT / "scripts" / "lib" / "common" / "application_manifest.toml").read_text(encoding="utf-8")
 
-    assert "fedleave-Ubuntu" in linux
-    assert "build_pyinstaller_core.sh" in linux
-    assert "build_gui_pyinstaller.sh" in linux
-    assert "--skip-backend-build" in linux
-    assert "fedleave-Windows" in windows
-    assert "build_pyinstaller_core.ps1" in windows
-    assert "build_gui_pyinstaller.ps1" in windows
-    assert "-SkipBackendBuild" in windows
-
-
-def test_core_build_scripts_include_yearly_comparison_companions():
-    linux = (ROOT / "scripts" / "build_pyinstaller_core.sh").read_text()
-    windows = (ROOT / "scripts" / "build_pyinstaller_core.ps1").read_text()
-
-    for app_name in [
+    expected_apps = [
+        "fedleave",
+        "FedLeaveCalendar",
+        "AnnualLeaveChartForTheYear",
+        "SickLeaveChartForTheYear",
+        "CreditHoursChartForTheYear",
+        "CompTimeChartForTheYear",
+        "TravelCompChartForTheYear",
+        "TimeOffAwardChartForTheYear",
         "AnnualLeaveYearlyComparison",
         "SickLeaveYearlyComparison",
         "CreditHoursYearlyComparison",
@@ -80,24 +47,16 @@ def test_core_build_scripts_include_yearly_comparison_companions():
         "TravelCompYearlyComparison",
         "TimeOffAwardYearlyComparison",
         "OvertimeYearlyComparison",
-    ]:
-        assert app_name in linux
-        assert app_name in windows
+        "fedleaveMonthReportGraphic",
+    ]
+
+    for app in expected_apps:
+        assert app in pyproject
+        assert f"[{app}]" in manifest
 
 
-def test_about_page_mentions_the_logo_asset():
-    about = (ROOT / "help" / "about-fedleave-calendar.html").read_text()
+def test_readme_documents_consolidated_installers():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
-    assert "qrc:/about-fedleave-calendar-logo" in about
-    assert "Version 0.2.0" in about
-    assert "experiment" in about
-    assert "not use it for anything critical" in about
-
-
-def test_pyproject_includes_new_chart_entry_points():
-    pyproject = (ROOT / "pyproject.toml").read_text()
-
-    assert "CreditHoursChartForTheYear" in pyproject
-    assert "CompTimeChartForTheYear" in pyproject
-    assert "TravelCompChartForTheYear" in pyproject
-    assert "TimeOffAwardChartForTheYear" in pyproject
+    assert "LinuxInstall.sh" in readme
+    assert "WindowsInstall.bat" in readme

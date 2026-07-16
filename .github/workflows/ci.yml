@@ -56,7 +56,10 @@ jobs:
 
       - name: Build Linux executables
         if: runner.os != 'Windows'
-        run: ./scripts/build_pyinstaller.sh
+        shell: bash
+        run: |
+          chmod +x ./scripts/LinuxInstall.sh
+          ./scripts/LinuxInstall.sh --unattended --build-only --verbose
 
       - name: Smoke test Linux executables
         if: runner.os != 'Windows'
@@ -85,8 +88,8 @@ jobs:
 
       - name: Build Windows executables
         if: runner.os == 'Windows'
-        shell: pwsh
-        run: .\scripts\build_pyinstaller.ps1
+        shell: cmd
+        run: scripts\WindowsInstall.bat --unattended --build-only --verbose
 
       - name: Smoke test Windows executables
         if: runner.os == 'Windows'

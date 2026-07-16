@@ -1,0 +1,76 @@
+# Packaging metadata for scripts defined in pyproject.toml [project.scripts].
+# Any new script added to pyproject.toml must have a matching section here.
+
+[fedleave]
+mode = "console"
+hidden_imports = ["holidays", "icalendar"]
+
+[FedLeaveCalendar]
+mode = "windowed"
+icon = "assets/fedleave-icon.ico"
+add_data = ["help:help", "assets:assets"]
+hidden_imports = [
+  "PySide6.QtCore",
+  "PySide6.QtGui",
+  "PySide6.QtWidgets",
+  "PySide6.QtPrintSupport",
+  "shiboken6",
+  "shiboken6.Shiboken",
+]
+collect_all = ["shiboken6"]
+
+[AnnualLeaveChartForTheYear]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[SickLeaveChartForTheYear]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[CreditHoursChartForTheYear]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[CompTimeChartForTheYear]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[TravelCompChartForTheYear]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[TimeOffAwardChartForTheYear]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[AnnualLeaveYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[SickLeaveYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[CreditHoursYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[CompTimeYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[TravelCompYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[TimeOffAwardYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[OvertimeYearlyComparison]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+
+[fedleaveMonthReportGraphic]
+mode = "console"
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]

@@ -10,9 +10,12 @@ pyvenv.cfg
 bin/
 lib/
 lib64/
+!scripts/lib/
+!scripts/lib/**
 .pyinstaller-venv/
 .pyinstaller-build/
 .pyinstaller-spec/
+.build/
 .dist/
 dist/
 build/
