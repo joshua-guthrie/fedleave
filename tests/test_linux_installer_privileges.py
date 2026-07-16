@@ -125,6 +125,7 @@ def test_linux_install_repairs_existing_build_workspace_ownership(tmp_path, monk
     monkeypatch.setattr(module.os, "access", fake_access)
     monkeypatch.setattr(module.os, "getuid", lambda: 1000, raising=False)
     monkeypatch.setattr(module.os, "getgid", lambda: 1000, raising=False)
+    monkeypatch.setattr(module.os, "geteuid", lambda: 1000, raising=False)
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
     engine._ensure_build_workspace_access()
