@@ -10,6 +10,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE_PATH = ROOT / "scripts" / "lib" / "common" / "installer_engine.py"
+HELPER_PATH = ROOT / "scripts" / "lib" / "common" / "linux_installer_helper.py"
 
 
 def _load_engine_module():
@@ -67,7 +68,8 @@ def test_linux_install_prompts_for_sudo_instead_of_failing(tmp_path, monkeypatch
 
     assert captured["cmd"][0] == "sudo"
     assert captured["cmd"][1] == module.sys.executable
-    assert captured["cmd"][2] == "-c"
+    assert captured["cmd"][2] == str(HELPER_PATH)
+    assert captured["cmd"][3] == "install-system"
     assert captured["cmd"][4] == str(ROOT)
     assert captured["cmd"][5] == str(dist_dir)
     assert captured["cmd"][6] == "9.9.9"
@@ -129,7 +131,8 @@ def test_linux_install_repairs_existing_build_workspace_ownership(tmp_path, monk
 
     assert captured["cmd"][0] == "sudo"
     assert captured["cmd"][1] == module.sys.executable
-    assert captured["cmd"][2] == "-c"
+    assert captured["cmd"][2] == str(HELPER_PATH)
+    assert captured["cmd"][3] == "repair-build-workspace"
     assert captured["cmd"][4] == str(engine.build_root)
     assert captured["cmd"][5] == "1000"
     assert captured["cmd"][6] == "1000"

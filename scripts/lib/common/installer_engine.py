@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shlex
 import shutil
 import subprocess
 import sys
@@ -74,6 +73,8 @@ class InstallerEngine:
     def log(self, message: str) -> None:
         line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}"
         print(line)
+        if not hasattr(self, "_log_handle"):
+            return
         self._log_handle.write(line + "\n")
         self._log_handle.flush()
 
@@ -151,10 +152,11 @@ class InstallerEngine:
             )
 
         print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Repairing build workspace ownership for {self.build_root}")
-        self._run_privileged_python(
-            self._linux_chown_helper_code(),
-            [str(self.build_root), str(os.getuid()), str(os.getgid())],
+        self._run_helper(
+            self._linux_helper_path(),
+            ["repair-build-workspace", str(self.build_root), str(os.getuid()), str(os.getgid())],
             "Build workspace repair",
+            use_sudo=os.geteuid() != 0,
         )
 
     def _build_workspace_needs_repair(self) -> bool:
@@ -219,7 +221,8 @@ class InstallerEngine:
         spec_dir: Path,
         platform_dist: Path,
     ) -> None:
-        entry_path = entries_dir / f"{target.name}.py"
+        entry_filename = f"{target.name}.py" if target.name != "fedleave" else "fedleave_bootstrap.py"
+        entry_path = entries_dir / entry_filename
         entry_path.write_text(
             f"from {target.module} import {target.func}\n\n"
             "if __name__ == '__main__':\n"
@@ -361,159 +364,31 @@ class InstallerEngine:
             if self.options.unattended:
                 raise InstallerError("System-wide install requires elevated privileges in unattended mode.", EXIT_PERMISSION)
             self.log("Requesting sudo to complete the system-wide installation.")
-            self._run_privileged_python(
-                self._linux_install_helper_code(),
-                [str(self.repo_root), str(dist_dir), version, str(self.options.keep_versions)],
-                "System-wide install",
-            )
-            return
+        helper_args = [
+            "install-system",
+            str(self.repo_root),
+            str(dist_dir),
+            version,
+            str(self.options.keep_versions),
+        ]
+        self._run_helper(
+            self._linux_helper_path(),
+            helper_args,
+            "System-wide install",
+            use_sudo=os.geteuid() != 0,
+        )
 
-        install_root = Path("/opt/fedleave")
-        versions = install_root / "versions"
-        versions.mkdir(parents=True, exist_ok=True)
-
-        target = versions / version
-        staging = versions / f"{version}.staging"
-        if staging.exists():
-            shutil.rmtree(staging)
-        if target.exists():
-            shutil.rmtree(target)
-
-        self.log(f"Installing version {version} to {target}")
-        shutil.copytree(dist_dir, staging)
-        staging.rename(target)
-
-        current_link = install_root / "current"
-        if current_link.exists() or current_link.is_symlink():
-            current_link.unlink()
-        current_link.symlink_to(target, target_is_directory=True)
-
-        self._install_linux_wrappers(current_link)
-        self._cleanup_old_versions(versions, self.options.keep_versions)
-
-    def _run_privileged_python(self, code: str, args: list[str], description: str) -> None:
-        cmd = ["sudo", sys.executable, "-c", code, *args]
-        self.log("RUN: " + " ".join(shlex.quote(part) for part in cmd))
+    def _run_helper(self, helper_path: Path, args: list[str], description: str, use_sudo: bool = False) -> None:
+        cmd = [sys.executable, str(helper_path), *args]
+        if use_sudo:
+            cmd = ["sudo", *cmd]
+        self.log("RUN: " + " ".join(cmd))
         process = subprocess.run(cmd, cwd=str(self.repo_root))
         if process.returncode != 0:
             raise InstallerError(f"{description} failed ({process.returncode}).", EXIT_BUILD_FAILED)
 
-    def _linux_chown_helper_code(self) -> str:
-        return """
-from pathlib import Path
-import os
-import shutil
-import sys
-
-target = Path(sys.argv[1])
-uid = int(sys.argv[2])
-gid = int(sys.argv[3])
-
-if target.exists():
-    for path in sorted(target.rglob('*'), key=lambda p: len(p.parts), reverse=True):
-        try:
-            os.chown(path, uid, gid)
-        except FileNotFoundError:
-            continue
-    os.chown(target, uid, gid)
-""".strip()
-
-    def _linux_install_helper_code(self) -> str:
-        return """
-from pathlib import Path
-import shutil
-import sys
-import tomllib
-
-repo_root = Path(sys.argv[1])
-dist_dir = Path(sys.argv[2])
-version = sys.argv[3]
-keep_versions = max(1, int(sys.argv[4]))
-
-install_root = Path('/opt/fedleave')
-versions = install_root / 'versions'
-versions.mkdir(parents=True, exist_ok=True)
-
-target = versions / version
-staging = versions / f'{version}.staging'
-if staging.exists():
-    shutil.rmtree(staging)
-if target.exists():
-    shutil.rmtree(target)
-
-shutil.copytree(dist_dir, staging)
-staging.rename(target)
-
-current_link = install_root / 'current'
-if current_link.exists() or current_link.is_symlink():
-    current_link.unlink()
-current_link.symlink_to(target, target_is_directory=True)
-
-scripts = tomllib.loads((repo_root / 'pyproject.toml').read_text(encoding='utf-8')).get('project', {}).get('scripts', {})
-bin_dir = Path('/usr/local/bin')
-bin_dir.mkdir(parents=True, exist_ok=True)
-for app_name in scripts:
-    wrapper = bin_dir / app_name
-    wrapper.write_text(
-        "#!/usr/bin/env bash\n"
-        f"exec '{current_link}/{app_name}/{app_name}' \"$@\"\n",
-        encoding='utf-8',
-    )
-    wrapper.chmod(0o755)
-
-desktop_dir = Path('/usr/local/share/applications')
-desktop_dir.mkdir(parents=True, exist_ok=True)
-desktop_file = desktop_dir / 'fedleave-calendar.desktop'
-desktop_file.write_text(
-    "[Desktop Entry]\n"
-    "Type=Application\n"
-    "Name=FedLeave Calendar\n"
-    "Exec=/usr/local/bin/FedLeaveCalendar\n"
-    "Terminal=false\n"
-    "Categories=Office;Utility;\n",
-    encoding='utf-8',
-)
-
-items = sorted([p for p in versions.iterdir() if p.is_dir()], key=lambda p: p.name)
-if len(items) > keep_versions:
-    for stale in items[:-keep_versions]:
-        shutil.rmtree(stale, ignore_errors=True)
-""".strip()
-
-    def _install_linux_wrappers(self, current_link: Path) -> None:
-        scripts = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("scripts", {})
-        bin_dir = Path("/usr/local/bin")
-        bin_dir.mkdir(parents=True, exist_ok=True)
-
-        for app_name in scripts:
-            wrapper = bin_dir / app_name
-            wrapper.write_text(
-                "#!/usr/bin/env bash\n"
-                f"exec '{current_link}/{app_name}/{app_name}' \"$@\"\n",
-                encoding="utf-8",
-            )
-            wrapper.chmod(0o755)
-
-        desktop_dir = Path("/usr/local/share/applications")
-        desktop_dir.mkdir(parents=True, exist_ok=True)
-        desktop_file = desktop_dir / "fedleave-calendar.desktop"
-        desktop_file.write_text(
-            "[Desktop Entry]\n"
-            "Type=Application\n"
-            "Name=FedLeave Calendar\n"
-            "Exec=/usr/local/bin/FedLeaveCalendar\n"
-            "Terminal=false\n"
-            "Categories=Office;Utility;\n",
-            encoding="utf-8",
-        )
-
-    def _cleanup_old_versions(self, versions_dir: Path, keep_count: int) -> None:
-        items = sorted([p for p in versions_dir.iterdir() if p.is_dir()], key=lambda p: p.name)
-        if len(items) <= keep_count:
-            return
-        for stale in items[:-keep_count]:
-            self.log(f"Removing old version {stale.name}")
-            shutil.rmtree(stale, ignore_errors=True)
+    def _linux_helper_path(self) -> Path:
+        return self.repo_root / "scripts" / "lib" / "common" / "linux_installer_helper.py"
 
     def _project_version(self) -> str:
         pyproject = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8"))

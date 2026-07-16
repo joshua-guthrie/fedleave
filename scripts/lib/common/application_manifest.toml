@@ -3,7 +3,8 @@
 
 [fedleave]
 mode = "console"
-hidden_imports = ["holidays", "icalendar"]
+hidden_imports = ["fedleave", "holidays", "icalendar"]
+collect_all = ["fedleave"]
 
 [FedLeaveCalendar]
 mode = "windowed"

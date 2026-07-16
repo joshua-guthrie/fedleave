@@ -25,7 +25,23 @@ The program is entirely single user.  I suppose it could be made into a multiple
 
 I would not be using this application for any thing critical.  For me, it's a fun little experiement.
 
-## Setup
+## Installation
+
+End users should use the platform installer script instead of setting up a development environment manually:
+
+```bash
+./scripts/LinuxInstall.sh
+```
+
+```bat
+scripts\WindowsInstall.bat
+```
+
+The installer requires Python 3 to be available so it can run the build and packaging steps. On Linux, the script can install Python 3 automatically when `apt-get` is available. System-wide installation may also prompt for `sudo` during the final install step.
+
+## Development Setup
+
+If you want to work on the source tree directly, create a virtual environment and install the project in editable mode:
 
 Linux / macOS:
 
@@ -33,6 +49,7 @@ Linux / macOS:
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r requirements.txt
+pip install -r requirements-gui.txt
 pip install -e .
 ```
 
@@ -42,8 +59,82 @@ Windows PowerShell:
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+pip install -r requirements-gui.txt
 pip install -e .
 ```
+
+## Building and Installing FedLeave
+
+This section is for the packaged installer workflow: creating the bundled applications, installing them system-wide, or managing upgrades and repairs. It is separate from the source-development setup above.
+
+FedLeave now uses two platform entry scripts only:
+
+- `scripts/LinuxInstall.sh`
+- `scripts/WindowsInstall.bat`
+
+These scripts handle build, install, repair, rollback, activation, and uninstall flows.
+
+Linux interactive installation:
+
+```bash
+git clone https://github.com/joshua-guthrie/fedleave.git
+cd fedleave
+chmod +x scripts/LinuxInstall.sh
+./scripts/LinuxInstall.sh
+```
+
+Windows interactive installation (elevated Command Prompt):
+
+```bat
+git clone https://github.com/joshua-guthrie/fedleave.git
+cd fedleave
+scripts\WindowsInstall.bat
+```
+
+Automated and unattended installation:
+
+```bash
+./scripts/LinuxInstall.sh --unattended
+```
+
+```bat
+scripts\WindowsInstall.bat --unattended
+```
+
+Build-only mode (no system install):
+
+```bash
+./scripts/LinuxInstall.sh --unattended --build-only --verbose
+```
+
+```bat
+scripts\WindowsInstall.bat --unattended --build-only --verbose
+```
+
+Installed command names:
+
+The installer creates command launchers using the exact names from `project.scripts`.
+On Linux these wrappers are installed in `/usr/local/bin`.
+On Windows these launchers are in the packaged output and keep the same names with `.exe`.
+
+- `fedleave`
+- `FedLeaveCalendar`
+- `AnnualLeaveChartForTheYear`
+- `SickLeaveChartForTheYear`
+- `CreditHoursChartForTheYear`
+- `CompTimeChartForTheYear`
+- `TravelCompChartForTheYear`
+- `TimeOffAwardChartForTheYear`
+- `AnnualLeaveYearlyComparison`
+- `SickLeaveYearlyComparison`
+- `CreditHoursYearlyComparison`
+- `CompTimeYearlyComparison`
+- `TravelCompYearlyComparison`
+- `TimeOffAwardYearlyComparison`
+- `OvertimeYearlyComparison`
+- `fedleaveMonthReportGraphic`
+
+Important: command names are case-sensitive on Linux. For example, `fedleave` and `FedLeaveCalendar` are different commands.
 
 ## Commands
 
@@ -1758,84 +1849,3 @@ Daily and as-of queries:
 	fedleave balance --year 2026 --project-to 2026-12-15 --data-dir /path/to/data
 
 	fedleave activity --year 2026 --date 2026-01-11 --data-dir /path/to/data
-
-Building and Installing FedLeave
---------------------------------
-
-FedLeave now uses two platform entry scripts only:
-
-- `scripts/LinuxInstall.sh`
-- `scripts/WindowsInstall.bat`
-
-These scripts handle build, install, repair, rollback, activation, and uninstall flows.
-
-Linux interactive installation:
-
-```bash
-git clone https://github.com/joshua-guthrie/fedleave.git
-cd fedleave
-chmod +x scripts/LinuxInstall.sh
-./scripts/LinuxInstall.sh
-```
-
-Windows interactive installation (elevated Command Prompt):
-
-```bat
-git clone https://github.com/joshua-guthrie/fedleave.git
-cd fedleave
-scripts\WindowsInstall.bat
-```
-
-Automated and unattended installation:
-
-```bash
-./scripts/LinuxInstall.sh --unattended
-```
-
-```bat
-scripts\WindowsInstall.bat --unattended
-```
-
-Build-only mode (no system install):
-
-```bash
-./scripts/LinuxInstall.sh --unattended --build-only --verbose
-```
-
-```bat
-scripts\WindowsInstall.bat --unattended --build-only --verbose
-```
-
-Common options:
-
-- `--help`
-- `--unattended`
-- `--build-only`
-- `--install-only PATH`
-- `--repair`
-- `--rollback`
-- `--activate-version VERSION`
-- `--uninstall`
-- `--clean`
-- `--keep-build`
-- `--keep-versions COUNT`
-- `--desktop`
-- `--allow-downgrade`
-- `--python-installer PATH`
-- `--offline`
-- `--verbose`
-
-Output and installation behavior:
-
-- Build output is generated under `.build/<platform>/dist/` and copied to `dist/fedleave-Ubuntu/` or `dist/fedleave-Windows/`.
-- Runtime binaries remain PyInstaller one-folder bundles (do not copy inner executables out of their bundle directories).
-- Linux system-wide installation target is `/opt/fedleave` with command wrappers in `/usr/local/bin`.
-- Linux desktop integration is installed under `/usr/local/share/applications`.
-- Windows installer is batch-based and does not invoke PowerShell.
-- Unattended mode is verbose, non-interactive, and emits a final JSON result.
-
-Notes:
-
-- Python is a build dependency, not a FedLeave runtime dependency after packaging.
-- Uninstall removes application files and integration, but does not remove user-created application data.
-- Build artifacts are platform-specific; build on the platform you intend to run.
