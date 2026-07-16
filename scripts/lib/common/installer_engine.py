@@ -64,6 +64,7 @@ class InstallerEngine:
         self.repo_root = repo_root
         self.options = options
         self.build_root = repo_root / ".build" / options.platform
+        self._ensure_build_workspace_access()
         self.log_dir = self.build_root / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.log_path = self.log_dir / f"installer-{int(time.time())}.log"
@@ -132,6 +133,29 @@ class InstallerEngine:
         self.log(f"Cleaning build area {self.build_root}")
         shutil.rmtree(self.build_root, ignore_errors=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
+
+    def _ensure_build_workspace_access(self) -> None:
+        if self.options.platform != "linux":
+            return
+
+        if not self.build_root.exists():
+            return
+
+        if os.access(self.build_root, os.W_OK | os.X_OK):
+            return
+
+        if self.options.unattended:
+            raise InstallerError(
+                f"Build workspace is not writable: {self.build_root}. Run LinuxInstall.sh with sudo once to repair ownership.",
+                EXIT_PERMISSION,
+            )
+
+        self.log(f"Repairing build workspace ownership for {self.build_root}")
+        self._run_privileged_python(
+            self._linux_chown_helper_code(),
+            [str(self.build_root), str(os.getuid()), str(os.getgid())],
+            "Build workspace repair",
+        )
 
     def _ensure_python(self) -> None:
         if sys.version_info < (3, 11):
@@ -355,6 +379,26 @@ class InstallerEngine:
         process = subprocess.run(cmd, cwd=str(self.repo_root))
         if process.returncode != 0:
             raise InstallerError(f"{description} failed ({process.returncode}).", EXIT_BUILD_FAILED)
+
+    def _linux_chown_helper_code(self) -> str:
+        return """
+from pathlib import Path
+import os
+import shutil
+import sys
+
+target = Path(sys.argv[1])
+uid = int(sys.argv[2])
+gid = int(sys.argv[3])
+
+if target.exists():
+    for path in sorted(target.rglob('*'), key=lambda p: len(p.parts), reverse=True):
+        try:
+            os.chown(path, uid, gid)
+        except FileNotFoundError:
+            continue
+    os.chown(target, uid, gid)
+""".strip()
 
     def _linux_install_helper_code(self) -> str:
         return """

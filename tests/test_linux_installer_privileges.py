@@ -89,3 +89,42 @@ def test_linux_install_requires_privilege_in_unattended_mode(tmp_path, monkeypat
 
     engine._log_handle.close()
     assert exc_info.value.code == module.EXIT_PERMISSION
+
+
+def test_linux_install_repairs_existing_build_workspace_ownership(tmp_path, monkeypatch):
+    module = _load_engine_module()
+    options = _make_options(module)
+    engine = module.InstallerEngine.__new__(module.InstallerEngine)
+    engine.repo_root = ROOT
+    engine.options = options
+    engine.build_root = tmp_path / ".build" / "linux"
+    engine._log_handle = SimpleNamespace(write=lambda *args, **kwargs: None, flush=lambda: None)
+    engine.log = lambda message: None
+
+    engine.build_root.mkdir(parents=True)
+
+    captured: dict[str, object] = {}
+
+    def fake_access(path, mode):
+        if Path(path) == engine.build_root:
+            return False
+        return True
+
+    def fake_run(cmd, cwd=None):
+        captured["cmd"] = cmd
+        captured["cwd"] = cwd
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(module.os, "access", fake_access)
+    monkeypatch.setattr(module.os, "getuid", lambda: 1000)
+    monkeypatch.setattr(module.os, "getgid", lambda: 1000)
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+
+    engine._ensure_build_workspace_access()
+
+    assert captured["cmd"][0] == "sudo"
+    assert captured["cmd"][1] == module.sys.executable
+    assert captured["cmd"][2] == "-c"
+    assert captured["cmd"][4] == str(engine.build_root)
+    assert captured["cmd"][5] == "1000"
+    assert captured["cmd"][6] == "1000"
