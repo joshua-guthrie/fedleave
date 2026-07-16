@@ -12,6 +12,7 @@ class GuiSettings:
     fedleave_path: str = ""
     data_dir: str = ""
     first_day_of_week: str = "Sunday"
+    payday_offset_days: int = 6
     show_auto_accruals: bool = False
     show_holidays: bool = True
     show_paydays: bool = True

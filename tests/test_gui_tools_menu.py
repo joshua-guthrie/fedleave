@@ -4,8 +4,10 @@ from PySide6.QtWidgets import QDialog
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QFileDialog
 
 from fedleave_gui.main_window import MainWindow
+from fedleave_gui.settings import GuiSettings
 
 
 def _application() -> QApplication:
@@ -89,6 +91,29 @@ def test_change_leave_year_action_updates_displayed_year(monkeypatch, tmp_path):
     assert refreshed[-1] == 2024
 
 
+def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr("fedleave_gui.main_window.load_settings", lambda: GuiSettings(data_dir=str(tmp_path)))
+    window = MainWindow()
+
+    leave_years = tmp_path / "leave_years"
+    leave_years.mkdir()
+    (leave_years / "2026.json").write_text("{}", encoding="utf-8")
+
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    yearly_comparison_action = next(
+        action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
+    )
+
+    assert yearly_comparison_action.menu().isEnabled() is False
+
+    (leave_years / "2027.json").write_text("{}", encoding="utf-8")
+    window._refresh_yearly_comparison_menu()
+
+    assert yearly_comparison_action.menu().isEnabled() is True
+
+
 def test_change_accrual_action_updates_backend_and_refreshes(monkeypatch):
     _application()
     refreshed: list[int] = []
@@ -140,6 +165,31 @@ def test_change_accrual_action_updates_backend_and_refreshes(monkeypatch):
         }
     ]
     assert refreshed[-1] == window.year
+
+
+def test_import_data_uses_safe_default_and_refreshes(monkeypatch, tmp_path):
+    _application()
+    captured: list[list[str]] = []
+    refreshed: list[bool] = []
+
+    class FakeBackend:
+        def run_text(self, args, include_data_dir=True):
+            captured.append(list(args))
+            return "imported"
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    window = MainWindow()
+    window.refresh = lambda: refreshed.append(True)
+
+    archive = tmp_path / "backup.json"
+    archive.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(archive), "JSON files (*.json)"))
+
+    window.import_data()
+
+    assert captured == [["import-data", "--input", str(archive)]]
+    assert refreshed == [True]
 
 
 def test_help_menu_hides_backend_about_action(monkeypatch):

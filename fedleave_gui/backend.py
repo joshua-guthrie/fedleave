@@ -142,6 +142,9 @@ class FedleaveBackend:
     def use_or_lose(self, year: int) -> dict[str, Any]:
         return self.run_json(["use-or-lose", "--year", str(year), "--json"])
 
+    def balance(self, year: int, *, as_of: str) -> dict[str, Any]:
+        return self.run_json(["balance", "--year", str(year), "--as-of", as_of, "--json"])
+
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])
 

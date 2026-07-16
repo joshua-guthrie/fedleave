@@ -121,3 +121,45 @@ def test_import_removes_legacy_transaction_history(tmp_path: Path):
     imported = json.loads((target / "leave_years" / "2026.json").read_text(encoding="utf-8"))
     assert imported["transactions"] == [{"id": "active"}]
     assert "starting_balance_history" not in imported
+
+
+def test_import_preserves_existing_current_year_file(tmp_path: Path):
+    target = tmp_path / "target"
+    archive = tmp_path / "previous-year.json"
+    current_year = {
+        "schema_version": 1,
+        "leave_year": 2026,
+        "leave_year_start": "2026-01-11",
+        "leave_year_end": "2027-01-09",
+        "pay_period_count": 1,
+        "annual_leave_accrual_hours": 6.0,
+        "sick_leave_accrual_hours": 4.0,
+        "starting_balances": {"annual": 120.0, "sick": 180.0},
+        "carryover_from_previous_year": {"annual": 120.0, "sick": 180.0},
+        "transactions": [],
+        "pay_periods": [],
+        "holidays": [],
+    }
+    previous_year = {
+        "schema_version": 1,
+        "leave_year": 2025,
+        "leave_year_start": "2025-01-12",
+        "leave_year_end": "2026-01-10",
+        "pay_period_count": 1,
+        "annual_leave_accrual_hours": 6.0,
+        "sick_leave_accrual_hours": 4.0,
+        "starting_balances": {"annual": 100.0, "sick": 160.0},
+        "carryover_from_previous_year": {"annual": 100.0, "sick": 160.0},
+        "transactions": [],
+        "pay_periods": [],
+        "holidays": [],
+    }
+    target_years = target / "leave_years"
+    target_years.mkdir(parents=True)
+    (target_years / "2026.json").write_text(json.dumps(current_year), encoding="utf-8")
+    archive.write_text(json.dumps({"schema_version": 1, "leave_years": {"2025": previous_year}, "holiday_cache": {}}), encoding="utf-8")
+
+    import_data(input=archive, data_dir=target)
+
+    assert json.loads((target / "leave_years" / "2026.json").read_text(encoding="utf-8")) == current_year
+    assert json.loads((target / "leave_years" / "2025.json").read_text(encoding="utf-8")) == previous_year

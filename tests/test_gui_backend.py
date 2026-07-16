@@ -43,6 +43,16 @@ elif args[:1] == ["use-or-lose"]:
             }
         )
     )
+elif args[:1] == ["balance"]:
+    print(
+        json.dumps(
+            {
+                "year": int(args[args.index("--year") + 1]),
+                "as_of": args[args.index("--as-of") + 1],
+                "balances": {"annual": 92.0, "sick": 40.0},
+            }
+        )
+    )
 elif args[:1] == ["list"]:
     print(
         json.dumps(
@@ -98,6 +108,11 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     projection = backend.use_or_lose(2026)
     assert projection["year"] == 2026
     assert projection["use_or_lose"]["use_or_lose"] == 0.0
+
+    balance = backend.balance(2026, as_of="2026-08-08")
+    assert balance["year"] == 2026
+    assert balance["as_of"] == "2026-08-08"
+    assert balance["balances"]["annual"] == 92.0
 
     transactions = backend.list_transactions(2026)
     assert len(transactions) == 1

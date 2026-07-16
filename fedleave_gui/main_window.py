@@ -50,6 +50,7 @@ from .chart_windows import LeaveChartDialog
 from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
 from .resources import asset_file, help_base_url, help_file, window_icon
 from fedleave.config import get_default_data_dir
+from fedleave.payperiods import calculate_pay_date
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
 from fedleave_month_report_graphic.report import ReportData as MonthReportData
 from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
@@ -212,6 +213,13 @@ def _section_heading(text: str) -> QLabel:
     font.setBold(True)
     label.setFont(font)
     return label
+
+
+def _balance_date_label(selected: date, today: date | None = None) -> str:
+    reference = today or date.today()
+    if selected == reference:
+        return "Today"
+    return f"{selected.month}/{selected.day}/{selected.year}"
 
 
 class DayCell(QPushButton):
@@ -485,6 +493,9 @@ class PreferencesDialog(QDialog):
         self.first_day = QComboBox()
         self.first_day.addItems(["Sunday", "Monday"])
         self.first_day.setCurrentText(settings.first_day_of_week)
+        self.payday_offset = QSpinBox()
+        self.payday_offset.setRange(0, 13)
+        self.payday_offset.setValue(settings.payday_offset_days)
         self.show_auto = QCheckBox()
         self.show_auto.setChecked(settings.show_auto_accruals)
         self.show_holidays = QCheckBox()
@@ -503,6 +514,7 @@ class PreferencesDialog(QDialog):
         form.addRow("Backend executable path", self.fedleave_path)
         form.addRow("Data directory", self.data_dir)
         form.addRow("First day of week", self.first_day)
+        form.addRow("Pay day offset from pay-period end", self.payday_offset)
         form.addRow("Show automatic accruals", self.show_auto)
         form.addRow("Enable holiday highlighting", self.show_holidays)
         form.addRow("Enable pay-day highlighting", self.show_paydays)
@@ -521,6 +533,7 @@ class PreferencesDialog(QDialog):
         self.settings.fedleave_path = self.fedleave_path.text().strip()
         self.settings.data_dir = self.data_dir.text().strip()
         self.settings.first_day_of_week = self.first_day.currentText()
+        self.settings.payday_offset_days = self.payday_offset.value()
         self.settings.show_auto_accruals = self.show_auto.isChecked()
         self.settings.show_holidays = self.show_holidays.isChecked()
         self.settings.show_paydays = self.show_paydays.isChecked()
@@ -833,8 +846,11 @@ class MainWindow(QMainWindow):
         self.today = date.today()
         self.year = self.today.year
         self.month = self.today.month
+        self.balance_as_of = self.today
         self.month_json: dict[str, Any] | None = None
         self.use_or_lose_json: dict[str, Any] | None = None
+        self.balance_snapshot: dict[str, Any] | None = None
+        self.yearly_comparison_menu: Any | None = None
         self._leave_chart_windows: list[LeaveChartDialog] = []
         self.setWindowTitle("FedLeave Calendar")
         self.resize(1320, 860)
@@ -919,8 +935,16 @@ class MainWindow(QMainWindow):
         side.addWidget(self.pay_period_scroll)
         top.addLayout(side, 1)
         root_layout.addLayout(top, 4)
-        self.as_of_today_label = _section_heading("As of Today")
-        root_layout.addWidget(self.as_of_today_label)
+        self.balance_button = QPushButton()
+        balance_font = QFont(self.balance_button.font())
+        balance_font.setBold(True)
+        self.balance_button.setFont(balance_font)
+        self.balance_button.setCursor(Qt.PointingHandCursor)
+        self.balance_button.setMinimumHeight(36)
+        self.balance_button.clicked.connect(self.select_balance_date)
+        self._update_balance_button_text()
+        self.as_of_today_label = self.balance_button
+        root_layout.addWidget(self.balance_button)
         self.balance_table = QTableWidget(0, 3)
         self.balance_table.setHorizontalHeaderLabels(["Category", "Balance", "Use or Lose"])
         _set_table_header_alignments(self.balance_table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
@@ -946,14 +970,14 @@ class MainWindow(QMainWindow):
         leave_charts_menu = view_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self._action(leave_charts_menu, label, lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label))
-        yearly_comparison_menu = view_menu.addMenu("Yearly Leave Comparison")
-        yearly_comparison_menu.setEnabled(len(_available_leave_years(self.settings.data_dir or None)) > 1)
+        self.yearly_comparison_menu = view_menu.addMenu("Yearly Leave Comparison")
         for label, app_name, category in YEARLY_COMPARISON_CHARTS:
             self._action(
-                yearly_comparison_menu,
+                self.yearly_comparison_menu,
                 f"{label} Comparison",
                 lambda _checked=False, app_name=app_name, label=label, category=category: self.open_yearly_leave_comparison(app_name, label, category),
             )
+        self._refresh_yearly_comparison_menu()
         self._toggle(view_menu, "Show Automatic Accruals in Day Cells", self.settings.show_auto_accruals, "show_auto_accruals")
         self._toggle(view_menu, "Show Holidays", self.settings.show_holidays, "show_holidays")
         self._toggle(view_menu, "Show Pay-Day Highlight", self.settings.show_paydays, "show_paydays")
@@ -987,6 +1011,44 @@ class MainWindow(QMainWindow):
         save_settings(self.settings)
         self.render_month()
 
+    def _apply_month_display_settings(self) -> None:
+        if not self.month_json:
+            return
+        _apply_payday_offset(self.month_json, self.settings.payday_offset_days)
+
+    def _update_balance_button_text(self) -> None:
+        if not hasattr(self, "balance_button"):
+            return
+        self.balance_button.setText(f"Leave Balances as of {_balance_date_label(self.balance_as_of)}")
+
+    def _refresh_balance_snapshot(self) -> None:
+        if not self.month_json:
+            self.balance_snapshot = None
+            self._update_balance_button_text()
+            return
+
+        if self.balance_as_of == date.today():
+            snapshot = self.month_json.get("balance_as_of_today")
+            if isinstance(snapshot, dict):
+                self.balance_snapshot = snapshot
+                self._update_balance_button_text()
+                return
+
+        try:
+            self.balance_snapshot = self.backend.balance(self.year, as_of=self.balance_as_of.isoformat())
+        except BackendError:
+            snapshot = self.month_json.get("balance_as_of_today")
+            self.balance_snapshot = snapshot if isinstance(snapshot, dict) else None
+        self._update_balance_button_text()
+
+    def select_balance_date(self) -> None:
+        dialog = SelectDateDialog("Leave Balances as Of", self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        self.balance_as_of = dialog.selected_date()
+        self._refresh_balance_snapshot()
+        self._render_balances()
+
     def preferences(self) -> None:
         dialog = PreferencesDialog(self.settings, self)
         if dialog.exec() == QDialog.Accepted:
@@ -995,11 +1057,18 @@ class MainWindow(QMainWindow):
             self.backend = self._backend()
             self.refresh()
 
+    def _refresh_yearly_comparison_menu(self) -> None:
+        if self.yearly_comparison_menu is None:
+            return
+        self.yearly_comparison_menu.setEnabled(len(_available_leave_years(self.settings.data_dir or None)) > 1)
+
     def refresh(self) -> None:
         try:
             self.backend = self._backend()
             self.month_json = self.backend.load_month(self.year, self.month)
             self.use_or_lose_json = self.backend.use_or_lose(self.year)
+            self._refresh_balance_snapshot()
+            self._refresh_yearly_comparison_menu()
         except BackendMissingError:
             QMessageBox.critical(self, "Backend Missing", "The fedleave backend executable could not be found. Open Preferences to set the path.")
             self.preferences()
@@ -1012,6 +1081,7 @@ class MainWindow(QMainWindow):
     def render_month(self) -> None:
         if not self.month_json:
             return
+        self._apply_month_display_settings()
         self.title_label.setText(f"{calendar.month_name[self.month]} {self.year}")
         self._render_calendar()
         self._render_pay_periods()
@@ -1091,7 +1161,8 @@ class MainWindow(QMainWindow):
         self.pay_period_layout.addStretch(1)
 
     def _render_balances(self) -> None:
-        balance = ((self.month_json.get("balance_as_of_today") or {}).get("balances") or {})
+        snapshot = self.balance_snapshot or (self.month_json.get("balance_as_of_today") if self.month_json else {}) or {}
+        balance = (snapshot.get("balances") or {})
         use_or_lose = (self.use_or_lose_json or {}).get("use_or_lose") if isinstance(self.use_or_lose_json, dict) else {}
         if not isinstance(use_or_lose, dict):
             use_or_lose = {}
@@ -1149,6 +1220,7 @@ class MainWindow(QMainWindow):
 
     def go_today(self) -> None:
         self.today = date.today()
+        self.balance_as_of = self.today
         self.year = self.today.year
         self.month = self.today.month
         self.refresh()
@@ -1181,6 +1253,7 @@ class MainWindow(QMainWindow):
         except BackendError as exc:
             QMessageBox.warning(self, "Create Failed", str(exc))
             return
+        self.balance_as_of = date.today()
         self.year = dialog.year.value()
         self.month = 1
         self.refresh()
@@ -1209,7 +1282,7 @@ class MainWindow(QMainWindow):
         if not path:
             return
         try:
-            self.backend.run_text(["import-data", "--input", path, "--overwrite"])
+            self.backend.run_text(["import-data", "--input", path])
         except BackendError as exc:
             QMessageBox.warning(self, "Import Failed", str(exc))
             return
@@ -1381,6 +1454,7 @@ class MainWindow(QMainWindow):
         dialog = ChangeLeaveYearDialog(years, self.year, self)
         if dialog.exec() != QDialog.Accepted:
             return
+        self.balance_as_of = date.today()
         self.year = dialog.selected_year()
         self.refresh()
 
@@ -1472,3 +1546,23 @@ def _pay_period_rows(period: dict[str, Any]) -> list[list[str]]:
         label = CATEGORY_LABELS.get(category, (category, category))[1]
         rows.append([label, earned, used, balance])
     return rows
+
+
+def _apply_payday_offset(month_json: dict[str, Any], payday_offset_days: int) -> dict[str, Any]:
+    pay_dates: set[str] = set()
+    for period in month_json.get("pay_periods", []):
+        end_value = period.get("end_date") or period.get("end")
+        if not end_value:
+            continue
+        try:
+            end_date = date.fromisoformat(str(end_value))
+        except ValueError:
+            continue
+        pay_date = calculate_pay_date(end_date, payday_offset_days).isoformat()
+        period["pay_date"] = pay_date
+        pay_dates.add(pay_date)
+
+    month_json["pay_dates"] = sorted(pay_dates)
+    for day in month_json.get("days", []):
+        day["is_payday"] = str(day.get("date")) in pay_dates
+    return month_json
