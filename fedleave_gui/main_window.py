@@ -986,6 +986,8 @@ class MainWindow(QMainWindow):
         self._action(tools_menu, "Change Accrual...", self.change_accrual)
         self._action(tools_menu, "Validate Data", self.validate_data)
         self._action(tools_menu, "Export Data...", self.export_data)
+        import_external_menu = tools_menu.addMenu("Import From External App")
+        self._action(import_external_menu, "FRC-E WMS HTTP Leave Report", self.import_wms_http_leave_report)
         self._action(tools_menu, "Import Data...", self.import_data)
         help_menu = self.menuBar().addMenu("Help")
         self._action(help_menu, "Help Contents", self.show_help)
@@ -1283,6 +1285,31 @@ class MainWindow(QMainWindow):
             return
         try:
             self.backend.run_text(["import-data", "--input", path])
+        except BackendError as exc:
+            QMessageBox.warning(self, "Import Failed", str(exc))
+            return
+        self.refresh()
+
+    def import_wms_http_leave_report(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import FRC-E WMS HTTP Leave Report",
+            "",
+            "HTML files (*.html *.htm)",
+        )
+        if not path:
+            return
+        if (
+            QMessageBox.question(
+                self,
+                "Import FRC-E WMS HTTP Leave Report",
+                "This will overwrite matching leave transactions from the selected WMS report. Continue?",
+            )
+            != QMessageBox.Yes
+        ):
+            return
+        try:
+            self.backend.run_text(["import-wms-http", "--input", path])
         except BackendError as exc:
             QMessageBox.warning(self, "Import Failed", str(exc))
             return

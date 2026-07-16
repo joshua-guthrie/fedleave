@@ -3,7 +3,7 @@ from __future__ import annotations
 import typer
 
 from .cli_app import HELP_TEXT, _print_json, app, console, starting_balance_app
-from .commands.data import export_data, import_data, init, validate
+from .commands.data import export_data, import_data, import_wms_http, init, validate
 from .commands.transactions import add, correct, list_transactions, reconcile, set_day, types, void
 from .commands.starting_balance import starting_balance_set
 from .commands.rollover import rollover

@@ -5,6 +5,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QMessageBox
 
 from fedleave_gui.main_window import MainWindow
 from fedleave_gui.settings import GuiSettings
@@ -26,6 +27,7 @@ def test_tools_menu_hides_internal_data_folder(monkeypatch):
         "Change Accrual...",
         "Validate Data",
         "Export Data...",
+        "Import From External App",
         "Import Data...",
     ]
     assert "Open Preferences Folder" not in labels
@@ -189,6 +191,32 @@ def test_import_data_uses_safe_default_and_refreshes(monkeypatch, tmp_path):
     window.import_data()
 
     assert captured == [["import-data", "--input", str(archive)]]
+    assert refreshed == [True]
+
+
+def test_import_wms_http_report_uses_html_picker_and_refreshes(monkeypatch, tmp_path):
+    _application()
+    captured: list[list[str]] = []
+    refreshed: list[bool] = []
+
+    class FakeBackend:
+        def run_text(self, args, include_data_dir=True):
+            captured.append(list(args))
+            return "imported"
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    window = MainWindow()
+    window.refresh = lambda: refreshed.append(True)
+
+    report = tmp_path / "clocking.html"
+    report.write_text("<html><body><table class='jrPage'></table></body></html>", encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(report), "HTML files (*.html *.htm)"))
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
+
+    window.import_wms_http_leave_report()
+
+    assert captured == [["import-wms-http", "--input", str(report)]]
     assert refreshed == [True]
 
 

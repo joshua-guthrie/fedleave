@@ -9,9 +9,16 @@ from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
 from ..cli_helpers import load_leave_year, parse_iso_date
-from ..config import get_default_data_dir
+from ..config import get_default_data_dir, load_config
 from ..ledger import apply_fixes_to_leave_year, validate_leave_year
 from ..storage import atomic_write_json, ensure_data_dir, load_json, remove_legacy_transaction_history, write_json
+from ..wms_import import (
+    WmsImportError,
+    build_leave_year_skeleton,
+    build_transactions_from_report,
+    parse_wms_http_leave_report,
+    report_transaction_keys,
+)
 
 
 @app.command()
@@ -199,6 +206,79 @@ def import_data(
         raise typer.Exit(code=2)
 
     console.print(f"Imported fedleave {import_kind} into {base}")
+
+
+@app.command("import-wms-http")
+def import_wms_http(
+    input: Path = typer.Option(..., help="Input WMS clocking HTML report path."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    """Import a FRC-E WMS HTTP leave report from HTML."""
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    if not input.exists():
+        console.print(f"[red]ERROR:[/red] Import report not found: {input}")
+        raise typer.Exit(code=1)
+
+    try:
+        report = parse_wms_http_leave_report(input.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        console.print(f"[red]ERROR:[/red] Could not read report as UTF-8 HTML: {exc}")
+        raise typer.Exit(code=2)
+    except WmsImportError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    base = get_default_data_dir(data_dir)
+    ensure_data_dir(base)
+    year_path = base / "leave_years" / f"{report.leave_year}.json"
+
+    if year_path.exists():
+        leave_year = load_leave_year(report.leave_year, data_dir)
+    else:
+        try:
+            config = load_config(base)
+            annual_accrual = float(config.get("defaults", {}).get("annual_leave_accrual_hours", 6.0))
+        except FileNotFoundError:
+            annual_accrual = 6.0
+        leave_year = build_leave_year_skeleton(report, annual_accrual)
+
+    transactions = leave_year.setdefault("transactions", [])
+    removed_keys = report_transaction_keys(report)
+    if removed_keys:
+        transactions[:] = [
+            transaction
+            for transaction in transactions
+            if (
+                str(transaction.get("date", "")),
+                str(transaction.get("category", "")),
+                str(transaction.get("direction", "")),
+            )
+            not in removed_keys
+        ]
+
+    existing_ids = [str(transaction.get("id", "")) for transaction in transactions]
+    try:
+        imported_transactions, _ = build_transactions_from_report(report, existing_ids)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    transactions.extend(imported_transactions)
+    year_path.parent.mkdir(parents=True, exist_ok=True)
+    if year_path.exists():
+        write_json(year_path, leave_year)
+    else:
+        atomic_write_json(year_path, leave_year)
+
+    console.print(
+        f"Imported {len(imported_transactions)} WMS leave transaction(s) from {input.name} "
+        f"into leave year {report.leave_year}."
+    )
+    if report.ignored_rows:
+        console.print(f"Ignored {report.ignored_rows} non-leave or regular-time row(s).")
+
 
 @app.command(name="validate")
 def validate(

@@ -216,6 +216,7 @@ Current GUI features:
 - Authoritative day editing with explicit Use/Earn controls and positive hour entry
 - View > Leave Charts launches the annual, sick, credit hours, comp time, travel comp, and time-off award chart companion apps in their own windows
 - View > Yearly Leave Comparison launches the annual, sick, credit hours, comp time, travel comp, time-off award, and overtime yearly comparison chart companion apps in their own windows
+- Tools > Import From External App > FRC-E WMS HTTP Leave Report imports the WMS HTML report and asks before replacing matching leave transactions
 - Leave chart windows include Save PNG, Save PDF, and Print actions
 - Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
 - Help and About dialogs
@@ -389,6 +390,18 @@ Commands and common options:
 			- Existing files are preserved by default.
 			- Use `--overwrite` to replace existing files; overwritten files are backed up first.
 			- Single leave-year backup files with top-level `leave_year`, `transactions`, and `pay_periods` fields are imported into `leave_years/YEAR.json` for backwards compatibility.
+
+	import-wms-http
+		Import a FRC-E WMS HTTP Leave Report from HTML.
+
+		Syntax:
+			fedleave import-wms-http --input PATH [--data-dir PATH]
+
+		Notes:
+			- The importer reads the WMS clocking HTML report directly and maps each supported WMS leave code through a single rule table in `fedleave/wms_import.py`.
+			- Matching transactions in the target leave year are replaced authoritatively; automatic accrual transactions and unrelated transaction categories are left alone.
+			- If the report belongs to a leave year that does not yet exist, FedLeave creates that leave year file before importing the transactions.
+			- Unsupported leave codes raise an error so new WMS leave types can be added explicitly rather than silently misfiled.
 
 	list
 		List active transactions for a leave year.
@@ -934,6 +947,7 @@ Commands without `--json`:
 - `starting-balance set`
 - `export-data`
 - `import-data`
+- `import-wms-http`
 - `types`
 - `holidays`
 - `help`
@@ -969,7 +983,7 @@ Transaction fields:
 - `hours`: Decimal hours.
 - `description`: Free-text description.
 - `status`: Transaction status.
-- `source`: Transaction source, such as `manual`, `clocking-report`, or `correction`.
+- `source`: Transaction source, such as `manual`, `clocking-report`, `wms-http`, or `correction`.
 - `created_at`: Creation timestamp.
 - `updated_at`: Last update timestamp.
 - `expiration_date`: Expiration date for expiring leave categories, or `null`.

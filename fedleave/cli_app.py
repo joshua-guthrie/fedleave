@@ -40,6 +40,8 @@ Primary commands:
                 Compare the balance for one category across every leave year
     export-data Export config, leave years, and holiday cache to a JSON archive
     import-data Import a JSON archive created by export-data or a single leave-year backup
+    import-wms-http
+                Import a FRC-E WMS HTTP Leave Report from HTML
     correct     Update a transaction in place
     void        Delete a transaction (legacy command name)
     rollover    Preview or apply leave year rollover
@@ -128,6 +130,10 @@ Command details and examples:
 
     fedleave import-data --input fedleave_backup.json [--overwrite] [--data-dir PATH]
         Import a JSON archive created by export-data or a single leave-year backup. Existing files are preserved unless --overwrite is used.
+
+    fedleave import-wms-http --input path/to/FRC-E-WMS-leave-report.html [--data-dir PATH]
+        Import a FRC-E WMS HTTP Leave Report from HTML and replace matching transactions in the target leave year.
+        The importer preserves existing automatic accruals and leaves other transaction categories untouched.
 
     fedleave correct --id TRANSACTION_ID --hours HOURS --reason "TEXT" [--json] [--show-transaction-ids] [--data-dir PATH]
         Update the selected transaction in place, preserving its ID and retaining only final values.
