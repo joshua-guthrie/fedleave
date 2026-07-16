@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import importlib
 import json
 import sys
 import types
+from datetime import date
 from pathlib import Path
 
 
@@ -83,7 +85,10 @@ def test_compare_leave_balances_outputs_json_for_multiple_years(tmp_path: Path, 
         year_dir / "2025.json",
         year=2025,
         annual_start=100.0,
-        annual_transactions=[{"date": "2025-06-01", "category": "annual", "direction": "used", "hours": 4.0}],
+        annual_transactions=[
+            {"date": "2025-06-01", "category": "annual", "direction": "used", "hours": 4.0},
+            {"date": "2025-10-01", "category": "annual", "direction": "earned", "hours": 10.0},
+        ],
         overtime_transactions=[{"date": "2025-06-01", "category": "overtime", "direction": "worked", "hours": 6.0}],
     )
     _write_leave_year(
@@ -103,6 +108,13 @@ def test_compare_leave_balances_outputs_json_for_multiple_years(tmp_path: Path, 
     assert [point["year"] for point in payload["points"]] == [2025, 2026]
     assert payload["points"][0]["value"] == 96.0
     assert payload["points"][1]["value"] == 126.0
+
+
+def test_comparison_date_for_year_clamps_february_29_on_non_leap_year(monkeypatch):
+    _install_chart_import_stubs(monkeypatch)
+    charting = importlib.import_module("fedleave.charting")
+
+    assert charting.comparison_date_for_year(date(2024, 2, 29), 2025).isoformat() == "2025-02-28"
 
 
 def test_compare_leave_balances_includes_overtime_worked(tmp_path: Path, capsys, monkeypatch):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from calendar import monthrange
 import json
 import os
 import shutil
@@ -105,6 +106,12 @@ def y_tick_step(y_max: Decimal) -> Decimal:
 def comparison_y_tick_step(y_max: Decimal) -> Decimal:
     target = max(y_max / Decimal("5"), Decimal("10"))
     return max(Decimal("10"), round_up_to_nearest_ten(target))
+
+
+def comparison_date_for_year(as_of: date, year: int) -> date:
+    """Map a selected comparison date onto a specific leave year."""
+    last_day = monthrange(year, as_of.month)[1]
+    return date(year, as_of.month, min(as_of.day, last_day))
 
 
 def _executable_names(app_name: str) -> tuple[str, ...]:
@@ -422,7 +429,8 @@ def comparison_chart_points(
     if not year_dir.exists():
         raise FileNotFoundError(f"Leave year directory not found: {year_dir}")
 
-    target_date = parse_iso_date(as_of).isoformat()
+    selected_date = parse_iso_date(as_of)
+    target_date = selected_date.isoformat()
     points: list[dict[str, Any]] = []
     max_value = Decimal("0")
 
@@ -434,7 +442,8 @@ def comparison_chart_points(
             leave_year = load_leave_year(year, data_dir)
         except FileNotFoundError:
             continue
-        balances = calculate_balances(leave_year, until_date=target_date)
+        comparison_date = comparison_date_for_year(selected_date, year).isoformat()
+        balances = calculate_balances(leave_year, until_date=comparison_date)
         value = Decimal(str(balances.get(category, 0.0)))
         max_value = max(max_value, value)
         points.append(
