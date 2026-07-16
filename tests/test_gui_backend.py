@@ -179,6 +179,7 @@ def test_find_fedleave_reports_search_paths_when_missing(tmp_path: Path, monkeyp
         "__file__",
         str(tmp_path / "fedleave" / "executable_search.py"),
     )
+    monkeypatch.setattr(executable_search, "_candidate_roots", lambda: iter([tmp_path / "fedleave" / "bin", tmp_path / "fedleave" / "dist" ]))
     monkeypatch.setattr(backend_module.shutil, "which", lambda name: None)
 
     with pytest.raises(backend_module.BackendMissingError, match="Searched:"):

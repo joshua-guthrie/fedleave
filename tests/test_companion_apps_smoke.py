@@ -1,12 +1,19 @@
 import json
+import os
 import subprocess
 import sys
+from pathlib import Path
 
 from fedleave.config import init_config
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
-    result = subprocess.run(cmd, text=True, capture_output=True, check=False, **kwargs)
+    env = kwargs.pop("env", os.environ.copy())
+    env["PATH"] = os.pathsep.join([str(ROOT / "bin"), env.get("PATH", "")])
+    result = subprocess.run(cmd, text=True, capture_output=True, check=False, env=env, **kwargs)
     if result.returncode != 0:
         raise AssertionError(
             "Command failed with exit code "

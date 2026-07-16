@@ -36,8 +36,6 @@ def _candidate_roots() -> Iterator[Path]:
     roots.extend(
         [
             package_root,
-            package_root / "dist" / "fedleave-Ubuntu",
-            package_root / "dist" / "fedleave-Windows",
         ]
     )
 

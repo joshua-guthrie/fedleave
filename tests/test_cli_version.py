@@ -1,4 +1,5 @@
 import json
+import sys
 
 from typer.testing import CliRunner
 
@@ -30,7 +31,10 @@ def test_cli_startup_removes_legacy_history_from_default_store(tmp_path, monkeyp
         ),
         encoding="utf-8",
     )
-    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    if sys.platform.startswith("win"):
+        monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "xdg"))
+    else:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
 
     result = CliRunner().invoke(app, ["types"])
 
