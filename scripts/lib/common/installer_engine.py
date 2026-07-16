@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -313,16 +314,22 @@ class InstallerEngine:
         if not dist_dir.exists():
             raise InstallerError(f"Install source does not exist: {dist_dir}")
 
+        version = self._project_version()
         if os.geteuid() != 0:
             if self.options.unattended:
                 raise InstallerError("System-wide install requires elevated privileges in unattended mode.", EXIT_PERMISSION)
-            raise InstallerError("Run LinuxInstall.sh with sudo for system-wide installation.", EXIT_PERMISSION)
+            self.log("Requesting sudo to complete the system-wide installation.")
+            self._run_privileged_python(
+                self._linux_install_helper_code(),
+                [str(self.repo_root), str(dist_dir), version, str(self.options.keep_versions)],
+                "System-wide install",
+            )
+            return
 
         install_root = Path("/opt/fedleave")
         versions = install_root / "versions"
         versions.mkdir(parents=True, exist_ok=True)
 
-        version = self._project_version()
         target = versions / version
         staging = versions / f"{version}.staging"
         if staging.exists():
@@ -341,6 +348,75 @@ class InstallerEngine:
 
         self._install_linux_wrappers(current_link)
         self._cleanup_old_versions(versions, self.options.keep_versions)
+
+    def _run_privileged_python(self, code: str, args: list[str], description: str) -> None:
+        cmd = ["sudo", sys.executable, "-c", code, *args]
+        self.log("RUN: " + " ".join(shlex.quote(part) for part in cmd))
+        process = subprocess.run(cmd, cwd=str(self.repo_root))
+        if process.returncode != 0:
+            raise InstallerError(f"{description} failed ({process.returncode}).", EXIT_BUILD_FAILED)
+
+    def _linux_install_helper_code(self) -> str:
+        return """
+from pathlib import Path
+import shutil
+import sys
+import tomllib
+
+repo_root = Path(sys.argv[1])
+dist_dir = Path(sys.argv[2])
+version = sys.argv[3]
+keep_versions = max(1, int(sys.argv[4]))
+
+install_root = Path('/opt/fedleave')
+versions = install_root / 'versions'
+versions.mkdir(parents=True, exist_ok=True)
+
+target = versions / version
+staging = versions / f'{version}.staging'
+if staging.exists():
+    shutil.rmtree(staging)
+if target.exists():
+    shutil.rmtree(target)
+
+shutil.copytree(dist_dir, staging)
+staging.rename(target)
+
+current_link = install_root / 'current'
+if current_link.exists() or current_link.is_symlink():
+    current_link.unlink()
+current_link.symlink_to(target, target_is_directory=True)
+
+scripts = tomllib.loads((repo_root / 'pyproject.toml').read_text(encoding='utf-8')).get('project', {}).get('scripts', {})
+bin_dir = Path('/usr/local/bin')
+bin_dir.mkdir(parents=True, exist_ok=True)
+for app_name in scripts:
+    wrapper = bin_dir / app_name
+    wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        f"exec '{current_link}/{app_name}/{app_name}' \"$@\"\n",
+        encoding='utf-8',
+    )
+    wrapper.chmod(0o755)
+
+desktop_dir = Path('/usr/local/share/applications')
+desktop_dir.mkdir(parents=True, exist_ok=True)
+desktop_file = desktop_dir / 'fedleave-calendar.desktop'
+desktop_file.write_text(
+    "[Desktop Entry]\n"
+    "Type=Application\n"
+    "Name=FedLeave Calendar\n"
+    "Exec=/usr/local/bin/FedLeaveCalendar\n"
+    "Terminal=false\n"
+    "Categories=Office;Utility;\n",
+    encoding='utf-8',
+)
+
+items = sorted([p for p in versions.iterdir() if p.is_dir()], key=lambda p: p.name)
+if len(items) > keep_versions:
+    for stale in items[:-keep_versions]:
+        shutil.rmtree(stale, ignore_errors=True)
+""".strip()
 
     def _install_linux_wrappers(self, current_link: Path) -> None:
         scripts = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("scripts", {})
