@@ -658,6 +658,118 @@ class ChangeLeaveYearDialog(QDialog):
         return int(self.year_input.currentData())
 
 
+class TransactionDateRangeDialog(QDialog):
+    def __init__(self, start: date, end: date, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("View Leave Transactions")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+
+        self.start_date_input = QDateEdit()
+        self.start_date_input.setCalendarPopup(True)
+        self.start_date_input.setDisplayFormat("yyyy-MM-dd")
+        self.start_date_input.setDate(QDate(start.year, start.month, start.day))
+        form.addRow("Start Date", self.start_date_input)
+
+        self.end_date_input = QDateEdit()
+        self.end_date_input.setCalendarPopup(True)
+        self.end_date_input.setDisplayFormat("yyyy-MM-dd")
+        self.end_date_input.setDate(QDate(end.year, end.month, end.day))
+        form.addRow("End Date", self.end_date_input)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected_dates(self) -> tuple[date, date]:
+        start = date.fromisoformat(self.start_date_input.date().toString("yyyy-MM-dd"))
+        end = date.fromisoformat(self.end_date_input.date().toString("yyyy-MM-dd"))
+        return start, end
+
+
+class LeaveTransactionsDialog(QDialog):
+    def __init__(self, start: date, end: date, transactions: list[dict[str, Any]], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Leave Transactions")
+        self.resize(1100, 560)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(f"Transactions from {start.isoformat()} to {end.isoformat()}"))
+
+        self.table = QTableWidget(len(transactions), 8)
+        self.table.setHorizontalHeaderLabels(["Date", "Type", "Direction", "Hours", "Status", "Source", "Description", "ID"])
+        self.table.verticalHeader().setVisible(False)
+        _set_table_header_alignments(
+            self.table,
+            [
+                TABLE_TEXT_ALIGNMENT,
+                TABLE_TEXT_ALIGNMENT,
+                TABLE_TEXT_ALIGNMENT,
+                TABLE_NUMBER_ALIGNMENT,
+                TABLE_TEXT_ALIGNMENT,
+                TABLE_TEXT_ALIGNMENT,
+                TABLE_TEXT_ALIGNMENT,
+                TABLE_TEXT_ALIGNMENT,
+            ],
+        )
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(7, QHeaderView.ResizeToContents)
+        self.table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self._populate_rows(transactions)
+        self.table.setSortingEnabled(True)
+        layout.addWidget(self.table)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _populate_rows(self, transactions: list[dict[str, Any]]) -> None:
+        for row, transaction in enumerate(transactions):
+            category = str(transaction.get("category", "")).strip()
+            label = CATEGORY_LABELS.get(category, (category, category))[1]
+            self._set_row(
+                row,
+                [
+                    str(transaction.get("date", "")),
+                    label,
+                    str(transaction.get("direction", "")).replace("_", " ").title(),
+                    _fmt(transaction.get("hours")),
+                    str(transaction.get("status", "")).replace("_", " "),
+                    str(transaction.get("source", "")).replace("_", " "),
+                    str(transaction.get("description", "")),
+                    str(transaction.get("id", "")),
+                ],
+            )
+
+    def _set_row(self, row: int, values: list[str]) -> None:
+        alignments = [
+            TABLE_TEXT_ALIGNMENT,
+            TABLE_TEXT_ALIGNMENT,
+            TABLE_TEXT_ALIGNMENT,
+            TABLE_NUMBER_ALIGNMENT,
+            TABLE_TEXT_ALIGNMENT,
+            TABLE_TEXT_ALIGNMENT,
+            TABLE_TEXT_ALIGNMENT,
+            TABLE_TEXT_ALIGNMENT,
+        ]
+        for column, value in enumerate(values):
+            self.table.setItem(row, column, _table_item(value, alignments[column]))
+
+
 def _available_leave_years(data_dir: str | None) -> list[int]:
     base_dir = get_default_data_dir(Path(data_dir) if data_dir else None)
     year_dir = base_dir / "leave_years"
@@ -788,6 +900,7 @@ class MainWindow(QMainWindow):
         self._action(view_menu, "Next Month", self.next_month)
         self._action(view_menu, "Select Month...", self.select_month)
         self._action(view_menu, "Today", self.go_today)
+        self._action(view_menu, "View Leave Transactions...", self.view_leave_transactions)
         leave_charts_menu = view_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self._action(leave_charts_menu, label, lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label))
@@ -1215,6 +1328,55 @@ class MainWindow(QMainWindow):
 
     def show_abbreviations(self) -> None:
         AbbreviationsDialog(self).exec()
+
+    def view_leave_transactions(self) -> None:
+        today = date.today()
+        start_default = date(self.year, self.month, 1)
+        end_default = date(self.year, self.month, calendar.monthrange(self.year, self.month)[1])
+        if end_default > today:
+            end_default = today
+
+        dialog = TransactionDateRangeDialog(start_default, end_default, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+
+        start_date, end_date = dialog.selected_dates()
+        if end_date < start_date:
+            QMessageBox.warning(self, "View Leave Transactions", "The end date must be on or after the start date.")
+            return
+
+        try:
+            transactions = self._transactions_in_range(start_date, end_date)
+        except BackendError as exc:
+            QMessageBox.warning(self, "View Leave Transactions", str(exc))
+            return
+
+        if not transactions:
+            QMessageBox.information(self, "View Leave Transactions", "No leave transactions were found for that date range.")
+            return
+
+        LeaveTransactionsDialog(start_date, end_date, transactions, self).exec()
+
+    def _transactions_in_range(self, start_date: date, end_date: date) -> list[dict[str, Any]]:
+        years = _available_leave_years(self.settings.data_dir or None)
+        if not years:
+            years = [self.year]
+
+        rows: list[dict[str, Any]] = []
+        for year in years:
+            for transaction in self.backend.list_transactions(year):
+                try:
+                    transaction_date = date.fromisoformat(str(transaction.get("date", "")))
+                except ValueError:
+                    continue
+                if transaction_date < start_date or transaction_date > end_date:
+                    continue
+                if not _nonzero(transaction.get("hours")):
+                    continue
+                rows.append(transaction)
+
+        rows.sort(key=lambda transaction: (str(transaction.get("date", "")), str(transaction.get("id", ""))))
+        return rows
 
     def about_backend(self) -> None:
         try:

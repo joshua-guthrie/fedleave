@@ -120,6 +120,13 @@ class FedleaveBackend:
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])
 
+    def list_transactions(self, year: int) -> list[dict[str, Any]]:
+        payload = self.run_json(["list", "--year", str(year), "--json"])
+        transactions = payload.get("transactions")
+        if not isinstance(transactions, list):
+            raise BackendError("fedleave returned an unexpected transaction list payload.")
+        return [item for item in transactions if isinstance(item, dict)]
+
     def set_day(self, day: str, values: dict[str, float], comments: dict[str, str] | None = None) -> dict[str, Any]:
         args = ["set-day", "--date", day, "--authoritative", "--json"]
         for category, value in values.items():

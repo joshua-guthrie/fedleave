@@ -37,6 +37,7 @@ def test_view_menu_includes_select_month_action(monkeypatch):
     labels = [action.text() for action in view_action.menu().actions() if action.text()]
 
     assert "Select Month..." in labels
+    assert "View Leave Transactions..." in labels
 
 
 def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):

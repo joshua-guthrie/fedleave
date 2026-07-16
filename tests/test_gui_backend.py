@@ -41,6 +41,26 @@ elif args[:1] == ["use-or-lose"]:
             }
         )
     )
+elif args[:1] == ["list"]:
+    print(
+        json.dumps(
+            {
+                "year": int(args[args.index("--year") + 1]),
+                "transactions": [
+                    {
+                        "id": "20260708-001",
+                        "date": "2026-07-08",
+                        "category": "annual",
+                        "direction": "used",
+                        "hours": 5.0,
+                        "status": "planned",
+                        "source": "manual",
+                        "description": "Doctor",
+                    }
+                ],
+            }
+        )
+    )
 elif args[:1] == ["--version"]:
     print("fedleave 0.2.0")
 else:
@@ -76,6 +96,12 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     projection = backend.use_or_lose(2026)
     assert projection["year"] == 2026
     assert projection["use_or_lose"]["use_or_lose"] == 0.0
+
+    transactions = backend.list_transactions(2026)
+    assert len(transactions) == 1
+    assert transactions[0]["id"] == "20260708-001"
+    assert transactions[0]["date"] == "2026-07-08"
+    assert transactions[0]["hours"] == 5.0
 
     result = backend.set_day(
         "2026-07-08",
