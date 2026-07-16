@@ -48,7 +48,7 @@ def test_linux_install_prompts_for_sudo_instead_of_failing(tmp_path, monkeypatch
     options = _make_options(module)
     monkeypatch.setattr(module.InstallerEngine, "_build_workspace_needs_repair", lambda self: False)
     engine = module.InstallerEngine(ROOT, options)
-    monkeypatch.setattr(module.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(module.os, "geteuid", lambda: 1000, raising=False)
     monkeypatch.setattr(module.InstallerEngine, "_project_version", lambda self: "9.9.9")
 
     dist_dir = tmp_path / "dist" / "fedleave-Ubuntu"
@@ -83,7 +83,7 @@ def test_linux_install_requires_privilege_in_unattended_mode(tmp_path, monkeypat
     options.unattended = True
     monkeypatch.setattr(module.InstallerEngine, "_build_workspace_needs_repair", lambda self: False)
     engine = module.InstallerEngine(ROOT, options)
-    monkeypatch.setattr(module.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(module.os, "geteuid", lambda: 1000, raising=False)
 
     dist_dir = tmp_path / "dist" / "fedleave-Ubuntu"
     dist_dir.mkdir(parents=True)
@@ -123,8 +123,8 @@ def test_linux_install_repairs_existing_build_workspace_ownership(tmp_path, monk
         return SimpleNamespace(returncode=0)
 
     monkeypatch.setattr(module.os, "access", fake_access)
-    monkeypatch.setattr(module.os, "getuid", lambda: 1000)
-    monkeypatch.setattr(module.os, "getgid", lambda: 1000)
+    monkeypatch.setattr(module.os, "getuid", lambda: 1000, raising=False)
+    monkeypatch.setattr(module.os, "getgid", lambda: 1000, raising=False)
     monkeypatch.setattr(module.subprocess, "run", fake_run)
 
     engine._ensure_build_workspace_access()
