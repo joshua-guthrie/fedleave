@@ -24,13 +24,27 @@ def ensure_data_dir(data_dir: Path) -> None:
 
 
 def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
-    temp_path = path.with_suffix(path.suffix + ".tmp")
-    with open(temp_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, sort_keys=False)
-        f.write("\n")
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exists: {path}")
-    temp_path.replace(path)
+
+    temp_path: Path | None = None
+    try:
+        with NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f"{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+            temp_path = Path(f.name)
+            json.dump(data, f, indent=2, sort_keys=False)
+            f.write("\n")
+        temp_path.replace(path)
+    except Exception:
+        if temp_path is not None and temp_path.exists():
+            temp_path.unlink()
+        raise
 
 
 def backup_file(path: Path) -> Path:
@@ -38,8 +52,14 @@ def backup_file(path: Path) -> Path:
         raise FileNotFoundError(path)
     backup_dir = path.parent.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S")
-    backup_path = backup_dir / f"{path.name}.{timestamp}.bak"
+    timestamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")
+    counter = 0
+    while True:
+        suffix = f".{timestamp}" if counter == 0 else f".{timestamp}.{counter}"
+        backup_path = backup_dir / f"{path.name}{suffix}.bak"
+        if not backup_path.exists():
+            break
+        counter += 1
     shutil.copy2(path, backup_path)
     return backup_path
 

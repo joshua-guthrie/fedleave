@@ -163,3 +163,42 @@ def test_import_preserves_existing_current_year_file(tmp_path: Path):
 
     assert json.loads((target / "leave_years" / "2026.json").read_text(encoding="utf-8")) == current_year
     assert json.loads((target / "leave_years" / "2025.json").read_text(encoding="utf-8")) == previous_year
+
+
+def test_import_validates_the_entire_archive_before_writing(tmp_path: Path):
+    target = tmp_path / "target"
+    archive = tmp_path / "invalid.json"
+    archive.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "config": {"schema_version": 1, "user": {"display_name": "Imported"}},
+                "leave_years": {
+                    "2026": {
+                        "schema_version": 1,
+                        "leave_year": 2026,
+                        "leave_year_start": "2026-01-11",
+                        "leave_year_end": "2027-01-09",
+                        "pay_period_count": 1,
+                        "annual_leave_accrual_hours": 6.0,
+                        "sick_leave_accrual_hours": 4.0,
+                        "starting_balances": {"annual": 0.0, "sick": 0.0},
+                        "carryover_from_previous_year": {"annual": 0.0, "sick": 0.0},
+                        "transactions": [],
+                        "pay_periods": [],
+                        "holidays": [],
+                    }
+                },
+                "holiday_cache": {
+                    "bad/name": {"year": 2026}
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(typer.Exit) as excinfo:
+        import_data(input=archive, data_dir=target)
+
+    assert excinfo.value.exit_code == 2
+    assert not target.exists()

@@ -176,20 +176,20 @@ def import_data(
         raise typer.Exit(code=2)
 
     base = get_default_data_dir(data_dir)
-    ensure_data_dir(base)
-
     try:
+        write_items: list[tuple[Path, dict]] = []
+
         config = archive.get("config")
         if config is not None:
             if not isinstance(config, dict):
                 raise ValueError("config must be an object")
-            _write_import_file(base / "config.json", config, overwrite=overwrite)
+            write_items.append((base / "config.json", config))
 
         for year, leave_year in archive.get("leave_years", {}).items():
             if not str(year).isdigit() or not isinstance(leave_year, dict):
                 raise ValueError(f"Invalid leave year entry: {year}")
             remove_legacy_transaction_history(leave_year)
-            _write_import_file(base / "leave_years" / f"{year}.json", leave_year, overwrite=overwrite)
+            write_items.append((base / "leave_years" / f"{year}.json", leave_year))
 
         holiday_cache = archive.get("holiday_cache", {})
         if not isinstance(holiday_cache, dict):
@@ -197,7 +197,22 @@ def import_data(
         for name, cache in holiday_cache.items():
             if "/" in str(name) or "\\" in str(name) or not isinstance(cache, dict):
                 raise ValueError(f"Invalid holiday cache entry: {name}")
-            _write_import_file(base / "holiday_cache" / f"{name}.json", cache, overwrite=overwrite)
+            write_items.append((base / "holiday_cache" / f"{name}.json", cache))
+
+        if not overwrite:
+            for path, _ in write_items:
+                if path.exists():
+                    console.print(f"[red]ERROR:[/red] Refusing to overwrite existing file: {path}")
+                    raise typer.Exit(code=2)
+    except ValueError as exc:
+        console.print(f"[red]ERROR:[/red] {exc}")
+        raise typer.Exit(code=2)
+
+    ensure_data_dir(base)
+
+    try:
+        for path, payload in write_items:
+            _write_import_file(path, payload, overwrite=overwrite)
     except FileExistsError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
