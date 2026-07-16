@@ -630,6 +630,48 @@ class SelectDateDialog(QDialog):
         return self.date_input.date().toString("yyyy-MM-dd")
 
 
+class ChangeAccrualDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Change Annual Accrual")
+        self.setModal(True)
+
+        layout = QVBoxLayout(self)
+        description = QLabel(
+            "Change the annual leave accrual rate starting on the selected date. "
+            "FedLeave will update future automatic annual leave accrual transactions for that leave year."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        form = QFormLayout()
+
+        self.effective_date_input = QDateEdit()
+        self.effective_date_input.setCalendarPopup(True)
+        self.effective_date_input.setDisplayFormat("yyyy-MM-dd")
+        self.effective_date_input.setDate(QDate.currentDate())
+        form.addRow("Effective date", self.effective_date_input)
+
+        self.hours_input = QComboBox()
+        for hours in (4, 6, 8):
+            self.hours_input.addItem(f"{hours} hours per pay period", hours)
+        self.hours_input.setCurrentIndex(1)
+        form.addRow("Annual accrual rate", self.hours_input)
+
+        layout.addLayout(form)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def selected_effective_date(self) -> str:
+        return self.effective_date_input.date().toString("yyyy-MM-dd")
+
+    def selected_hours(self) -> float:
+        return float(self.hours_input.currentData())
+
+
 class ChangeLeaveYearDialog(QDialog):
     def __init__(self, years: list[int], current_year: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -917,6 +959,7 @@ class MainWindow(QMainWindow):
         self._toggle(view_menu, "Show Pay-Day Highlight", self.settings.show_paydays, "show_paydays")
         self._toggle(view_menu, "Show Pay-Period End Highlight", self.settings.show_pay_period_end, "show_pay_period_end")
         tools_menu = self.menuBar().addMenu("Tools")
+        self._action(tools_menu, "Change Accrual...", self.change_accrual)
         self._action(tools_menu, "Validate Data", self.validate_data)
         self._action(tools_menu, "Export Data...", self.export_data)
         self._action(tools_menu, "Import Data...", self.import_data)
@@ -1169,6 +1212,21 @@ class MainWindow(QMainWindow):
             self.backend.run_text(["import-data", "--input", path, "--overwrite"])
         except BackendError as exc:
             QMessageBox.warning(self, "Import Failed", str(exc))
+            return
+        self.refresh()
+
+    def change_accrual(self) -> None:
+        dialog = ChangeAccrualDialog(self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        try:
+            self.backend.accrual_change(
+                as_of=dialog.selected_effective_date(),
+                hours=dialog.selected_hours(),
+                category="annual",
+            )
+        except BackendError as exc:
+            QMessageBox.warning(self, "Change Accrual", str(exc))
             return
         self.refresh()
 

@@ -21,6 +21,7 @@ def test_tools_menu_hides_internal_data_folder(monkeypatch):
     labels = [action.text() for action in tools_action.menu().actions()]
 
     assert labels == [
+        "Change Accrual...",
         "Validate Data",
         "Export Data...",
         "Import Data...",
@@ -86,6 +87,59 @@ def test_change_leave_year_action_updates_displayed_year(monkeypatch, tmp_path):
 
     assert window.year == 2024
     assert refreshed[-1] == 2024
+
+
+def test_change_accrual_action_updates_backend_and_refreshes(monkeypatch):
+    _application()
+    refreshed: list[int] = []
+
+    def fake_refresh(self):
+        refreshed.append(self.year)
+
+    class FakeBackend:
+        def __init__(self):
+            self.calls: list[dict[str, object]] = []
+
+        def accrual_change(self, **kwargs):
+            self.calls.append(kwargs)
+            return {
+                "action": "accrual_changed",
+                "year": 2026,
+                "previous_hours_per_pay_period": 6.0,
+                "new_hours_per_pay_period": 8.0,
+                "updated_auto_accrual_transactions": 13,
+            }
+
+    fake_backend = FakeBackend()
+    monkeypatch.setattr(MainWindow, "refresh", fake_refresh)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: fake_backend)
+    window = MainWindow()
+
+    class FakeChangeAccrualDialog:
+        def __init__(self, parent=None):
+            self.parent = parent
+
+        def exec(self):
+            return QDialog.Accepted
+
+        def selected_effective_date(self):
+            return "2026-07-12"
+
+        def selected_hours(self):
+            return 8.0
+
+    monkeypatch.setattr("fedleave_gui.main_window.ChangeAccrualDialog", FakeChangeAccrualDialog)
+
+    window.change_accrual()
+
+    assert fake_backend.calls == [
+        {
+            "as_of": "2026-07-12",
+            "hours": 8.0,
+            "category": "annual",
+        }
+    ]
+    assert refreshed[-1] == window.year
 
 
 def test_help_menu_hides_backend_about_action(monkeypatch):

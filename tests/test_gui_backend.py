@@ -22,6 +22,8 @@ if args[:1] == ["month"]:
     print(json.dumps({"year": int(args[args.index("--year") + 1]), "month": int(args[args.index("--month") + 1]), "days": []}))
 elif args[:1] == ["set-day"]:
     print(json.dumps({"action": "set-day", "args": args}))
+elif args[:1] == ["accrual-change"]:
+    print(json.dumps({"action": "accrual_changed", "args": args}))
 elif args[:1] == ["validate"]:
     print(json.dumps({"ok": True}))
 elif args[:1] == ["use-or-lose"]:
@@ -119,6 +121,26 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     assert "2" in args
     assert "--credit-comment" in args
     assert "Late" in args
+    assert args[-2:] == ["--data-dir", str(tmp_path / "data")]
+
+
+def test_gui_backend_uses_fedleave_binary_for_accrual_change(tmp_path: Path):
+    fake = _fake_fedleave(tmp_path / "fedleave")
+    backend = FedleaveBackend(BackendOptions(fedleave_path=str(fake), data_dir=str(tmp_path / "data")))
+
+    result = backend.accrual_change(as_of="2026-07-12", hours=8.0)
+
+    args = result["args"]
+    assert args[:8] == [
+        "accrual-change",
+        "--as-of",
+        "2026-07-12",
+        "--category",
+        "annual",
+        "--hours",
+        "8",
+        "--json",
+    ]
     assert args[-2:] == ["--data-dir", str(tmp_path / "data")]
 
 

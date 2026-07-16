@@ -114,6 +114,31 @@ class FedleaveBackend:
             raise BackendError("fedleave backend returned an empty version response.")
         return version
 
+    def accrual_change(
+        self,
+        *,
+        as_of: str,
+        hours: float,
+        category: str = "annual",
+        reason: str = "",
+        year: int | None = None,
+    ) -> dict[str, Any]:
+        command = [
+            "accrual-change",
+            "--as-of",
+            as_of,
+            "--category",
+            category,
+            "--hours",
+            _format_number(hours),
+            "--json",
+        ]
+        if year is not None:
+            command.extend(["--year", str(year)])
+        if reason:
+            command.extend(["--reason", reason])
+        return self.run_json(command)
+
     def use_or_lose(self, year: int) -> dict[str, Any]:
         return self.run_json(["use-or-lose", "--year", str(year), "--json"])
 
