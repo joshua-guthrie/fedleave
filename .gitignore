@@ -12,6 +12,8 @@ lib/
 lib64/
 !scripts/lib/
 !scripts/lib/**
+scripts/lib/**/__pycache__/
+scripts/lib/**/*.pyc
 .pyinstaller-venv/
 .pyinstaller-build/
 .pyinstaller-spec/
