@@ -634,16 +634,36 @@ directly, or choose **View > Analytics...** in `FedLeaveCalendar`; the calendar
 passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
 
-![FedLeave Analytics summary](examples/fedleave-analytics-main.png)
-
-![FedLeave Analytics supporting-transactions dialog](examples/fedleave-analytics-supporting-transactions.png)
-
 The four pages are Summary, Seasonality, Calendar Heatmap, and Overtime, Comp,
 and Credit. Monthly views combine horizontal bar charts with their supporting
 tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
 Leave Year values; double-clicking a row opens its supporting transactions.
 The application never modifies leave data or displays backend/data-directory
 diagnostics in the user interface.
+
+Summary provides the headline leave-use, overtime, comp-time, credit-hour, and
+data-quality measures for the selected leave year:
+
+![FedLeave Analytics summary](examples/fedleave-analytics-main.png)
+
+Seasonality compares leave use and work patterns by month, weekday, and pay
+period, with a chart and the exact values shown together:
+
+![FedLeave Analytics seasonality](examples/fedleave-analytics-seasonality.png)
+
+Calendar Heatmap shows when leave was used or time was earned. Its selector only
+offers leave types and directions that have non-zero data:
+
+![FedLeave Analytics calendar heatmap](examples/fedleave-analytics-calendar-heatmap.png)
+
+Overtime, Comp, and Credit explains earned, used, paid-out, forfeited, expired,
+and outstanding hours, including monthly charts and supporting tables:
+
+![FedLeave Analytics overtime, comp, and credit analysis](examples/fedleave-analytics-overtime-comp-credit.png)
+
+Double-click a table row to inspect the transactions supporting that result:
+
+![FedLeave Analytics supporting-transactions dialog](examples/fedleave-analytics-supporting-transactions.png)
 
 ```bash
 FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \

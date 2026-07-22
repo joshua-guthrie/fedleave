@@ -5,6 +5,7 @@ from pathlib import Path
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 from fedleave_analytics.analytics import analyze_leave_year
@@ -114,6 +115,19 @@ def test_table_headers_match_data_alignment_and_have_role_based_widths():
     assert table.columnWidth(0) >= 180
     assert table.columnWidth(1) >= 180
     assert table.columnWidth(2) >= 180
+
+    long_headers = table_widget(
+        [{"month": "Jan 2026", "credit_earned": 2, "combined_additional_work": 3}],
+        [
+            ("month", "Month"),
+            ("credit_earned", "Credit Earned or Worked"),
+            ("combined_additional_work", "Combined Additional Work"),
+        ],
+    )
+    metrics = QFontMetrics(long_headers.horizontalHeader().font())
+    for column in (1, 2):
+        label = long_headers.horizontalHeaderItem(column).text()
+        assert long_headers.columnWidth(column) >= metrics.horizontalAdvance(label) + 64
 
 
 def test_dynamic_heatmaps_and_monthly_lifecycle_charts_are_populated():

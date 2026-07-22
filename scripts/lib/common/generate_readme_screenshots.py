@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import date
 from pathlib import Path
 import subprocess
 import sys
@@ -53,20 +54,41 @@ def _sample_data(data_dir: Path) -> None:
         leave_year = load_json(path)
         entries = [
             (f"{year}-02-06", "annual", "used", 8, "Winter annual leave"),
-            (f"{year}-03-17", "sick", "used", 4, "Medical appointment"),
-            (f"{year}-04-11", "credit", "earned", 3 + index, "Project support"),
-            (f"{year}-04-18", "credit", "used", 2, "Credit hours used"),
-            (f"{year}-05-09", "comp", "earned", 6 + index, "Release support"),
+            (f"{year}-02-20", "sick", "used", 4, "Medical appointment"),
+            (f"{year}-03-06", "annual", "used", 8, "Long weekend"),
+            (f"{year}-03-17", "sick", "used", 8, "Sick leave"),
+            (f"{year}-03-27", "overtime", "worked", 4 + index, "Quarter-end support"),
+            (f"{year}-04-10", "credit", "earned", 3 + index, "Project support"),
+            (f"{year}-04-17", "credit", "used", 2, "Credit hours used"),
+            (f"{year}-04-24", "annual", "used", 8, "Annual leave"),
+            (f"{year}-05-08", "comp", "earned", 8 + index, "Release support"),
             (f"{year}-05-22", "overtime", "worked", 5 + index, "Overtime worked"),
-            (f"{year}-06-12", "travel_comp", "earned", 8, "Official travel"),
-            (f"{year}-06-26", "time_off_award", "earned", 8, "Time-off award"),
-            (f"{year}-07-03", "annual", "used", 16 + index * 2, "Summer leave"),
-            (f"{year}-07-17", "comp", "used", 3, "Comp time used"),
-            (f"{year}-08-14", "annual", "used", 8, "Scheduled annual leave"),
-            (f"{year}-09-04", "sick", "used", 8, "Scheduled medical leave"),
+            (f"{year}-05-29", "sick", "used", 4, "Medical appointment"),
+            (f"{year}-06-05", "travel_comp", "earned", 10, "Official travel"),
+            (f"{year}-06-12", "time_off_award", "earned", 16, "Time-off award"),
+            (f"{year}-06-19", "travel_comp", "used", 4, "Travel comp used"),
+            (f"{year}-06-26", "annual", "used", 8, "Annual leave"),
+            (f"{year}-07-02", "sick", "used", 2, "Medical appointment"),
+            (f"{year}-07-06", "annual", "used", 8, "Summer vacation"),
+            (f"{year}-07-07", "annual", "used", 8, "Summer vacation"),
+            (f"{year}-07-08", "annual", "used", 8, "Summer vacation"),
+            (f"{year}-07-09", "annual", "used", 8, "Summer vacation"),
+            (f"{year}-07-10", "annual", "used", 8, "Summer vacation"),
+            (f"{year}-07-15", "credit", "earned", 2 + index, "Late meeting"),
+            (f"{year}-07-17", "comp", "used", 4, "Comp time used"),
+            (f"{year}-07-21", "sick", "used", 2, "Medical appointment"),
+            (f"{year}-07-24", "travel_comp", "used", 4, "Travel comp used"),
+            (f"{year}-07-31", "time_off_award", "used", 8, "Time-off award used"),
+            (f"{year}-08-14", "annual", "used", 8, "Annual leave"),
+            (f"{year}-08-28", "credit", "used", 3, "Credit hours used"),
+            (f"{year}-09-04", "sick", "used", 8, "Medical leave"),
+            (f"{year}-09-18", "comp", "earned", 6 + index, "Deployment support"),
             (f"{year}-10-09", "overtime", "worked", 7 + index, "Quarter-end support"),
-            (f"{year}-11-20", "annual", "used", 24, "Holiday leave"),
+            (f"{year}-10-23", "comp", "forfeited", 2, "Comp time forfeited"),
+            (f"{year}-11-20", "annual", "used", 24, "Thanksgiving leave"),
+            (f"{year}-12-04", "sick", "used", 4, "Medical appointment"),
             (f"{year}-12-18", "annual", "used", 16, "Year-end leave"),
+            (f"{year}-12-23", "time_off_award", "used", 4, "Time-off award used"),
         ]
         existing_ids = [str(tx.get("id", "")) for tx in leave_year.get("transactions", [])]
         for day, category, direction, hours, description in entries:
@@ -158,10 +180,15 @@ def _chart_screenshots(data_dir: Path) -> None:
 
 
 def _capture(widget: Any, path: Path, width: int, height: int, app: Any) -> None:
+    from PySide6.QtCore import QCoreApplication, QEvent
+
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
     widget.resize(width, height)
     widget.show()
     for _ in range(5):
         app.processEvents()
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    app.processEvents()
     image = widget.grab()
     if not image.save(str(path), "PNG"):
         raise RuntimeError(f"Could not save screenshot: {path}")
@@ -172,7 +199,7 @@ def _capture(widget: Any, path: Path, width: int, height: int, app: Any) -> None
 def _gui_screenshots(data_dir: Path) -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QDate
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QAbstractItemView, QApplication, QSplitter
 
     from fedleave_analytics.analytics import analyze_leave_year
     from fedleave.storage import load_json
@@ -194,7 +221,7 @@ def _gui_screenshots(data_dir: Path) -> None:
     window.month = 7
     window.balance_as_of = window.today
     window.refresh()
-    _capture(window, EXAMPLES / "fedleave-calendar-main-screen.png", 1920, 1080, app)
+    _capture(window, EXAMPLES / "fedleave-calendar-main-screen.png", 2560, 1440, app)
 
     day = {
         "date": "2026-07-17",
@@ -269,13 +296,38 @@ def _gui_screenshots(data_dir: Path) -> None:
             "leave_year_end": payload["leave_year_end"],
             "transactions": payload["transactions"],
             "available_leave_years": [2024, 2025, 2026],
-        }
+        },
+        date(2026, 7, 22),
     )
     analytics = AnalyticsWindow(BACKEND, str(data_dir), 2026, font_size=11, auto_load=False)
     analytics.set_data(analytics_data)
+    analytics.pages.setCurrentIndex(0)
     _capture(analytics, EXAMPLES / "fedleave-analytics-main.png", 1920, 1080, app)
 
-    detail_rows = analytics_data["transactions"][:8]
+    analytics.pages.setCurrentIndex(1)
+    analytics.seasonality_selector.setCurrentText("Leave Used by Month")
+    _capture(analytics, EXAMPLES / "fedleave-analytics-seasonality.png", 1920, 1080, app)
+
+    analytics.pages.setCurrentIndex(2)
+    for row in range(analytics.heatmap_table.rowCount()):
+        item = analytics.heatmap_table.item(row, 0)
+        if item is not None and item.text() == "2026-07-02":
+            analytics.heatmap_table.scrollToItem(item, QAbstractItemView.PositionAtTop)
+            break
+    _capture(analytics, EXAMPLES / "fedleave-analytics-calendar-heatmap.png", 1920, 1080, app)
+
+    analytics.pages.setCurrentIndex(3)
+    analytics.lifecycle_tabs.setCurrentIndex(4)
+    lifecycle_splitter = analytics.overtime_comp_page.findChild(QSplitter)
+    if lifecycle_splitter is not None:
+        lifecycle_splitter.setSizes([500, 300])
+    _capture(analytics, EXAMPLES / "fedleave-analytics-overtime-comp-credit.png", 1920, 1080, app)
+
+    detail_rows = [
+        row
+        for row in analytics_data["transactions"]
+        if row.get("source") == "screenshot-sample" and str(row.get("date", "")).startswith("2026-07")
+    ][:8]
     _capture(
         TransactionDialog(detail_rows),
         EXAMPLES / "fedleave-analytics-supporting-transactions.png",

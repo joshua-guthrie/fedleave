@@ -18,6 +18,9 @@ EXPECTED_SCREENSHOTS = {
     "examples/fedleave-calendar-expiring-leave.png",
     "examples/fedleave-calendar-transactions.png",
     "examples/fedleave-analytics-main.png",
+    "examples/fedleave-analytics-seasonality.png",
+    "examples/fedleave-analytics-calendar-heatmap.png",
+    "examples/fedleave-analytics-overtime-comp-credit.png",
     "examples/fedleave-analytics-supporting-transactions.png",
     "examples/annual-leave-chart-sample.png",
     "examples/sick-leave-chart-sample.png",
@@ -60,3 +63,5 @@ def test_readme_identifies_fedleave_as_main_and_analytics_as_a_companion() -> No
     companion_section = text.split("## Companion Applications", 1)[1]
     assert "### Companion Application: FedLeaveAnalytics" in companion_section
     assert "View > Analytics..." in companion_section
+    for page in ("Summary", "Seasonality", "Calendar Heatmap", "Overtime, Comp, and Credit"):
+        assert page in companion_section

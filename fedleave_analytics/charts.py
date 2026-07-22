@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor, QFont, QPainter, QPen, QPixmap
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QDialog,
@@ -79,6 +79,7 @@ def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> 
             table.setItem(row_index, column_index, item)
     table.resizeColumnsToContents()
     table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+    font_metrics = QFontMetrics(table.horizontalHeader().font())
     for column_index, (key, label) in enumerate(columns):
         current = table.columnWidth(column_index)
         if key == "month":
@@ -95,7 +96,8 @@ def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> 
             preferred = 145
         else:
             preferred = 115
-        table.setColumnWidth(column_index, max(current, preferred))
+        header_width = font_metrics.horizontalAdvance(label) + 64
+        table.setColumnWidth(column_index, max(current, preferred, header_width))
     table.horizontalHeader().sectionClicked.connect(lambda section, current=table: _enable_sorting(current, section))
     table.setAlternatingRowColors(True)
     return table
@@ -199,6 +201,11 @@ def render_horizontal_bar_chart(
         painter.setFont(title_font)
         painter.drawText(60, 30, WIDTH - 120, 55, Qt.AlignCenter, title)
 
+        body_font = QFont(painter.font())
+        body_font.setPointSize(10)
+        body_font.setBold(False)
+        painter.setFont(body_font)
+
         left, top, right, bottom = 190, 145, WIDTH - 65, HORIZONTAL_HEIGHT - 80
         values = [float(row.get(key) or 0) for row in rows for key, _label in series]
         minimum = min([0.0, *values])
@@ -223,9 +230,6 @@ def render_horizontal_bar_chart(
 
         row_height = (bottom - top) / max(1, len(rows))
         bar_height = max(3.0, min(22.0, row_height * 0.72 / max(1, len(series))))
-        body_font = QFont(painter.font())
-        body_font.setPointSize(10)
-        painter.setFont(body_font)
         for row_index, row in enumerate(rows):
             center_y = top + row_height * (row_index + 0.5)
             painter.setPen(QColor(TEXT))

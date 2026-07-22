@@ -239,6 +239,7 @@ class DayCell(QPushButton):
         super().__init__()
         self.day = day
         self.setMinimumSize(112, 92)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCursor(Qt.PointingHandCursor)
         self._display_text = self._text_for_day(settings)
         lines = self._display_text.splitlines()
