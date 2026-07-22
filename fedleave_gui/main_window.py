@@ -3,6 +3,7 @@ from __future__ import annotations
 import calendar
 import html
 import os
+import subprocess
 import sys
 import tempfile
 from datetime import datetime

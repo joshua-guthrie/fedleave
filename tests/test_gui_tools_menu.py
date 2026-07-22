@@ -43,6 +43,35 @@ def test_view_menu_includes_select_month_action(monkeypatch):
 
     assert "Select Month..." in labels
     assert "View Leave Transactions..." in labels
+    assert "Analytics..." in labels
+
+
+def test_analytics_view_action_launches_companion_with_current_context(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(
+        "fedleave_gui.main_window.load_settings",
+        lambda: GuiSettings(data_dir=str(tmp_path / "data"), font_size=12, pdf_export_folder=str(tmp_path / "pdf")),
+    )
+    window = MainWindow()
+    window.year = 2027
+    backend_path = tmp_path / "fedleave"
+    analytics_path = tmp_path / "FedLeaveAnalytics"
+    calls = []
+    monkeypatch.setattr(window.backend, "executable_path", lambda: backend_path)
+    monkeypatch.setattr("fedleave_gui.main_window.find_analytics", lambda: analytics_path)
+    monkeypatch.setattr("fedleave_gui.main_window.subprocess.Popen", lambda command: calls.append(command))
+
+    window.open_analytics()
+
+    assert calls == [[
+        str(analytics_path),
+        "--backend", str(backend_path),
+        "--year", "2027",
+        "--font-size", "12",
+        "--data-dir", str(tmp_path / "data"),
+        "--pdf-folder", str(tmp_path / "pdf"),
+    ]]
 
 
 def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):
