@@ -143,3 +143,30 @@ def test_windows_helper_restores_previous_install_if_bundle_is_invalid(tmp_path)
     assert (target / "old.txt").read_text(encoding="utf-8") == "old"
     assert not target.with_name("fedleave.staging").exists()
     assert not target.with_name("fedleave.previous").exists()
+
+
+def test_build_publish_succeeds_when_previous_windows_files_remain_locked(tmp_path, monkeypatch):
+    module = _load_module("windows_publish_engine", ENGINE_PATH)
+    engine = _engine(module)
+    messages: list[str] = []
+    engine.log = messages.append
+    completed = tmp_path / "completed" / "fedleave-Windows"
+    completed.mkdir(parents=True)
+    (completed / "new.txt").write_text("new build", encoding="utf-8")
+    published = tmp_path / "dist" / "fedleave-Windows"
+    published.mkdir(parents=True)
+    (published / "locked.pyd").write_text("old build", encoding="utf-8")
+
+    def locked_cleanup(path):
+        raise PermissionError(5, "Access is denied", str(path / "locked.pyd"))
+
+    monkeypatch.setattr(engine, "_remove_tree_with_retries", locked_cleanup)
+
+    engine._publish_build(completed, published)
+
+    assert (published / "new.txt").read_text(encoding="utf-8") == "new build"
+    assert not (published / "locked.pyd").exists()
+    abandoned = list(published.parent.glob(".fedleave-Windows.previous-*"))
+    assert len(abandoned) == 1
+    assert (abandoned[0] / "locked.pyd").read_text(encoding="utf-8") == "old build"
+    assert any("WARNING: Previous build remains" in message for message in messages)

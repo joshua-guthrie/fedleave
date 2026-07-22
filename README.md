@@ -6,9 +6,7 @@ Federal leave and time tracker.
   <img src="assets/fedleave-logo.png" alt="FedLeave logo" width="640">
 </p>
 
-This project is a command-line application for tracking federal-style leave balances and generating pay period calendars.
-
-The hope is that it is not only useful at the CLI, but could become the basis of larger leave tracking applications (web apps or GUIs).
+The main application is `fedleave`, a command-line leave ledger and the source of truth for every read, write, balance, and report operation. The desktop calendar, analytics interface, chart generators, yearly comparisons, and month report began as examples of applications that can be built on the CLI. They became useful in their own right, so they are included and supported as companion applications while continuing to use `fedleave` as their backend.
 
 Note:  In-case you're wondering... it was a 100% at home project.  None of it was done on company time!   It was also my first experiemnt into vibe coding.  So far, I'm impressed.
 
@@ -145,57 +143,6 @@ On Windows these launchers are in the packaged output and keep the same names wi
 
 Important: command names are case-sensitive on Linux. For example, `fedleave` and `FedLeaveCalendar` are different commands.
 
-`FedLeaveAnalytics` is a read-only companion application for seasonality,
-calendar heatmaps, overtime, compensatory-time, and credit-hour analysis. It can
-be launched independently with `FedLeaveAnalytics --year YEAR`, or from
-`FedLeaveCalendar` under `View > Analytics...`. Future active transactions are
-included automatically and analytical values are reported in hours. The
-application reads the normalized JSON returned by `fedleave list --json` and
-does not modify leave data.
-
-The analytics window presents user-facing results and explanations without
-displaying backend paths, data-directory paths, or transaction-loading
-diagnostics. When launched from `FedLeaveCalendar`, the calendar passes the
-exact resolved data directory used by its own backend. No user-specific path
-is compiled into the application. When launched independently, use
-`--data-dir PATH` to override the normal platform data directory.
-
-The four analytics pages are:
-
-- **Summary** — one structured table containing total leave, peak month and
-  pay period, final-quarter concentration, overtime, and comp lifecycle
-  conclusions. The Basis column explains each calculation.
-- **Seasonality** — selectable tables and charts for leave used by month,
-  weekday, and pay period; overtime by month; net leave accumulation; and
-  final-quarter concentration.
-- **Calendar Heatmap** — selectable complete leave-year graphics for all leave
-  used and for each nonzero leave category/direction combination. Intensity
-  means hours earned or used; a red outline and `F` identify future-dated
-  transactions, and a complete date table appears underneath.
-- **Overtime, Comp, and Credit** — lifecycle summary, comp earned-lot,
-  allocation and expiration-performance tables, plus monthly horizontal charts
-  and tables for overtime, comp, and credit hours.
-
-Monthly seasonality and lifecycle tabs place a horizontal bar chart above the
-supporting table. Every time-based table separates **Through Today**, **Future Scheduled**, and
-**Full Leave Year** values. Double-click a seasonality, heatmap, or lifecycle
-row to inspect the supporting transactions. The toolbar provides leave-year
-selection, Refresh, Open Chart, CSV export, and Close. Chart windows include
-the exact data table used by the graphic and support PNG, PDF, and printing.
-
-Examples:
-
-```bash
-FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
-    --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
-```
-
-Seasonality counts only actual or scheduled absence (`direction = used`).
-Earned, worked, adjusted, paid-out, forfeited, and expired transactions are
-not absence hours. The final quarter is the final 25 percent of inclusive
-calendar days in the selected leave year. Undefined statistics are displayed
-as `N/A`, not as fabricated zeroes.
-
 ## Commands
 
 Run `fedleave --help` after installation.
@@ -267,6 +214,14 @@ Screenshots:
 
 ![FedLeave Calendar day editor](examples/fedleave-calendar-edit-leave.png)
 
+![FedLeave Calendar preferences](examples/fedleave-calendar-preferences.png)
+
+![FedLeave Calendar force balance dialog](examples/fedleave-calendar-force-balance.png)
+
+![FedLeave Calendar expiring leave dialog](examples/fedleave-calendar-expiring-leave.png)
+
+![FedLeave Calendar transactions dialog](examples/fedleave-calendar-transactions.png)
+
 Current GUI features:
 
 - Month navigation with Previous, Next, and Today
@@ -320,6 +275,26 @@ under `dist/` (for example `dist/fedleave-Ubuntu/FedLeaveCalendar` and
 bundle as its backend, so the backend is not duplicated inside the GUI bundle.
 Use `--offline` with the Linux build-only command when all dependencies are
 already installed in the build virtual environment.
+
+Completed builds are published through a staging directory. On Windows, the
+previous bundle is moved aside before the new bundle is activated, so a mapped
+or antivirus-scanned `.pyd` in the previous build does not cause the completed
+build to fail during recursive deletion. Cleanup is retried; if Windows still
+holds an old file, the installer reports the uniquely named previous directory
+as a warning and removes it on a later build after the lock is released.
+
+Fast build-script validation without dependency installation or PyInstaller compilation:
+
+```bash
+./scripts/LinuxInstall.sh --unattended --smoke-test
+python scripts/lib/common/installer_engine.py --platform windows --unattended --smoke-test
+```
+
+The smoke test parses every project entry point and packaging-manifest entry,
+checks referenced modules and assets, writes each generated bootstrap, and
+constructs every platform-specific PyInstaller command. The test suite executes
+both platform configurations. A full build still remains the final packaging
+validation before a release.
 
 ## CLI Detailed Help
 
@@ -623,6 +598,11 @@ For the full project specification and rules, see the project documentation or t
 
 ## Companion Applications
 
+`fedleave` is the main application. Every application in this section is a
+companion built on its CLI contract; none maintains a separate leave database.
+These programs began as examples of how scripts and GUIs could consume the
+backend, then proved useful enough to ship with the project.
+
 The chart companion applications use the same styling, fonts, and color palette. Traditional leave balance charts use straight connections between pay-period points: current and historical data is solid, while future data is dashed in the same color and thickness. They scale their Y-axis from 0 to the maximum leave balance, rounded up to the nearest 10 hours, so the scale stays readable without clipping the highest point. The yearly comparison charts use the same visual style, but they round the Y-axis up to the nearest 10 hours for most categories and to the nearest 50 hours for annual and sick leave.
 
 Supported leave chart apps:
@@ -645,6 +625,33 @@ Yearly comparison apps:
 - `OvertimeYearlyComparison`
 
 The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Military Leave, Court Leave, Religious Comp, or Restored Annual.
+
+### Companion Application: FedLeaveAnalytics
+
+`FedLeaveAnalytics` is the read-only companion for seasonality, calendar
+heatmaps, overtime, compensatory-time, and credit-hour analysis. Launch it
+directly, or choose **View > Analytics...** in `FedLeaveCalendar`; the calendar
+passes its selected backend, leave year, font size, PDF folder, and exact
+resolved data directory.
+
+![FedLeave Analytics summary](examples/fedleave-analytics-main.png)
+
+![FedLeave Analytics supporting-transactions dialog](examples/fedleave-analytics-supporting-transactions.png)
+
+The four pages are Summary, Seasonality, Calendar Heatmap, and Overtime, Comp,
+and Credit. Monthly views combine horizontal bar charts with their supporting
+tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
+Leave Year values; double-clicking a row opens its supporting transactions.
+The application never modifies leave data or displays backend/data-directory
+diagnostics in the user interface.
+
+```bash
+FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
+    --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
+```
+
+Seasonality counts only actual or scheduled absence (`direction = used`).
+Undefined statistics are displayed as `N/A`, not fabricated zeroes.
 
 ### Companion Application: AnnualLeaveChartForTheYear
 
@@ -725,6 +732,10 @@ If `fedleave` cannot be found, the application will exit with a helpful error me
 
 A companion application that generates a PNG chart of credit hour balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
 
+Sample output:
+
+![Credit hours chart sample](examples/credit-hours-chart-sample.png)
+
 ### Usage
 
 ```bash
@@ -752,6 +763,10 @@ If `fedleave` cannot be found, the application will exit with a helpful error me
 ### Companion Application: CompTimeChartForTheYear
 
 A companion application that generates a PNG chart of comp time balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
+
+Sample output:
+
+![Comp time chart sample](examples/comp-time-chart-sample.png)
 
 ### Usage
 
@@ -781,6 +796,10 @@ If `fedleave` cannot be found, the application will exit with a helpful error me
 
 A companion application that generates a PNG chart of travel comp balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
 
+Sample output:
+
+![Travel comp chart sample](examples/travel-comp-chart-sample.png)
+
 ### Usage
 
 ```bash
@@ -808,6 +827,10 @@ If `fedleave` cannot be found, the application will exit with a helpful error me
 ### Companion Application: TimeOffAwardChartForTheYear
 
 A companion application that generates a PNG chart of time-off award balances throughout the leave year. It uses the same styling, fonts, colors, and Y-axis scaling rules as the annual and sick chart applications.
+
+Sample output:
+
+![Time-off award chart sample](examples/time-off-award-chart-sample.png)
 
 ### Usage
 
@@ -944,7 +967,7 @@ Usage:
 OvertimeYearlyComparison --as-of 2026-07-14 --outputFile overtime_yearly_comparison.png
 ```
 
-## Companion Application: fedleaveMonthReportGraphic
+### Companion Application: fedleaveMonthReportGraphic
 
 A companion application that generates a landscape 16:9 graphical month report. It treats `fedleave` as the data source, calls the public CLI commands, and does not read leave-year data files directly. PNG is the primary output format and SVG is also supported.
 

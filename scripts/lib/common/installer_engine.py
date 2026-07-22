@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import shutil
@@ -38,6 +39,7 @@ class Options:
     python_installer: str | None
     offline: bool
     verbose: bool
+    smoke_test: bool = False
 
 
 @dataclass
@@ -62,7 +64,12 @@ class InstallerEngine:
     def __init__(self, repo_root: Path, options: Options) -> None:
         self.repo_root = repo_root
         self.options = options
-        self.build_root = repo_root / ".build" / options.platform
+        configured_build_root = os.environ.get("FEDLEAVE_BUILD_ROOT")
+        self.build_root = (
+            Path(configured_build_root).resolve() / options.platform
+            if configured_build_root
+            else repo_root / ".build" / options.platform
+        )
         self._ensure_build_workspace_access()
         self.log_dir = self.build_root / "logs"
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -87,7 +94,9 @@ class InstallerEngine:
             if self.options.clean:
                 self._clean_build_area()
 
-            if operation == "uninstall":
+            if operation == "smoke-test":
+                self._smoke_test_build_configuration()
+            elif operation == "uninstall":
                 self._uninstall()
             elif operation == "activate":
                 self._activate(self.options.activate_version or "")
@@ -116,6 +125,8 @@ class InstallerEngine:
             return result
 
     def _resolve_operation(self) -> str:
+        if self.options.smoke_test:
+            return "smoke-test"
         if self.options.uninstall:
             return "uninstall"
         if self.options.activate_version:
@@ -207,10 +218,7 @@ class InstallerEngine:
         self._validate_build(platform_dist, targets)
 
         repo_dist = self._repo_dist_dir()
-        if repo_dist.exists():
-            shutil.rmtree(repo_dist)
-        repo_dist.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copytree(platform_dist, repo_dist)
+        self._publish_build(platform_dist, repo_dist)
         self.log(f"Build complete at {repo_dist}")
 
         if not self.options.keep_build:
@@ -226,6 +234,14 @@ class InstallerEngine:
         spec_dir: Path,
         platform_dist: Path,
     ) -> None:
+        entry_path = self._write_entry(target, entries_dir)
+        cmd = self._build_target_command(py_exe, target, entry_path, work_dir, spec_dir, platform_dist)
+
+        self.log(f"Building {target.name}")
+        self._run(cmd)
+
+    def _write_entry(self, target: BuildTarget, entries_dir: Path) -> Path:
+        entries_dir.mkdir(parents=True, exist_ok=True)
         entry_filename = f"{target.name}.py" if target.name != "fedleave" else "fedleave_bootstrap.py"
         entry_path = entries_dir / entry_filename
         entry_path.write_text(
@@ -234,7 +250,17 @@ class InstallerEngine:
             f"    raise SystemExit({target.func}())\n",
             encoding="utf-8",
         )
+        return entry_path
 
+    def _build_target_command(
+        self,
+        py_exe: Path,
+        target: BuildTarget,
+        entry_path: Path,
+        work_dir: Path,
+        spec_dir: Path,
+        platform_dist: Path,
+    ) -> list[str]:
         cmd = [
             str(py_exe),
             "-m",
@@ -268,9 +294,107 @@ class InstallerEngine:
             cmd.extend(["--icon", str(self.repo_root / target.icon)])
 
         cmd.append(str(entry_path))
+        return cmd
 
-        self.log(f"Building {target.name}")
-        self._run(cmd)
+    def _smoke_test_build_configuration(self) -> None:
+        """Exercise build discovery and command construction without running PyInstaller."""
+        self._ensure_python()
+        targets = self._load_targets()
+        repo_path = str(self.repo_root)
+        if repo_path not in sys.path:
+            sys.path.insert(0, repo_path)
+        smoke_root = self.build_root / "smoke-test"
+        entries_dir = smoke_root / "entries"
+        work_dir = smoke_root / "work"
+        spec_dir = smoke_root / "spec"
+        platform_dist = smoke_root / "dist"
+        for path in (entries_dir, work_dir, spec_dir, platform_dist):
+            path.mkdir(parents=True, exist_ok=True)
+
+        for target in targets:
+            try:
+                module_spec = importlib.util.find_spec(target.module)
+            except ModuleNotFoundError:
+                module_spec = None
+            if module_spec is None:
+                raise InstallerError(f"Build target module could not be imported: {target.module}")
+            for data_spec in target.add_data:
+                source, _destination = data_spec.split(":", 1)
+                if not (self.repo_root / source).exists():
+                    raise InstallerError(f"Build data source does not exist: {source}")
+            if target.icon and not (self.repo_root / target.icon).exists():
+                raise InstallerError(f"Build icon does not exist: {target.icon}")
+            entry_path = self._write_entry(target, entries_dir)
+            command = self._build_target_command(
+                Path(sys.executable), target, entry_path, work_dir, spec_dir, platform_dist
+            )
+            if "PyInstaller" not in command or str(entry_path) != command[-1]:
+                raise InstallerError(f"Invalid PyInstaller command for {target.name}")
+
+        self.log(f"Build-script smoke test passed for {len(targets)} application targets.")
+        if not self.options.keep_build:
+            shutil.rmtree(smoke_root, ignore_errors=True)
+
+    def _publish_build(self, platform_dist: Path, repo_dist: Path) -> None:
+        """Publish a complete build without deleting files from the active Windows tree."""
+        repo_dist.parent.mkdir(parents=True, exist_ok=True)
+        for abandoned in sorted(repo_dist.parent.glob(f".{repo_dist.name}.previous-*")):
+            try:
+                self._remove_tree_with_retries(abandoned)
+            except OSError as exc:
+                self.log(f"WARNING: Earlier build still remains at {abandoned}: {exc}")
+        token = f"{os.getpid()}-{time.time_ns()}"
+        staging = repo_dist.parent / f".{repo_dist.name}.staging-{token}"
+        previous = repo_dist.parent / f".{repo_dist.name}.previous-{token}"
+        shutil.copytree(platform_dist, staging)
+        moved_previous = False
+        try:
+            if repo_dist.exists():
+                self._replace_path_with_retries(repo_dist, previous, "move the previous build aside")
+                moved_previous = True
+            self._replace_path_with_retries(staging, repo_dist, "activate the completed build")
+        except Exception:
+            if moved_previous and previous.exists() and not repo_dist.exists():
+                self._replace_path_with_retries(previous, repo_dist, "restore the previous build")
+            if staging.exists():
+                shutil.rmtree(staging, ignore_errors=True)
+            raise
+
+        if previous.exists():
+            try:
+                self._remove_tree_with_retries(previous)
+            except OSError as exc:
+                # Windows can keep mapped .pyd files locked after a program exits.
+                # The new build is already active, so leave the uniquely named old
+                # tree for a later clean instead of failing a successful build.
+                self.log(f"WARNING: Previous build remains at {previous}: {exc}")
+
+    @staticmethod
+    def _replace_path_with_retries(source: Path, destination: Path, description: str) -> None:
+        last_error: OSError | None = None
+        for attempt in range(6):
+            try:
+                source.replace(destination)
+                return
+            except OSError as exc:
+                last_error = exc
+                if attempt < 5:
+                    time.sleep(0.2 * (attempt + 1))
+        raise InstallerError(f"Could not {description}: {last_error}") from last_error
+
+    @staticmethod
+    def _remove_tree_with_retries(path: Path) -> None:
+        last_error: OSError | None = None
+        for attempt in range(6):
+            try:
+                shutil.rmtree(path)
+                return
+            except OSError as exc:
+                last_error = exc
+                if attempt < 5:
+                    time.sleep(0.2 * (attempt + 1))
+        if last_error is not None:
+            raise last_error
 
     def _validate_build(self, dist_dir: Path, targets: list[BuildTarget]) -> None:
         missing: list[str] = []
@@ -614,6 +738,11 @@ def parse_args(argv: list[str]) -> Options:
     parser.add_argument("--python-installer")
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument(
+        "--smoke-test",
+        action="store_true",
+        help="Validate build targets and PyInstaller command construction without building binaries.",
+    )
     ns = parser.parse_args(argv)
 
     invalid_pairs = [
@@ -644,6 +773,7 @@ def parse_args(argv: list[str]) -> Options:
         python_installer=ns.python_installer,
         offline=ns.offline,
         verbose=ns.verbose,
+        smoke_test=ns.smoke_test,
     )
 
 
