@@ -138,12 +138,55 @@ On Windows these launchers are in the packaged output and keep the same names wi
 Important: command names are case-sensitive on Linux. For example, `fedleave` and `FedLeaveCalendar` are different commands.
 
 `FedLeaveAnalytics` is a read-only companion application for seasonality,
-calendar heatmap, overtime, and compensatory-time lifecycle analysis. It can
+calendar heatmaps, overtime, compensatory-time, and credit-hour analysis. It can
 be launched independently with `FedLeaveAnalytics --year YEAR`, or from
 `FedLeaveCalendar` under `View > Analytics...`. Future active transactions are
 included automatically and analytical values are reported in hours. The
 application reads the normalized JSON returned by `fedleave list --json` and
 does not modify leave data.
+
+The analytics window presents user-facing results and explanations without
+displaying backend paths, data-directory paths, or transaction-loading
+diagnostics. When launched from `FedLeaveCalendar`, the calendar passes the
+exact resolved data directory used by its own backend. No user-specific path
+is compiled into the application. When launched independently, use
+`--data-dir PATH` to override the normal platform data directory.
+
+The four analytics pages are:
+
+- **Summary** — one structured table containing total leave, peak month and
+  pay period, final-quarter concentration, overtime, and comp lifecycle
+  conclusions. The Basis column explains each calculation.
+- **Seasonality** — selectable tables and charts for leave used by month,
+  weekday, and pay period; overtime by month; net leave accumulation; and
+  final-quarter concentration.
+- **Calendar Heatmap** — selectable complete leave-year graphics for all leave
+  used and for each nonzero leave category/direction combination. Intensity
+  means hours earned or used; a red outline and `F` identify future-dated
+  transactions, and a complete date table appears underneath.
+- **Overtime, Comp, and Credit** — lifecycle summary, comp earned-lot,
+  allocation and expiration-performance tables, plus monthly horizontal charts
+  and tables for overtime, comp, and credit hours.
+
+Monthly seasonality and lifecycle tabs place a horizontal bar chart above the
+supporting table. Every time-based table separates **Through Today**, **Future Scheduled**, and
+**Full Leave Year** values. Double-click a seasonality, heatmap, or lifecycle
+row to inspect the supporting transactions. The toolbar provides leave-year
+selection, Refresh, Open Chart, CSV export, and Close. Chart windows include
+the exact data table used by the graphic and support PNG, PDF, and printing.
+
+Examples:
+
+```bash
+FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
+    --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
+```
+
+Seasonality counts only actual or scheduled absence (`direction = used`).
+Earned, worked, adjusted, paid-out, forfeited, and expired transactions are
+not absence hours. The final quarter is the final 25 percent of inclusive
+calendar days in the selected leave year. Undefined statistics are displayed
+as `N/A`, not as fabricated zeroes.
 
 ## Commands
 

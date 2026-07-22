@@ -20,24 +20,24 @@ from .cli_helpers import load_leave_year, parse_iso_date
 from .config import get_default_data_dir as resolve_default_data_dir
 from .ledger import calculate_balances
 from .executable_search import is_executable, iter_executable_candidates
+from .chart_style import (
+    BACKGROUND,
+    BASE_ASPECT_RATIO,
+    BASE_HEIGHT,
+    BASE_WIDTH,
+    BLUE,
+    BORDER,
+    GRID_MAJOR,
+    GRID_MINOR,
+    PLOT_BOTTOM,
+    PLOT_LEFT,
+    PLOT_RIGHT,
+    PLOT_TOP,
+    RED,
+    TEXT,
+)
 
-
-BASE_WIDTH = 1610
-BASE_HEIGHT = 1180
-BASE_ASPECT_RATIO = BASE_HEIGHT / BASE_WIDTH
-PLOT_LEFT = 78
-PLOT_TOP = 122
-PLOT_RIGHT = 1580
-PLOT_BOTTOM = 912
 Y_MIN = Decimal("0")
-
-BLUE = "#4F81BD"
-RED = "#C0504D"
-GRID_MAJOR = "#8F8F8F"
-GRID_MINOR = "#A9A9A9"
-BORDER = "#808080"
-TEXT = "#000000"
-BACKGROUND = "#FFFFFF"
 
 FEDLEAVE_REPO_URL = "https://github.com/joshua-guthrie/fedleave"
 

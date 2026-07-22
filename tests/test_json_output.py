@@ -113,6 +113,9 @@ def test_loading_legacy_data_removes_voided_transactions(tmp_path: Path, capsys)
     listed_ids = {transaction["id"] for transaction in listed["transactions"]}
     assert active.id in listed_ids
     assert voided.id not in listed_ids
+    assert listed["available_leave_years"] == [2026]
+    assert "annual" in listed["visible_categories"]
+    assert listed["category_definitions"]["annual"]["label"] == "Annual"
     stored = json.loads(year_file.read_text(encoding="utf-8"))
     assert {transaction["id"] for transaction in stored["transactions"]} == listed_ids
     assert all("void" not in transaction for transaction in stored["transactions"])

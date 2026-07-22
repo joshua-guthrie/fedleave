@@ -18,7 +18,8 @@ from ..ledger import (
     create_transaction,
     normalize_direction,
 )
-from ..storage import write_json
+from ..config import load_config
+from ..storage import load_json, write_json
 
 _SET_DAY_CATEGORIES = [
     "annual",
@@ -756,9 +757,58 @@ def list_transactions(
         raise typer.Exit(code=1)
 
     transactions = list(leave_year.get("transactions", []))
+    available_leave_years: list[int] = []
+    visible_categories: set[str] = set()
+    leave_year_directory = get_leave_year_path(year, data_dir).parent
+    for year_path in sorted(leave_year_directory.glob("*.json")):
+        if not year_path.stem.isdigit():
+            continue
+        try:
+            historical = load_json(year_path)
+        except (OSError, ValueError):
+            continue
+        available_leave_years.append(int(year_path.stem))
+        for field in ("starting_balances", "carryover_from_previous_year"):
+            values = historical.get(field, {})
+            if not isinstance(values, dict):
+                continue
+            for category, value in values.items():
+                try:
+                    if abs(float(value)) > 1e-9:
+                        visible_categories.add(str(category))
+                except (TypeError, ValueError):
+                    continue
+        for historical_transaction in historical.get("transactions", []):
+            try:
+                hours = abs(float(historical_transaction.get("hours", 0)))
+            except (TypeError, ValueError):
+                continue
+            if (
+                hours > 1e-9
+                and not historical_transaction.get("void")
+                and str(historical_transaction.get("status", "")).lower()
+                not in {"denied", "cancelled", "voided", "deleted"}
+            ):
+                visible_categories.add(str(historical_transaction.get("category", "")))
+
+    try:
+        category_rules = load_config(data_dir).get("rules", {})
+    except (FileNotFoundError, ValueError):
+        category_rules = {}
+    companion_metadata = {
+        "available_leave_years": available_leave_years,
+        "visible_categories": sorted(category for category in visible_categories if category),
+        "category_definitions": {
+            category: {
+                "label": category.replace("_", " ").title(),
+                "rules": category_rules.get(category, {}),
+            }
+            for category in TRANSACTION_CATEGORIES
+        },
+    }
     if not transactions:
         if json_output:
-            _print_json({**leave_year, "year": year, "transactions": []})
+            _print_json({**leave_year, **companion_metadata, "year": year, "transactions": []})
             return
         console.print(f"No transactions found for {year}.")
         raise typer.Exit(code=0)
@@ -767,7 +817,7 @@ def list_transactions(
     if json_output:
         # Keep the existing transaction list interface while exposing the
         # normalized leave-year metadata required by read-only companions.
-        _print_json({**leave_year, "year": year, "transactions": transactions})
+        _print_json({**leave_year, **companion_metadata, "year": year, "transactions": transactions})
         return
 
     for transaction in transactions:

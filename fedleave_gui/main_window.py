@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import html
+import json
 import os
 import subprocess
 import sys
@@ -98,6 +99,15 @@ YEARLY_COMPARISON_CHARTS = [
     ("Time Off Award", "TimeOffAwardYearlyComparison", "time_off_award"),
     ("Overtime Worked", "OvertimeYearlyComparison", "overtime"),
 ]
+
+CHART_APP_CATEGORIES = {
+    "AnnualLeaveChartForTheYear": "annual",
+    "SickLeaveChartForTheYear": "sick",
+    "CreditHoursChartForTheYear": "credit",
+    "CompTimeChartForTheYear": "comp",
+    "TravelCompChartForTheYear": "travel_comp",
+    "TimeOffAwardChartForTheYear": "time_off_award",
+}
 
 
 @dataclass
@@ -838,6 +848,35 @@ def _available_leave_years(data_dir: str | None) -> list[int]:
     return years
 
 
+def _visible_categories(data_dir: str | None) -> set[str]:
+    base_dir = get_default_data_dir(Path(data_dir) if data_dir else None)
+    year_dir = base_dir / "leave_years"
+    visible: set[str] = set()
+    if not year_dir.exists():
+        return visible
+    for path in sorted(year_dir.glob("*.json")):
+        try:
+            leave_year = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        for field in ("starting_balances", "carryover_from_previous_year"):
+            values = leave_year.get(field, {})
+            if not isinstance(values, dict):
+                continue
+            for category, value in values.items():
+                if _nonzero(value):
+                    visible.add(str(category))
+        for transaction in leave_year.get("transactions", []):
+            if (
+                isinstance(transaction, dict)
+                and not transaction.get("void")
+                and str(transaction.get("status", "")).lower() not in {"denied", "cancelled", "voided", "deleted"}
+                and _nonzero(transaction.get("hours"))
+            ):
+                visible.add(str(transaction.get("category", "")))
+    return visible
+
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -852,6 +891,8 @@ class MainWindow(QMainWindow):
         self.use_or_lose_json: dict[str, Any] | None = None
         self.balance_snapshot: dict[str, Any] | None = None
         self.yearly_comparison_menu: Any | None = None
+        self.leave_chart_actions: dict[str, QAction] = {}
+        self.yearly_comparison_actions: dict[str, QAction] = {}
         self._leave_chart_windows: list[LeaveChartDialog] = []
         self._analytics_processes: list[subprocess.Popen[Any]] = []
         self.setWindowTitle("FedLeave Calendar")
@@ -860,10 +901,11 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def _backend(self) -> FedleaveBackend:
+        configured_data_dir = Path(self.settings.data_dir).expanduser() if self.settings.data_dir else None
         return FedleaveBackend(
             BackendOptions(
                 fedleave_path=self.settings.fedleave_path or None,
-                data_dir=self.settings.data_dir or None,
+                data_dir=str(get_default_data_dir(configured_data_dir)),
             )
         )
 
@@ -972,10 +1014,14 @@ class MainWindow(QMainWindow):
         self._action(view_menu, "Analytics...", self.open_analytics)
         leave_charts_menu = view_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
-            self._action(leave_charts_menu, label, lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label))
+            self.leave_chart_actions[CHART_APP_CATEGORIES[app_name]] = self._action(
+                leave_charts_menu,
+                label,
+                lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label),
+            )
         self.yearly_comparison_menu = view_menu.addMenu("Yearly Leave Comparison")
         for label, app_name, category in YEARLY_COMPARISON_CHARTS:
-            self._action(
+            self.yearly_comparison_actions[category] = self._action(
                 self.yearly_comparison_menu,
                 f"{label} Comparison",
                 lambda _checked=False, app_name=app_name, label=label, category=category: self.open_yearly_leave_comparison(app_name, label, category),
@@ -1067,6 +1113,13 @@ class MainWindow(QMainWindow):
             return
         self.yearly_comparison_menu.setEnabled(len(_available_leave_years(self.settings.data_dir or None)) > 1)
 
+    def _refresh_chart_visibility(self) -> None:
+        visible = _visible_categories(self.backend.options.data_dir)
+        for category, action in self.leave_chart_actions.items():
+            action.setVisible(category in visible)
+        for category, action in self.yearly_comparison_actions.items():
+            action.setVisible(category in visible)
+
     def refresh(self) -> None:
         try:
             self.backend = self._backend()
@@ -1074,6 +1127,7 @@ class MainWindow(QMainWindow):
             self.use_or_lose_json = self.backend.use_or_lose(self.year)
             self._refresh_balance_snapshot()
             self._refresh_yearly_comparison_menu()
+            self._refresh_chart_visibility()
         except BackendMissingError:
             QMessageBox.critical(self, "Backend Missing", "The fedleave backend executable could not be found. Open Preferences to set the path.")
             self.preferences()
@@ -1370,8 +1424,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "FedLeave Analytics", str(exc))
             return
         command = [str(analytics), "--backend", str(backend), "--year", str(self.year), "--font-size", str(self.settings.font_size)]
-        if self.settings.data_dir:
-            command.extend(["--data-dir", self.settings.data_dir])
+        command.extend(["--data-dir", str(self.backend.data_directory())])
         if self.settings.pdf_export_folder:
             command.extend(["--pdf-folder", self.settings.pdf_export_folder])
         try:

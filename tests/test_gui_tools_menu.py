@@ -1,4 +1,5 @@
 import os
+import json
 from PySide6.QtWidgets import QDialog
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -7,7 +8,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtWidgets import QMessageBox
 
-from fedleave_gui.main_window import MainWindow
+from fedleave_gui.main_window import MainWindow, _visible_categories
 from fedleave_gui.settings import GuiSettings
 
 
@@ -72,6 +73,25 @@ def test_analytics_view_action_launches_companion_with_current_context(monkeypat
         "--data-dir", str(tmp_path / "data"),
         "--pdf-folder", str(tmp_path / "pdf"),
     ]]
+
+
+def test_analytics_view_action_passes_resolved_default_data_directory(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr("fedleave_gui.main_window.load_settings", lambda: GuiSettings())
+    monkeypatch.setattr("fedleave_gui.main_window.get_default_data_dir", lambda _data_dir=None: tmp_path / "data")
+    window = MainWindow()
+    backend_path = tmp_path / "fedleave"
+    analytics_path = tmp_path / "FedLeaveAnalytics"
+    calls = []
+    monkeypatch.setattr(window.backend, "executable_path", lambda: backend_path)
+    monkeypatch.setattr("fedleave_gui.main_window.find_analytics", lambda: analytics_path)
+    monkeypatch.setattr("fedleave_gui.main_window.subprocess.Popen", lambda command: calls.append(command))
+
+    window.open_analytics()
+
+    assert "--data-dir" in calls[0]
+    assert calls[0][calls[0].index("--data-dir") + 1] == str(tmp_path / "data")
 
 
 def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):
@@ -143,6 +163,24 @@ def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monk
     window._refresh_yearly_comparison_menu()
 
     assert yearly_comparison_action.menu().isEnabled() is True
+
+
+def test_category_visibility_considers_balances_and_transactions_across_years(tmp_path):
+    leave_years = tmp_path / "leave_years"
+    leave_years.mkdir()
+    (leave_years / "2025.json").write_text(json.dumps({
+        "starting_balances": {"annual": 20, "religious_comp": 0},
+        "transactions": [],
+    }), encoding="utf-8")
+    (leave_years / "2026.json").write_text(json.dumps({
+        "starting_balances": {},
+        "transactions": [
+            {"category": "overtime", "hours": 2, "status": "reconciled"},
+            {"category": "religious_comp", "hours": 4, "status": "denied"},
+        ],
+    }), encoding="utf-8")
+
+    assert _visible_categories(str(tmp_path)) == {"annual", "overtime"}
 
 
 def test_change_accrual_action_updates_backend_and_refreshes(monkeypatch):

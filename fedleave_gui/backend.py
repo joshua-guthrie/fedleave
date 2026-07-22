@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.config import get_default_data_dir
 
 
 class BackendError(RuntimeError):
@@ -111,6 +112,10 @@ class FedleaveBackend:
 
     def executable_path(self) -> Path:
         return find_fedleave(self.options.fedleave_path)
+
+    def data_directory(self) -> Path:
+        configured = Path(self.options.data_dir).expanduser() if self.options.data_dir else None
+        return get_default_data_dir(configured)
 
     def version(self) -> str:
         version = self.run_text(["--version"], include_data_dir=False).strip()
