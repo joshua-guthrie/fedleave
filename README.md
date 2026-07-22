@@ -37,7 +37,7 @@ End users should use the platform installer script instead of setting up a devel
 scripts\WindowsInstall.bat
 ```
 
-The installer requires Python 3 to be available so it can run the build and packaging steps. On Linux, the script can install Python 3 automatically when `apt-get` is available. System-wide installation may also prompt for `sudo` during the final install step.
+The installer requires Python 3 to be available so it can run the build and packaging steps. On Linux, the script can install Python 3 automatically when `apt-get` is available. System-wide installation may also prompt for `sudo` during the final install step. On Windows, the script asks after a successful build whether to install the bundle in `C:\Program Files\fedleave`; accepting the prompt requests administrator approval when needed and creates public Desktop and all-users Start Menu shortcuts for FedLeave Calendar.
 
 ## Development Setup
 
@@ -83,13 +83,20 @@ chmod +x scripts/LinuxInstall.sh
 ./scripts/LinuxInstall.sh
 ```
 
-Windows interactive installation (elevated Command Prompt):
+Windows interactive installation:
 
 ```bat
 git clone https://github.com/joshua-guthrie/fedleave.git
 cd fedleave
 scripts\WindowsInstall.bat
 ```
+
+After the Windows build completes, answer `y` to install the contents of
+`dist\fedleave-Windows` in `C:\Program Files\fedleave` and create FedLeave
+Calendar shortcuts on the public Desktop and all-users Start Menu. Windows
+will display its normal administrator approval prompt if the terminal is not
+already elevated. Answering `n` leaves the completed bundle in `dist` without
+changing the installed copy.
 
 Automated and unattended installation:
 
@@ -584,7 +591,7 @@ For the full project specification and rules, see the project documentation or t
 
 ## Companion Applications
 
-The chart companion applications use the same styling, fonts, and color palette. The traditional leave balance charts scale their Y-axis from 0 to the maximum leave balance, rounded up to the nearest 10 hours, so the scale stays readable without clipping the highest point. The yearly comparison charts use the same visual style, but they round the Y-axis up to the nearest 10 hours for most categories and to the nearest 50 hours for annual and sick leave.
+The chart companion applications use the same styling, fonts, and color palette. Traditional leave balance charts use straight connections between pay-period points: current and historical data is solid, while future data is dashed in the same color and thickness. They scale their Y-axis from 0 to the maximum leave balance, rounded up to the nearest 10 hours, so the scale stays readable without clipping the highest point. The yearly comparison charts use the same visual style, but they round the Y-axis up to the nearest 10 hours for most categories and to the nearest 50 hours for annual and sick leave.
 
 Supported leave chart apps:
 
@@ -615,7 +622,7 @@ A companion application that generates a PNG chart of annual leave balances thro
 - Pay period markers on the X-axis
 - Use-or-lose threshold line (240 hours)
 - Grid lines for easy reading
-- Smooth curve interpolation
+- Straight balance connections, solid through today and dashed for future data
 
 Sample output:
 
@@ -651,7 +658,7 @@ A companion application that generates a PNG chart of sick leave balances throug
 
 - Sick leave balance line chart
 - Pay period markers on the X-axis
-- Smooth curve interpolation
+- Straight balance connections, solid through today and dashed for future data
 - Dynamic Y-axis scaling from 0 to the maximum balance rounded up to the nearest 10 hours
 
 Sample output:

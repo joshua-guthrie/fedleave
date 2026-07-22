@@ -35,6 +35,7 @@ from .chart_style import (
     PLOT_TOP,
     RED,
     TEXT,
+    draw_historical_and_future_line,
 )
 
 Y_MIN = Decimal("0")
@@ -403,8 +404,11 @@ def render_balance_chart(
         draw.line((round(x), dims.plot_top, round(x), dims.plot_bottom), fill=GRID_MINOR, width=2)
 
     raw_line = [(xs[index], y_to_px(value, dims)) for index, (_, value) in enumerate(points)]
-    smooth = catmull_rom(raw_line)
-    draw.line([(round(x), round(y)) for x, y in smooth], fill=BLUE, width=5, joint="curve")
+    dated_line = [
+        (period_end, raw_line[index][0], raw_line[index][1])
+        for index, (period_end, _value) in enumerate(points)
+    ]
+    draw_historical_and_future_line(draw, dated_line, as_of=date.today(), fill=BLUE, width=5)
 
     for x, y in raw_line:
         draw_diamond(draw, x, y, 9)

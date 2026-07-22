@@ -4,9 +4,10 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QDate
 from PySide6.QtWidgets import QApplication, QDialog
 
-from fedleave_gui.main_window import MainWindow, PreferencesDialog, _apply_payday_offset
+from fedleave_gui.main_window import MainWindow, PreferencesDialog, SelectDateDialog, _apply_payday_offset
 from fedleave_gui.settings import GuiSettings, load_settings, save_settings
 
 
@@ -94,3 +95,16 @@ def test_balance_button_updates_to_selected_as_of_date(monkeypatch):
     assert fake_backend.calls == [(window.year, "2026-05-08")]
     assert window.balance_button.text() == "Leave Balances as of 5/8/2026"
     assert window.balance_snapshot["balances"]["annual"] == 48.0
+    assert window.balance_table.item(0, 0).text() == "Annual Leave"
+    assert window.balance_table.item(0, 1).text() == "48"
+
+
+def test_select_date_dialog_returns_a_date_for_balance_refresh():
+    _application()
+    dialog = SelectDateDialog("Leave Balances as Of")
+    dialog.date_input.setDate(QDate(2026, 5, 8))
+
+    selected = dialog.selected_date()
+
+    assert selected == date(2026, 5, 8)
+    assert isinstance(selected, date)

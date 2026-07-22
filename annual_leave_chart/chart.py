@@ -14,7 +14,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from fedleave.executable_search import is_executable, iter_executable_candidates
 from fedleave.chart_style import (
@@ -32,6 +31,7 @@ from fedleave.chart_style import (
     PLOT_TOP,
     RED,
     TEXT,
+    draw_historical_and_future_line,
 )
 
 
@@ -336,43 +336,6 @@ def x_positions(count: int, dims: ChartDimensions) -> list[float]:
     ]
 
 
-def catmull_rom(
-    points: list[tuple[float, float]], samples_per_segment: int = 18
-) -> list[tuple[float, float]]:
-    """
-    Interpolate points using Catmull-Rom spline for smooth curve.
-    
-    Args:
-        points: List of (x, y) tuples
-        samples_per_segment: Number of interpolated points per segment
-        
-    Returns:
-        List of interpolated (x, y) tuples
-    """
-    if len(points) < 3:
-        return points
-    smooth: list[tuple[float, float]] = []
-    extended = [points[0], *points, points[-1]]
-    for index in range(1, len(extended) - 2):
-        p0 = np.array(extended[index - 1], dtype=float)
-        p1 = np.array(extended[index], dtype=float)
-        p2 = np.array(extended[index + 1], dtype=float)
-        p3 = np.array(extended[index + 2], dtype=float)
-        for step in range(samples_per_segment):
-            t = step / samples_per_segment
-            t2 = t * t
-            t3 = t2 * t
-            point = 0.5 * (
-                (2 * p1)
-                + (-p0 + p2) * t
-                + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
-                + (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-            )
-            smooth.append((float(point[0]), float(point[1])))
-    smooth.append(points[-1])
-    return smooth
-
-
 def rotated_label(text: str, font: ImageFont.ImageFont) -> Image.Image:
     """Create a rotated text label."""
     bbox = font.getbbox(text)
@@ -446,10 +409,11 @@ def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensio
 
     # Plot data line
     raw_line = [(xs[index], y_to_px(value, dims)) for index, (_, value) in enumerate(points)]
-    smooth = catmull_rom(raw_line)
-    draw.line(
-        [(round(x), round(y)) for x, y in smooth], fill=BLUE, width=5, joint="curve"
-    )
+    dated_line = [
+        (period_end, raw_line[index][0], raw_line[index][1])
+        for index, (period_end, _value) in enumerate(points)
+    ]
+    draw_historical_and_future_line(draw, dated_line, as_of=date.today(), fill=BLUE, width=5)
     
     # Plot data points
     for x, y in raw_line:

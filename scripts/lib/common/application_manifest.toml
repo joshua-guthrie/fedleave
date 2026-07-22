@@ -28,11 +28,11 @@ collect_all = ["shiboken6", "fedleave_analytics"]
 
 [AnnualLeaveChartForTheYear]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [SickLeaveChartForTheYear]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [CreditHoursChartForTheYear]
 mode = "console"

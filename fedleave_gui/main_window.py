@@ -650,8 +650,9 @@ class SelectDateDialog(QDialog):
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
-    def selected_date(self) -> str:
-        return self.date_input.date().toString("yyyy-MM-dd")
+    def selected_date(self) -> date:
+        selected = self.date_input.date()
+        return date(selected.year(), selected.month(), selected.day())
 
 
 class ChangeAccrualDialog(QDialog):
@@ -1446,7 +1447,7 @@ class MainWindow(QMainWindow):
                 self.backend.run_chart_app(
                     app_name,
                     output_file=output_file,
-                    as_of=dialog.selected_date(),
+                    as_of=dialog.selected_date().isoformat(),
                     data_dir=data_dir,
                 )
             except BackendError as exc:

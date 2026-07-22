@@ -361,7 +361,19 @@ class InstallerEngine:
 
     def _install_from_dist(self, dist_dir: Path) -> None:
         if self.options.platform == "windows":
-            self.log("Windows system-wide installation from batch is not available in this environment; build output remains in dist.")
+            if not dist_dir.exists():
+                raise InstallerError(f"Install source does not exist: {dist_dir}")
+            if not self.options.unattended and not self._confirm_windows_install():
+                self.log("Windows installation declined; build output remains in dist.")
+                return
+
+            helper_path = self._windows_helper_path()
+            helper_args = ["install-system", str(dist_dir)]
+            if self._windows_is_admin():
+                self._run_helper(helper_path, helper_args, "Windows system-wide install")
+            else:
+                self.log("Requesting administrator privileges for the Windows installation.")
+                self._run_windows_helper_elevated(helper_path, helper_args)
             return
 
         if not dist_dir.exists():
@@ -397,6 +409,76 @@ class InstallerEngine:
 
     def _linux_helper_path(self) -> Path:
         return self.repo_root / "scripts" / "lib" / "common" / "linux_installer_helper.py"
+
+    def _windows_helper_path(self) -> Path:
+        return self.repo_root / "scripts" / "lib" / "common" / "windows_installer_helper.py"
+
+    def _confirm_windows_install(self) -> bool:
+        try:
+            response = input(
+                "Build complete. Install FedLeave in C:\\Program Files\\fedleave "
+                "and create Desktop and Start Menu shortcuts? [y/N]: "
+            )
+        except EOFError:
+            return False
+        return response.strip().lower() in {"y", "yes"}
+
+    @staticmethod
+    def _windows_is_admin() -> bool:
+        if sys.platform != "win32":
+            return False
+        try:
+            import ctypes
+
+            return bool(ctypes.windll.shell32.IsUserAnAdmin())
+        except (AttributeError, OSError):
+            return False
+
+    def _run_windows_helper_elevated(self, helper_path: Path, args: list[str]) -> None:
+        if sys.platform != "win32":
+            raise InstallerError("Windows elevation is only available on Windows.", EXIT_PERMISSION)
+
+        import ctypes
+        from ctypes import wintypes
+
+        class ShellExecuteInfo(ctypes.Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("fMask", wintypes.ULONG),
+                ("hwnd", wintypes.HWND),
+                ("lpVerb", wintypes.LPCWSTR),
+                ("lpFile", wintypes.LPCWSTR),
+                ("lpParameters", wintypes.LPCWSTR),
+                ("lpDirectory", wintypes.LPCWSTR),
+                ("nShow", ctypes.c_int),
+                ("hInstApp", wintypes.HINSTANCE),
+                ("lpIDList", wintypes.LPVOID),
+                ("lpClass", wintypes.LPCWSTR),
+                ("hkeyClass", wintypes.HKEY),
+                ("dwHotKey", wintypes.DWORD),
+                ("hIconOrMonitor", wintypes.HANDLE),
+                ("hProcess", wintypes.HANDLE),
+            ]
+
+        execute_info = ShellExecuteInfo()
+        execute_info.cbSize = ctypes.sizeof(execute_info)
+        execute_info.fMask = 0x00000040  # SEE_MASK_NOCLOSEPROCESS
+        execute_info.lpVerb = "runas"
+        execute_info.lpFile = sys.executable
+        execute_info.lpParameters = subprocess.list2cmdline([str(helper_path), *args])
+        execute_info.lpDirectory = str(self.repo_root)
+        execute_info.nShow = 1
+
+        if not ctypes.windll.shell32.ShellExecuteExW(ctypes.byref(execute_info)):
+            raise InstallerError("Administrator approval was cancelled or elevation failed.", EXIT_PERMISSION)
+        try:
+            ctypes.windll.kernel32.WaitForSingleObject(execute_info.hProcess, 0xFFFFFFFF)
+            exit_code = wintypes.DWORD()
+            ctypes.windll.kernel32.GetExitCodeProcess(execute_info.hProcess, ctypes.byref(exit_code))
+        finally:
+            ctypes.windll.kernel32.CloseHandle(execute_info.hProcess)
+        if exit_code.value != 0:
+            raise InstallerError(f"Windows system-wide install failed ({exit_code.value}).", EXIT_BUILD_FAILED)
 
     def _project_version(self) -> str:
         pyproject = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8"))
