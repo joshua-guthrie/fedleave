@@ -26,13 +26,14 @@ TimeOffAwardYearlyComparison = "yearly_leave_comparison_chart.time_off_award:mai
 OvertimeYearlyComparison = "yearly_leave_comparison_chart.overtime:main"
 fedleaveMonthReportGraphic = "fedleave_month_report_graphic.__main__:main"
 FedLeaveCalendar = "fedleave_gui.__main__:main"
+FedLeaveAnalytics = "fedleave_analytics.app:main"
 
 [build-system]
 requires = ["setuptools>=65.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["fedleave", "annual_leave_chart", "sick_leave_chart", "credit_hours_chart", "comp_time_chart", "travel_comp_chart", "time_off_award_chart", "yearly_leave_comparison_chart", "fedleave_month_report_graphic", "fedleave_gui"]
+include = ["fedleave", "annual_leave_chart", "sick_leave_chart", "credit_hours_chart", "comp_time_chart", "travel_comp_chart", "time_off_award_chart", "yearly_leave_comparison_chart", "fedleave_month_report_graphic", "fedleave_gui", "fedleave_analytics"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

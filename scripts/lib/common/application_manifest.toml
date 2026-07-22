@@ -20,6 +20,12 @@ hidden_imports = [
 ]
 collect_all = ["shiboken6"]
 
+[FedLeaveAnalytics]
+mode = "windowed"
+icon = "assets/fedleave-icon.ico"
+hidden_imports = ["PySide6.QtCore", "PySide6.QtGui", "PySide6.QtWidgets", "shiboken6", "shiboken6.Shiboken"]
+collect_all = ["shiboken6", "fedleave_analytics"]
+
 [AnnualLeaveChartForTheYear]
 mode = "console"
 hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]

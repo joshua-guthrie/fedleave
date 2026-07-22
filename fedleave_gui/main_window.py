@@ -47,7 +47,7 @@ from PySide6.QtWidgets import (
 
 from . import __version__
 from .chart_windows import LeaveChartDialog
-from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend
+from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend, find_analytics
 from .resources import asset_file, help_base_url, help_file, window_icon
 from fedleave.config import get_default_data_dir
 from fedleave.payperiods import calculate_pay_date
@@ -852,6 +852,7 @@ class MainWindow(QMainWindow):
         self.balance_snapshot: dict[str, Any] | None = None
         self.yearly_comparison_menu: Any | None = None
         self._leave_chart_windows: list[LeaveChartDialog] = []
+        self._analytics_processes: list[subprocess.Popen[Any]] = []
         self.setWindowTitle("FedLeave Calendar")
         self.resize(1320, 860)
         self._build_ui()
@@ -967,6 +968,7 @@ class MainWindow(QMainWindow):
         self._action(view_menu, "Select Month...", self.select_month)
         self._action(view_menu, "Today", self.go_today)
         self._action(view_menu, "View Leave Transactions...", self.view_leave_transactions)
+        self._action(view_menu, "Analytics...", self.open_analytics)
         leave_charts_menu = view_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self._action(leave_charts_menu, label, lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label))
@@ -1358,6 +1360,25 @@ class MainWindow(QMainWindow):
 
             dialog.finished.connect(lambda _: _cleanup())
             dialog.show()
+
+    def open_analytics(self) -> None:
+        try:
+            analytics = find_analytics()
+            backend = self.backend.executable_path()
+        except BackendError as exc:
+            QMessageBox.warning(self, "FedLeave Analytics", str(exc))
+            return
+        command = [str(analytics), "--backend", str(backend), "--year", str(self.year), "--font-size", str(self.settings.font_size)]
+        if self.settings.data_dir:
+            command.extend(["--data-dir", self.settings.data_dir])
+        if self.settings.pdf_export_folder:
+            command.extend(["--pdf-folder", self.settings.pdf_export_folder])
+        try:
+            process = subprocess.Popen(command)
+        except OSError as exc:
+            QMessageBox.warning(self, "FedLeave Analytics", str(exc))
+            return
+        self._analytics_processes.append(process)
 
     def open_yearly_leave_comparison(self, app_name: str, label: str, _category: str) -> None:
         dialog = SelectDateDialog(f"{label} Comparison", self)

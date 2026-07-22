@@ -758,14 +758,16 @@ def list_transactions(
     transactions = list(leave_year.get("transactions", []))
     if not transactions:
         if json_output:
-            _print_json({"year": year, "transactions": []})
+            _print_json({**leave_year, "year": year, "transactions": []})
             return
         console.print(f"No transactions found for {year}.")
         raise typer.Exit(code=0)
 
     transactions = sorted(transactions, key=lambda item: item["id"])
     if json_output:
-        _print_json({"year": year, "transactions": transactions})
+        # Keep the existing transaction list interface while exposing the
+        # normalized leave-year metadata required by read-only companions.
+        _print_json({**leave_year, "year": year, "transactions": transactions})
         return
 
     for transaction in transactions:

@@ -119,6 +119,7 @@ On Windows these launchers are in the packaged output and keep the same names wi
 
 - `fedleave`
 - `FedLeaveCalendar`
+- `FedLeaveAnalytics`
 - `AnnualLeaveChartForTheYear`
 - `SickLeaveChartForTheYear`
 - `CreditHoursChartForTheYear`
@@ -135,6 +136,14 @@ On Windows these launchers are in the packaged output and keep the same names wi
 - `fedleaveMonthReportGraphic`
 
 Important: command names are case-sensitive on Linux. For example, `fedleave` and `FedLeaveCalendar` are different commands.
+
+`FedLeaveAnalytics` is a read-only companion application for seasonality,
+calendar heatmap, overtime, and compensatory-time lifecycle analysis. It can
+be launched independently with `FedLeaveAnalytics --year YEAR`, or from
+`FedLeaveCalendar` under `View > Analytics...`. Future active transactions are
+included automatically and analytical values are reported in hours. The
+application reads the normalized JSON returned by `fedleave list --json` and
+does not modify leave data.
 
 ## Commands
 
@@ -258,6 +267,8 @@ The consolidated scripts place each application in its own bundle directory
 under `dist/` (for example `dist/fedleave-Ubuntu/FedLeaveCalendar` and
 `dist/fedleave-Windows/FedLeaveCalendar`). The GUI uses the sibling `fedleave`
 bundle as its backend, so the backend is not duplicated inside the GUI bundle.
+Use `--offline` with the Linux build-only command when all dependencies are
+already installed in the build virtual environment.
 
 ## CLI Detailed Help
 

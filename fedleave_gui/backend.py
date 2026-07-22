@@ -67,6 +67,10 @@ def find_month_report_graphic(explicit: str | None = None) -> Path:
     )
 
 
+def find_analytics(explicit: str | None = None) -> Path:
+    return _find_companion_app("FedLeaveAnalytics", explicit=explicit, description="FedLeaveAnalytics")
+
+
 class FedleaveBackend:
     def __init__(self, options: BackendOptions | None = None) -> None:
         self.options = options or BackendOptions()

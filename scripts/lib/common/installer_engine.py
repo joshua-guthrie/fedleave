@@ -164,6 +164,11 @@ class InstallerEngine:
         paths = [self.build_root]
         paths.extend(sorted(self.build_root.rglob("*")))
         for path in paths:
+            # A virtualenv's Python launchers are symlinks to the system
+            # interpreter.  Their target is intentionally not writable by
+            # the project user, which does not make the build workspace bad.
+            if path.is_symlink():
+                continue
             try:
                 stat_result = path.stat()
             except FileNotFoundError:
@@ -291,20 +296,23 @@ class InstallerEngine:
 
     def _install_build_requirements(self, py_exe: Path) -> None:
         self.log("Installing build dependencies")
-        self._run([str(py_exe), "-m", "pip", "install", "--upgrade", "pip"])
-        self._run([str(py_exe), "-m", "pip", "install", "-r", str(self.repo_root / "requirements.txt")])
-        self._run([str(py_exe), "-m", "pip", "install", "-r", str(self.repo_root / "requirements-gui.txt")])
+        pip_options = ["--no-index"] if self.options.offline else []
+        editable_options = ["--no-build-isolation"] if self.options.offline else []
+        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "--upgrade", "pip"])
+        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "-r", str(self.repo_root / "requirements.txt")])
+        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "-r", str(self.repo_root / "requirements-gui.txt")])
         self._run(
             [
                 str(py_exe),
                 "-m",
                 "pip",
                 "install",
+                *pip_options,
                 "-r",
                 str(self.repo_root / "scripts" / "lib" / "common" / "installer-requirements.txt"),
             ]
         )
-        self._run([str(py_exe), "-m", "pip", "install", "-e", str(self.repo_root)])
+        self._run([str(py_exe), "-m", "pip", "install", *pip_options, *editable_options, "-e", str(self.repo_root)])
 
     def _load_targets(self) -> list[BuildTarget]:
         pyproject = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8"))
