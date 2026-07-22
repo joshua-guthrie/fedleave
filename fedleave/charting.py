@@ -293,9 +293,9 @@ def category_balance_points(
             tx = transactions[tx_index]
             hours = decimal_hours(tx.get("hours"))
             direction = tx.get("direction")
-            if direction in {"earned", "worked", "adjusted"}:
+            if direction in {"earned", "worked", "adjusted", "restored", "corrected", "reconciled", "forced_increase"}:
                 running += hours
-            elif direction in {"used", "expired", "forfeited"}:
+            elif direction in {"used", "expired", "forfeited", "forced_decrease"}:
                 running -= hours
             tx_index += 1
 

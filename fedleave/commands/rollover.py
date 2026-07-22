@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date as _date
+from datetime import date as _date, datetime as _datetime
 from pathlib import Path
 
 import typer
@@ -9,8 +9,9 @@ from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
 from ..cli_helpers import load_leave_year
-from ..config import get_default_data_dir
-from ..ledger import calculate_balances
+from ..config import get_default_data_dir, load_config
+from ..expirations import expiration_report
+from ..ledger import calculate_balances, create_transaction
 from ..payperiods import generate_pay_periods
 from ..storage import write_json
 
@@ -44,6 +45,12 @@ def rollover(
     balances = calculate_balances(src)
     annual_balance = balances.get("annual", 0.0)
     sick_balance = balances.get("sick", 0.0)
+    try:
+        config = load_config(base)
+    except FileNotFoundError:
+        config = None
+    expiration_data = expiration_report(src, config, as_of=_date.fromisoformat(str(src["leave_year_end"])))
+    expiring_lots = [lot for lot in expiration_data["lots"] if float(lot["remaining_hours"]) > 0.000001]
 
     # read carryover limit from config if present
     cfg_path = base / "config.json"
@@ -68,6 +75,7 @@ def rollover(
         "sick_balance": sick_balance,
         "created_file": None,
         "created_transaction_ids": [],
+        "carried_expiring_lots": len(expiring_lots),
     }
 
     if json_output and preview:
@@ -81,6 +89,7 @@ def rollover(
         console.print(f"  carry_forward={carry_forward:.2f}")
         console.print(f"  forfeiture={forfeiture:.2f}")
         console.print(f"  sick_balance carried fully: {sick_balance:.2f}")
+        console.print(f"  expiring leave lots carried individually: {len(expiring_lots)}")
 
     if preview:
         return
@@ -137,27 +146,58 @@ def rollover(
         "holidays": [],
         "rollover_status": {"rolled_from_previous_year": True, "rolled_to_next_year": False, "rollover_completed_at": None},
     }
+    for lot in expiring_lots:
+        category = str(lot["category"])
+        new_ly["carryover_from_previous_year"][category] = (
+            float(new_ly["carryover_from_previous_year"].get(category, 0.0))
+            + float(lot["remaining_hours"])
+        )
 
     # create starting-balance transactions
     existing_ids = []
-    try:
-        from ..ledger import create_transaction as _create_tx
-        if carry_forward and carry_forward > 0:
-            tx = _create_tx(date=new_start, category="annual", direction="starting_balance", hours=carry_forward, existing_ids=existing_ids)
-            new_ly["transactions"].append(tx.model_dump())
-            existing_ids.append(tx.id)
-            result["created_transaction_ids"].append(tx.id)
-        if sick_balance and sick_balance > 0:
-            tx2 = _create_tx(date=new_start, category="sick", direction="starting_balance", hours=sick_balance, existing_ids=existing_ids)
-            new_ly["transactions"].append(tx2.model_dump())
-            result["created_transaction_ids"].append(tx2.id)
-    except Exception:
-        pass
+    if carry_forward and carry_forward > 0:
+        tx = create_transaction(date=new_start, category="annual", direction="starting_balance", hours=carry_forward, existing_ids=existing_ids)
+        new_ly["transactions"].append(tx.model_dump())
+        existing_ids.append(tx.id)
+        result["created_transaction_ids"].append(tx.id)
+    if sick_balance and sick_balance > 0:
+        tx2 = create_transaction(date=new_start, category="sick", direction="starting_balance", hours=sick_balance, existing_ids=existing_ids)
+        new_ly["transactions"].append(tx2.model_dump())
+        existing_ids.append(tx2.id)
+        result["created_transaction_ids"].append(tx2.id)
+    source_by_id = {str(tx.get("id", "")): tx for tx in src.get("transactions", [])}
+    for lot in expiring_lots:
+        category = str(lot["category"])
+        tx = create_transaction(
+            date=new_start,
+            category=category,
+            direction="restored" if category == "restored_annual" else "earned",
+            hours=float(lot["remaining_hours"]),
+            description=f"Expiration lot carried from {lot['transaction_id']}",
+            status="reconciled",
+            source="expiration-rollover",
+            existing_ids=existing_ids,
+        )
+        carried = tx.model_dump()
+        carried["expiration_date"] = lot["expiration_date"]
+        carried["expiration_pay_period"] = lot.get("expiration_pay_period")
+        carried["original_earned_date"] = lot["earned_date"]
+        carried["carried_from_transaction_id"] = lot["transaction_id"]
+        new_ly["transactions"].append(carried)
+        existing_ids.append(tx.id)
+        result["created_transaction_ids"].append(tx.id)
+        original = source_by_id.get(str(lot["transaction_id"]))
+        if original is not None:
+            original["rolled_over_to_transaction_id"] = tx.id
+    source_status = src.setdefault("rollover_status", {})
+    source_status["rolled_to_next_year"] = True
+    source_status["rollover_completed_at"] = _datetime.now().isoformat()
 
     # write new leave year file
     year_path = base / "leave_years" / f"{to_year_int}.json"
     try:
         write_json(year_path, new_ly)
+        write_json(base / "leave_years" / f"{from_year}.json", src)
         result["created_file"] = str(year_path)
         if json_output:
             _print_json(result)

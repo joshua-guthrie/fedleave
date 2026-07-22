@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtWidgets import QMessageBox
 
+from fedleave_gui.backend import BackendError
 from fedleave_gui.main_window import MainWindow, _visible_categories
 from fedleave_gui.settings import GuiSettings
 
@@ -26,6 +27,8 @@ def test_tools_menu_hides_internal_data_folder(monkeypatch):
 
     assert labels == [
         "Change Accrual...",
+        "Force Leave Balance...",
+        "Expiring Leave Status...",
         "Validate Data",
         "Export Data...",
         "Import From External App",
@@ -287,6 +290,94 @@ def test_import_wms_http_report_uses_html_picker_and_refreshes(monkeypatch, tmp_
     assert refreshed == [True]
 
 
+def test_wms_import_failure_uses_copyable_diagnostic_dialog(monkeypatch, tmp_path):
+    _application()
+    shown = []
+
+    class FakeBackend:
+        def run_text(self, args, include_data_dir=True):
+            raise BackendError("WMS IMPORT COULD NOT CONTINUE\nReport row: 17\nGitHub issue URL")
+
+    class FakeDiagnosticDialog:
+        def __init__(self, title, report, parent=None):
+            shown.append((title, report))
+
+        def exec(self):
+            return QDialog.Accepted
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    monkeypatch.setattr("fedleave_gui.main_window.DiagnosticDialog", FakeDiagnosticDialog)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(tmp_path / "clocking.html"), "HTML"))
+    monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
+    window = MainWindow()
+
+    window.import_wms_http_leave_report()
+
+    assert shown == [("WMS Import Failed", "WMS IMPORT COULD NOT CONTINUE\nReport row: 17\nGitHub issue URL")]
+
+
+def test_force_balance_dialog_calls_backend_and_refreshes(monkeypatch):
+    _application()
+    calls = []
+    refreshed = []
+
+    class FakeBackend:
+        def force_balance(self, **values):
+            calls.append(values)
+            return {**values, "forced_balance": values["hours"]}
+
+    class FakeDialog:
+        def __init__(self, parent=None):
+            pass
+
+        def exec(self):
+            return QDialog.Accepted
+
+        def values(self):
+            return {"date": "2026-07-22", "category": "annual", "hours": 40.0, "comment": "Payroll balance"}
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    monkeypatch.setattr("fedleave_gui.main_window.ForceBalanceDialog", FakeDialog)
+    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: None)
+    window = MainWindow()
+    window.refresh = lambda: refreshed.append(True)
+
+    window.force_leave_balance()
+
+    assert calls == [{"date": "2026-07-22", "category": "annual", "hours": 40.0, "comment": "Payroll balance"}]
+    assert refreshed == [True]
+
+
+def test_periodic_update_alert_is_not_repeated_for_same_version(monkeypatch):
+    _application()
+    alerts = []
+
+    class FakeBackend:
+        def check_for_updates(self):
+            return {
+                "status": "ok",
+                "update_available": True,
+                "current_version": "0.2.0",
+                "latest_version": "0.3.0",
+                "release_url": "https://github.com/joshua-guthrie/fedleave/releases/tag/v0.3.0",
+                "instructions": "Run the installer.",
+            }
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    monkeypatch.setattr("fedleave_gui.main_window.save_settings", lambda settings: None)
+    monkeypatch.setattr(QMessageBox, "information", lambda *args, **kwargs: alerts.append(args[2]))
+    window = MainWindow()
+
+    window._perform_update_check(interactive=False)
+    window._perform_update_check(interactive=False)
+
+    assert len(alerts) == 1
+    assert "0.3.0" in alerts[0]
+
+
 def test_help_menu_hides_backend_about_action(monkeypatch):
     _application()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
@@ -295,7 +386,7 @@ def test_help_menu_hides_backend_about_action(monkeypatch):
     help_action = next(action for action in window.menuBar().actions() if action.text() == "Help")
     labels = [action.text() for action in help_action.menu().actions() if action.text()]
 
-    assert labels == ["Help Contents", "Leave Abbreviations", "About FedLeave Calendar"]
+    assert labels == ["Help Contents", "Leave Abbreviations", "Check for Updates...", "About FedLeave Calendar"]
 
 
 def test_select_month_action_updates_displayed_month(monkeypatch):

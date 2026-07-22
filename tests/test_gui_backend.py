@@ -24,6 +24,8 @@ elif args[:1] == ["set-day"]:
     print(json.dumps({"action": "set-day", "args": args}))
 elif args[:1] == ["accrual-change"]:
     print(json.dumps({"action": "accrual_changed", "args": args}))
+elif args[:1] == ["check-for-updates"]:
+    print(json.dumps({"status": "ok", "update_available": False, "args": args}))
 elif args[:1] == ["validate"]:
     print(json.dumps({"ok": True}))
 elif args[:1] == ["use-or-lose"]:
@@ -157,6 +159,15 @@ def test_gui_backend_uses_fedleave_binary_for_accrual_change(tmp_path: Path):
         "--json",
     ]
     assert args[-2:] == ["--data-dir", str(tmp_path / "data")]
+
+
+def test_update_check_does_not_pass_data_directory_to_network_only_command(tmp_path: Path):
+    fake = _fake_fedleave(tmp_path / "fedleave")
+    backend = FedleaveBackend(BackendOptions(fedleave_path=str(fake), data_dir=str(tmp_path / "data")))
+
+    result = backend.check_for_updates()
+
+    assert result["args"] == ["check-for-updates", "--json"]
 
 
 def test_gui_backend_reports_version_and_executable_path(tmp_path: Path):

@@ -8,8 +8,8 @@ from typing import Any, Callable
 
 
 EXCLUDED_STATUSES = {"denied", "cancelled", "voided", "deleted"}
-BALANCE_INCREASING_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled"}
-BALANCE_DECREASING_DIRECTIONS = {"used", "paid_out", "forfeited", "expired"}
+BALANCE_INCREASING_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled", "forced_increase"}
+BALANCE_DECREASING_DIRECTIONS = {"used", "paid_out", "forfeited", "expired", "forced_decrease"}
 COMP_DISPOSAL_DIRECTIONS = {"used", "paid_out", "forfeited", "expired"}
 EPSILON = 1e-9
 

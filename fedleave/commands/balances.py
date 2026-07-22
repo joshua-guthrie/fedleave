@@ -42,7 +42,7 @@ _DISPLAY_CATEGORY_LABELS = {
     "restored_annual": "RA",
 }
 
-_NEGATIVE_DIRECTIONS = {"used", "expired", "forfeited"}
+_NEGATIVE_DIRECTIONS = {"used", "expired", "forfeited", "forced_decrease"}
 
 
 def _display_line(transaction: dict) -> str:

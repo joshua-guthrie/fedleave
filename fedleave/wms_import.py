@@ -4,16 +4,51 @@ from dataclasses import dataclass
 from datetime import date
 from datetime import datetime as _datetime
 from html.parser import HTMLParser
+from pathlib import Path
+import platform
 import re
 from typing import Any
 
+from . import __version__
 from .config import LeaveYear
 from .ledger import create_transaction
 from .payperiods import generate_pay_periods
 
 
+WMS_SUPPORT_URL = "https://github.com/joshua-guthrie/fedleave/issues/new"
+
+
 class WmsImportError(ValueError):
-    pass
+    """An import failure carrying safe, copyable diagnostic context."""
+
+    def __init__(self, message: str, *, details: dict[str, Any] | None = None) -> None:
+        super().__init__(message)
+        self.details = details or {}
+
+    def support_report(self, input_path: Path | None = None) -> str:
+        lines = [
+            "WMS IMPORT COULD NOT CONTINUE",
+            "",
+            f"Problem: {self}",
+            f"FedLeave version: {__version__}",
+            f"Platform: {platform.system()} {platform.release()}",
+        ]
+        if input_path is not None:
+            lines.append(f"Input file: {input_path}")
+        for label, value in self.details.items():
+            if value not in (None, "", []):
+                lines.append(f"{label}: {value}")
+        lines.extend(
+            [
+                "",
+                "Please report this WMS format to FedLeave:",
+                f"1. Open {WMS_SUPPORT_URL}",
+                "2. Copy and paste this complete diagnostic into the issue.",
+                "3. Attach the original WMS HTML report so the importer can be updated.",
+                "   Review the report for personal information before attaching it.",
+            ]
+        )
+        return "\n".join(lines)
 
 
 @dataclass(frozen=True)
@@ -179,15 +214,18 @@ def _format_description(raw_code: str, start_time: str | None, hours: float, sta
     return " ".join(parts)
 
 
-def _row_to_spec(row: list[str]) -> WmsTransactionSpec | None:
+def _row_to_spec(row: list[str], row_number: int | None = None) -> WmsTransactionSpec | None:
     row_date = _cell(row, 13)
     raw_code = _cell(row, 15)
     if not row_date or not raw_code:
         return None
     try:
         parsed_date = _parse_date(row_date)
-    except WmsImportError:
-        return None
+    except WmsImportError as exc:
+        raise WmsImportError(
+            f"Invalid WMS transaction date {row_date!r}.",
+            details={"Report row": row_number, "Leave code": raw_code, "Row cells": row},
+        ) from exc
 
     base_code, _, _subcode = raw_code.partition("/")
     if base_code in _IGNORED_CODES:
@@ -195,13 +233,19 @@ def _row_to_spec(row: list[str]) -> WmsTransactionSpec | None:
 
     rule = _CODE_RULES.get(base_code)
     if rule is None:
-        raise WmsImportError(f"Unsupported WMS leave code {raw_code} on {row_date}")
+        raise WmsImportError(
+            f"Unsupported WMS leave code {raw_code} on {row_date}",
+            details={"Report row": row_number, "Leave code": raw_code, "Row cells": row},
+        )
 
     hours_text = _cell(row, 25)
     try:
         hours = float(hours_text)
     except ValueError as exc:
-        raise WmsImportError(f"Invalid hours for {raw_code} on {row_date}: {hours_text}") from exc
+        raise WmsImportError(
+            f"Invalid hours for {raw_code} on {row_date}: {hours_text}",
+            details={"Report row": row_number, "Leave code": raw_code, "Row cells": row},
+        ) from exc
 
     start_time = _format_clock_time(_cell(row, 23))
     status = _cell(row, 31)
@@ -239,8 +283,8 @@ def parse_wms_http_leave_report(html_text: str) -> WmsImportReport:
 
     specs: list[WmsTransactionSpec] = []
     ignored_rows = 0
-    for row in parser.rows:
-        spec = _row_to_spec(row)
+    for row_number, row in enumerate(parser.rows, start=1):
+        spec = _row_to_spec(row, row_number)
         if spec is None:
             if _cell(row, 13) and _cell(row, 15):
                 ignored_rows += 1

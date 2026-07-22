@@ -66,6 +66,8 @@ class CompRules(BaseModel):
     expiration_action: str = "warn"
     allow_payout_tracking: bool = True
     allow_forfeiture_tracking: bool = True
+    allow_extension: bool = True
+    reminder_pay_periods: list[int] = Field(default_factory=lambda: [1, 3, 6, 12])
 
 
 class TravelCompRules(BaseModel):
@@ -74,6 +76,7 @@ class TravelCompRules(BaseModel):
     expiration_action: str = "forfeit"
     allow_extension: bool = True
     extension_pay_periods: int = 26
+    reminder_pay_periods: list[int] = Field(default_factory=lambda: [1, 3, 6, 12])
 
 
 class CreditRules(BaseModel):
@@ -94,6 +97,17 @@ class TimeOffAwardRules(BaseModel):
     expires: bool = False
     expiration_days_after_earned: int | None = None
     agency_policy_required: bool = True
+    expiration_action: str = "forfeit"
+    allow_extension: bool = True
+    reminder_pay_periods: list[int] = Field(default_factory=lambda: [1, 3, 6, 12])
+
+
+class RestoredAnnualRules(BaseModel):
+    expires: bool = True
+    expiration_leave_years_after_restored: int = 2
+    expiration_action: str = "forfeit"
+    allow_extension: bool = True
+    reminder_pay_periods: list[int] = Field(default_factory=lambda: [1, 3, 6, 12])
 
 
 class ReligiousCompRules(BaseModel):
@@ -113,6 +127,7 @@ class Config(BaseModel):
         "travel_comp": TravelCompRules().model_dump(),
         "credit": CreditRules().model_dump(),
         "time_off_award": TimeOffAwardRules().model_dump(),
+        "restored_annual": RestoredAnnualRules().model_dump(),
         "religious_comp": ReligiousCompRules().model_dump(),
     })
 

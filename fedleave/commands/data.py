@@ -239,10 +239,11 @@ def import_wms_http(
     try:
         report = parse_wms_http_leave_report(input.read_text(encoding="utf-8"))
     except UnicodeDecodeError as exc:
-        console.print(f"[red]ERROR:[/red] Could not read report as UTF-8 HTML: {exc}")
+        error = WmsImportError(f"Could not read report as UTF-8 HTML: {exc}")
+        console.print(f"[red]ERROR:[/red]\n{error.support_report(input)}")
         raise typer.Exit(code=2)
     except WmsImportError as exc:
-        console.print(f"[red]ERROR:[/red] {exc}")
+        console.print(f"[red]ERROR:[/red]\n{exc.support_report(input)}")
         raise typer.Exit(code=2)
 
     base = get_default_data_dir(data_dir)

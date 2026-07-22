@@ -39,6 +39,46 @@ def test_preferences_dialog_applies_payday_offset(monkeypatch, tmp_path: Path):
     assert updated.payday_offset_days == 5
 
 
+def test_preferences_immediately_renders_changed_payday_offset(monkeypatch):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr("fedleave_gui.main_window.save_settings", lambda settings: None)
+    window = MainWindow()
+    window.month_json = {
+        "days": [
+            {"date": "2026-07-11", "is_payday": False, "entries": []},
+            {"date": "2026-07-17", "is_payday": True, "entries": []},
+        ],
+        "pay_periods": [{"end_date": "2026-07-11", "pay_date": "2026-07-17"}],
+    }
+    rendered: list[int] = []
+    original_render = window.render_month
+
+    def capture_render():
+        rendered.append(window.settings.payday_offset_days)
+        original_render()
+
+    window.render_month = capture_render
+
+    class FakePreferencesDialog:
+        def __init__(self, settings, parent=None):
+            self.settings = settings
+
+        def exec(self):
+            return QDialog.Accepted
+
+        def apply(self):
+            self.settings.payday_offset_days = 0
+            return self.settings
+
+    monkeypatch.setattr("fedleave_gui.main_window.PreferencesDialog", FakePreferencesDialog)
+
+    window.preferences()
+
+    assert rendered == [0]
+    assert window.month_json["pay_periods"][0]["pay_date"] == "2026-07-11"
+
+
 def test_apply_payday_offset_updates_pay_dates_and_day_flags():
     month_json = {
         "days": [

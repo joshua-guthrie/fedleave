@@ -15,4 +15,5 @@ def main(argv: list[str] | None = None) -> int:
     app.setWindowIcon(window_icon())
     window = MainWindow()
     window.show()
+    window.start_background_checks()
     return app.exec()

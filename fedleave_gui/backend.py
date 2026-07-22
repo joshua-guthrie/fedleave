@@ -82,10 +82,10 @@ class FedleaveBackend:
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
         return subprocess.run(command, **kwargs)
 
-    def run_json(self, args: list[str]) -> dict[str, Any]:
+    def run_json(self, args: list[str], *, include_data_dir: bool = True) -> dict[str, Any]:
         fedleave = find_fedleave(self.options.fedleave_path)
         command = [str(fedleave), *args]
-        if self.options.data_dir:
+        if include_data_dir and self.options.data_dir:
             command.extend(["--data-dir", self.options.data_dir])
         result = self._run_command(command)
         if result.returncode != 0:
@@ -153,6 +153,28 @@ class FedleaveBackend:
 
     def balance(self, year: int, *, as_of: str) -> dict[str, Any]:
         return self.run_json(["balance", "--year", str(year), "--as-of", as_of, "--json"])
+
+    def force_balance(self, *, date: str, category: str, hours: float, comment: str) -> dict[str, Any]:
+        return self.run_json(
+            [
+                "force-balance",
+                "--date",
+                date,
+                "--category",
+                category,
+                "--hours",
+                _format_number(hours),
+                "--comment",
+                comment,
+                "--json",
+            ]
+        )
+
+    def check_for_updates(self) -> dict[str, Any]:
+        return self.run_json(["check-for-updates", "--json"], include_data_dir=False)
+
+    def expirations(self, year: int) -> dict[str, Any]:
+        return self.run_json(["expirations", "--year", str(year), "--json"])
 
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])

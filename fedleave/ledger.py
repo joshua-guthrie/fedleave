@@ -39,6 +39,8 @@ TRANSACTION_DIRECTIONS = [
     "restored",
     "corrected",
     "reconciled",
+    "forced_increase",
+    "forced_decrease",
 ]
 
 TRANSACTION_STATUSES = [
@@ -54,8 +56,8 @@ TRANSACTION_STATUSES = [
 ]
 
 
-EARNED_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled"}
-USED_DIRECTIONS = {"used", "expired", "forfeited"}
+EARNED_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled", "forced_increase"}
+USED_DIRECTIONS = {"used", "expired", "forfeited", "forced_decrease"}
 WORKED_DIRECTIONS = {"worked"}
 
 
@@ -73,6 +75,8 @@ class Transaction(BaseModel):
     expiration_date: str | None = None
     expiration_pay_period: int | None = None
     earned_transaction_id: str | None = None
+    expiration_extension_reason: str | None = None
+    expiration_extended_at: str | None = None
 
     @field_validator("category")
     def validate_category(cls, value: str) -> str:

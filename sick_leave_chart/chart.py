@@ -307,9 +307,9 @@ def sick_leave_balance_points(year: int, data_dir: Path | None = None) -> tuple[
             tx = txs[tx_index]
             hours = decimal_hours(tx.get("hours"))
             direction = tx.get("direction")
-            if direction in {"earned", "worked", "adjusted"}:
+            if direction in {"earned", "worked", "adjusted", "restored", "corrected", "reconciled", "forced_increase"}:
                 running += hours
-            elif direction == "used":
+            elif direction in {"used", "expired", "forfeited", "forced_decrease"}:
                 running -= hours
             tx_index += 1
         

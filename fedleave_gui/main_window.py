@@ -7,7 +7,7 @@ import os
 import subprocess
 import sys
 import tempfile
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import webbrowser
 from dataclasses import dataclass
 from datetime import date
@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextBrowser,
+    QPlainTextEdit,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -162,7 +163,7 @@ def _entry_value(entry: dict[str, Any]) -> DayValue | None:
     if not _nonzero(hours):
         return None
     direction = str(entry.get("direction", ""))
-    value = -hours if direction in {"used", "expired", "forfeited"} else hours
+    value = -hours if direction in {"used", "expired", "forfeited", "forced_decrease"} else hours
     return DayValue(category, value)
 
 
@@ -492,6 +493,30 @@ class AbbreviationsDialog(QDialog):
         layout.addWidget(buttons)
 
 
+class DiagnosticDialog(QDialog):
+    """Display an error report that can be selected and copied verbatim."""
+
+    def __init__(self, title: str, report: str, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.resize(760, 520)
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("The import could not be completed. Copy this report when filing an issue:"))
+        self.report = QPlainTextEdit(report)
+        self.report.setReadOnly(True)
+        self.report.setLineWrapMode(QPlainTextEdit.NoWrap)
+        layout.addWidget(self.report, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        copy_button = buttons.addButton("Copy Report", QDialogButtonBox.ActionRole)
+        copy_button.clicked.connect(self._copy_report)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _copy_report(self) -> None:
+        self.report.selectAll()
+        self.report.copy()
+
+
 class PreferencesDialog(QDialog):
     def __init__(self, settings: GuiSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -522,6 +547,9 @@ class PreferencesDialog(QDialog):
         self.orientation.addItems(["Landscape", "Portrait"])
         self.orientation.setCurrentText(settings.print_orientation)
         self.pdf_folder = QLineEdit(settings.pdf_export_folder)
+        self.expiration_reminders = QLineEdit(
+            ", ".join(str(value) for value in settings.expiration_reminder_pay_periods)
+        )
         form.addRow("Backend executable path", self.fedleave_path)
         form.addRow("Data directory", self.data_dir)
         form.addRow("First day of week", self.first_day)
@@ -533,6 +561,7 @@ class PreferencesDialog(QDialog):
         form.addRow("Calendar font size", self.font_size)
         form.addRow("Print orientation", self.orientation)
         form.addRow("PDF export folder", self.pdf_folder)
+        form.addRow("Expiration reminders (pay periods)", self.expiration_reminders)
         layout.addLayout(form)
         layout.addWidget(QLabel(f"Settings file: {settings_path()}"))
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
@@ -552,6 +581,15 @@ class PreferencesDialog(QDialog):
         self.settings.font_size = self.font_size.value()
         self.settings.print_orientation = self.orientation.currentText()
         self.settings.pdf_export_folder = self.pdf_folder.text().strip()
+        reminders = []
+        for value in self.expiration_reminders.text().split(","):
+            try:
+                number = int(value.strip())
+            except ValueError:
+                continue
+            if number >= 0 and number not in reminders:
+                reminders.append(number)
+        self.settings.expiration_reminder_pay_periods = sorted(reminders) or [1, 3, 6, 12]
         return self.settings
 
 
@@ -695,6 +733,113 @@ class ChangeAccrualDialog(QDialog):
 
     def selected_hours(self) -> float:
         return float(self.hours_input.currentData())
+
+
+class ForceBalanceDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Force Leave Balance")
+        self.setModal(True)
+        layout = QVBoxLayout(self)
+        description = QLabel(
+            "Set the exact balance for one leave category on a date. FedLeave records the difference "
+            "as an auditable adjustment that affects that date and all later dates."
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        form = QFormLayout()
+        self.date_input = QDateEdit(QDate.currentDate())
+        self.date_input.setCalendarPopup(True)
+        self.date_input.setDisplayFormat("yyyy-MM-dd")
+        self.category_input = QComboBox()
+        for category, (_short, label) in CATEGORY_LABELS.items():
+            if category != "overtime":
+                self.category_input.addItem(label, category)
+        self.hours_input = QDoubleSpinBox()
+        self.hours_input.setRange(0.0, 10000.0)
+        self.hours_input.setDecimals(2)
+        self.hours_input.setSingleStep(0.25)
+        self.comment_input = QLineEdit()
+        self.comment_input.setPlaceholderText("Why this balance is being corrected")
+        form.addRow("Effective date", self.date_input)
+        form.addRow("Leave category", self.category_input)
+        form.addRow("Forced balance", self.hours_input)
+        form.addRow("Comment", self.comment_input)
+        layout.addLayout(form)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("Apply Adjustment")
+        buttons.accepted.connect(self._accept_if_valid)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _accept_if_valid(self) -> None:
+        if not self.comment_input.text().strip():
+            QMessageBox.warning(self, "Comment Required", "Enter a comment explaining the forced balance.")
+            return
+        self.accept()
+
+    def values(self) -> dict[str, Any]:
+        return {
+            "date": self.date_input.date().toString("yyyy-MM-dd"),
+            "category": str(self.category_input.currentData()),
+            "hours": self.hours_input.value(),
+            "comment": self.comment_input.text().strip(),
+        }
+
+
+class ExpirationStatusDialog(QDialog):
+    def __init__(self, payload: dict[str, Any], reminders: list[int], parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Expiring Leave Status")
+        self.resize(1050, 600)
+        layout = QVBoxLayout(self)
+        earliest = payload.get("earliest_expiration_date") or "None"
+        layout.addWidget(QLabel(f"As of {payload.get('as_of', '')}    Earliest expiration: {earliest}"))
+        lots = [row for row in payload.get("lots", []) if float(row.get("remaining_hours", 0.0)) > 0]
+        summary = []
+        for threshold in reminders:
+            hours = sum(
+                float(row.get("remaining_hours", 0.0))
+                for row in lots
+                if int(row.get("pay_periods_remaining", 0)) <= threshold
+            )
+            summary.append(f"within {threshold} PP: {hours:.2f} h")
+        layout.addWidget(QLabel("    ".join(summary)))
+        layout.addWidget(
+            QLabel(
+                f"Expired/forfeited this leave year: "
+                f"{float(payload.get('expired_or_forfeited_this_leave_year', 0.0)):.2f} hours"
+            )
+        )
+        self.table = QTableWidget(len(lots), 8)
+        self.table.setHorizontalHeaderLabels(
+            ["Leave Type", "Earned", "Original Hours", "Remaining", "Expires", "PP Left", "Use / PP", "Lot ID"]
+        )
+        self.table.verticalHeader().setVisible(False)
+        alignments = [TABLE_TEXT_ALIGNMENT, TABLE_TEXT_ALIGNMENT] + [TABLE_NUMBER_ALIGNMENT] * 2 + [TABLE_TEXT_ALIGNMENT] + [TABLE_NUMBER_ALIGNMENT] * 2 + [TABLE_TEXT_ALIGNMENT]
+        _set_table_header_alignments(self.table, alignments)
+        for row_number, row in enumerate(lots):
+            values = [
+                _category_display_text(str(row.get("category", ""))),
+                str(row.get("earned_date", "")),
+                f"{float(row.get('earned_hours', 0.0)):.2f}",
+                f"{float(row.get('remaining_hours', 0.0)):.2f}",
+                str(row.get("expiration_date", "")),
+                str(row.get("pay_periods_remaining", "")),
+                f"{float(row.get('hours_per_pay_period_to_use', 0.0)):.2f}",
+                str(row.get("transaction_id", "")),
+            ]
+            for column, value in enumerate(values):
+                self.table.setItem(row_number, column, _table_item(value, alignments[column]))
+        for column in range(7):
+            self.table.horizontalHeader().setSectionResizeMode(column, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(7, QHeaderView.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(self.table, 1)
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
 
 
 class ChangeLeaveYearDialog(QDialog):
@@ -901,6 +1046,15 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self.refresh()
 
+    def start_background_checks(self) -> None:
+        """Start low-frequency network and expiration reminders after the window is shown."""
+        self._update_timer = QTimer(self)
+        self._update_timer.setInterval(6 * 60 * 60 * 1000)
+        self._update_timer.timeout.connect(self.check_for_updates_periodically)
+        self._update_timer.start()
+        QTimer.singleShot(1500, self.check_for_updates_periodically)
+        QTimer.singleShot(2000, self.check_expiration_reminders)
+
     def _backend(self) -> FedleaveBackend:
         configured_data_dir = Path(self.settings.data_dir).expanduser() if self.settings.data_dir else None
         return FedleaveBackend(
@@ -1034,6 +1188,8 @@ class MainWindow(QMainWindow):
         self._toggle(view_menu, "Show Pay-Period End Highlight", self.settings.show_pay_period_end, "show_pay_period_end")
         tools_menu = self.menuBar().addMenu("Tools")
         self._action(tools_menu, "Change Accrual...", self.change_accrual)
+        self._action(tools_menu, "Force Leave Balance...", self.force_leave_balance)
+        self._action(tools_menu, "Expiring Leave Status...", self.show_expirations)
         self._action(tools_menu, "Validate Data", self.validate_data)
         self._action(tools_menu, "Export Data...", self.export_data)
         import_external_menu = tools_menu.addMenu("Import From External App")
@@ -1042,6 +1198,7 @@ class MainWindow(QMainWindow):
         help_menu = self.menuBar().addMenu("Help")
         self._action(help_menu, "Help Contents", self.show_help)
         self._action(help_menu, "Leave Abbreviations", self.show_abbreviations)
+        self._action(help_menu, "Check for Updates...", self.check_for_updates)
         self._action(help_menu, "About FedLeave Calendar", self.about_gui)
 
     def _action(self, menu: Any, text: str, callback: Any) -> QAction:
@@ -1107,6 +1264,9 @@ class MainWindow(QMainWindow):
             self.settings = dialog.apply()
             save_settings(self.settings)
             self.backend = self._backend()
+            # Apply display-only preferences immediately, even if the backend
+            # reload subsequently fails or takes time.
+            self.render_month()
             self.refresh()
 
     def _refresh_yearly_comparison_menu(self) -> None:
@@ -1369,7 +1529,7 @@ class MainWindow(QMainWindow):
         try:
             self.backend.run_text(["import-wms-http", "--input", path])
         except BackendError as exc:
-            QMessageBox.warning(self, "Import Failed", str(exc))
+            DiagnosticDialog("WMS Import Failed", str(exc), self).exec()
             return
         self.refresh()
 
@@ -1387,6 +1547,110 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Change Accrual", str(exc))
             return
         self.refresh()
+
+    def force_leave_balance(self) -> None:
+        dialog = ForceBalanceDialog(self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        try:
+            result = self.backend.force_balance(**dialog.values())
+        except BackendError as exc:
+            QMessageBox.warning(self, "Force Leave Balance", str(exc))
+            return
+        QMessageBox.information(
+            self,
+            "Force Leave Balance",
+            f"{_category_display_text(str(result.get('category', '')))} was set to "
+            f"{float(result.get('forced_balance', 0.0)):.2f} hours as of {result.get('date', '')}.",
+        )
+        self.refresh()
+
+    def _update_check_is_due(self, now: datetime | None = None) -> bool:
+        now = now or datetime.now(timezone.utc)
+        try:
+            previous = datetime.fromisoformat(self.settings.last_update_check_utc)
+            if previous.tzinfo is None:
+                previous = previous.replace(tzinfo=timezone.utc)
+        except (TypeError, ValueError):
+            return True
+        return now - previous >= timedelta(hours=24)
+
+    def check_for_updates_periodically(self) -> None:
+        if self._update_check_is_due():
+            self._perform_update_check(interactive=False)
+
+    def check_for_updates(self) -> None:
+        self._perform_update_check(interactive=True)
+
+    def _perform_update_check(self, *, interactive: bool) -> None:
+        self.settings.last_update_check_utc = datetime.now(timezone.utc).isoformat()
+        save_settings(self.settings)
+        try:
+            result = self.backend.check_for_updates()
+        except BackendError as exc:
+            if interactive:
+                QMessageBox.warning(self, "Check for Updates", str(exc))
+            return
+        if result.get("status") != "ok":
+            if interactive:
+                QMessageBox.information(self, "Check for Updates", str(result.get("message", "Update check unavailable.")))
+            return
+        latest = str(result.get("latest_version") or "")
+        if result.get("update_available"):
+            if not interactive and latest == self.settings.last_update_notified_version:
+                return
+            QMessageBox.information(
+                self,
+                "FedLeave Update Available",
+                f"FedLeave {latest} is available (installed: {result.get('current_version', '')}).\n\n"
+                f"Download: {result.get('release_url', '')}\n\n{result.get('instructions', '')}",
+            )
+            self.settings.last_update_notified_version = latest
+            save_settings(self.settings)
+        elif interactive:
+            QMessageBox.information(self, "Check for Updates", "This installation is up to date.")
+
+    def _expiration_payload(self) -> dict[str, Any] | None:
+        if not hasattr(self.backend, "expirations"):
+            return None
+        try:
+            return self.backend.expirations(self.year)
+        except BackendError:
+            return None
+
+    def show_expirations(self) -> None:
+        payload = self._expiration_payload()
+        if payload is None:
+            QMessageBox.warning(self, "Expiring Leave Status", "Expiration status could not be loaded.")
+            return
+        ExpirationStatusDialog(payload, self.settings.expiration_reminder_pay_periods, self).exec()
+
+    def check_expiration_reminders(self) -> None:
+        today_text = date.today().isoformat()
+        if self.settings.last_expiration_reminder_date == today_text:
+            return
+        payload = self._expiration_payload()
+        if payload is None:
+            return
+        limits = self.settings.expiration_reminder_pay_periods
+        if not limits:
+            return
+        urgent = [
+            row for row in payload.get("lots", [])
+            if float(row.get("remaining_hours", 0.0)) > 0
+            and int(row.get("pay_periods_remaining", 0)) <= max(limits)
+        ]
+        if not urgent:
+            return
+        total = sum(float(row.get("remaining_hours", 0.0)) for row in urgent)
+        QMessageBox.warning(
+            self,
+            "Expiring Leave Reminder",
+            f"{total:.2f} hours are due to expire within {max(limits)} pay periods. "
+            "Open Tools > Expiring Leave Status for lot details.",
+        )
+        self.settings.last_expiration_reminder_date = today_text
+        save_settings(self.settings)
 
     def open_leave_chart(self, app_name: str, label: str) -> None:
         year = self.month_json.get("year") if isinstance(self.month_json, dict) else self.year

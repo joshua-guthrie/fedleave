@@ -5,7 +5,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from .config import get_default_data_dir
+from .config import get_default_data_dir, load_config
+from .expirations import synchronize_expirations
 from .storage import load_json, remove_legacy_transaction_history, write_json
 from .validation import sanitize_text
 
@@ -24,7 +25,14 @@ def load_leave_year(year: int, data_dir: Path | None = None) -> dict[str, Any]:
     if not path.exists():
         raise FileNotFoundError(f"Leave year file not found: {path}")
     leave_year = load_json(path)
-    if remove_legacy_transaction_history(leave_year):
+    changed = remove_legacy_transaction_history(leave_year)
+    try:
+        config = load_config(data_dir)
+    except FileNotFoundError:
+        config = None
+    if synchronize_expirations(leave_year, config)["changed"]:
+        changed = True
+    if changed:
         write_json(path, leave_year)
     return leave_year
 
@@ -40,7 +48,14 @@ def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = N
         if not path.is_file() or path.suffix != ".json":
             continue
         leave_year = load_json(path)
-        if remove_legacy_transaction_history(leave_year):
+        changed = remove_legacy_transaction_history(leave_year)
+        try:
+            config = load_config(data_dir)
+        except FileNotFoundError:
+            config = None
+        if synchronize_expirations(leave_year, config)["changed"]:
+            changed = True
+        if changed:
             write_json(path, leave_year)
         try:
             start = parse_iso_date(str(leave_year.get("leave_year_start", "")))

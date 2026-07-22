@@ -19,13 +19,14 @@ It's a little program I'm using to serve as a back end to an AI agent and a dash
 
 
 ## Limitations
-I'm making no effort to track expiring leave, such as travel comp time, award leave, etc.  I've never had the problem in my personal life of having to worry about leave expiring ! :)
 
 The program is entirely single user.  I suppose it could be made into a multiple user system with seperate data files for each user, but that has never been my use case.  At your own peril.
 
 I would not be using this application for any thing critical.  For me, it's a fun little experiement.
 
 ## Installation
+
+FedLeave's Linux installer and packaged desktop applications are written and tested for Debian-based distributions, including Ubuntu. Other Linux distributions may work from source, but are not currently supported by the installer.
 
 End users should use the platform installer script instead of setting up a development environment manually:
 
@@ -400,6 +401,36 @@ Commands and common options:
 		Example:
 			fedleave accrual-change --year 2026 --as-of 2026-07-12 --category annual --hours 6 --reason "15-year service accrual"
 
+	force-balance
+		Force one category to an exact balance as of a date by recording an auditable adjustment.
+
+		Syntax:
+			fedleave force-balance --date YYYY-MM-DD|today --category CATEGORY --hours HOURS --comment TEXT [--json] [--data-dir PATH]
+
+	expirations
+		Show individually tracked expiring-leave lots and reminder totals.
+
+		Syntax:
+			fedleave expirations [--year YEAR] [--within-pay-periods N] [--category comp|travel_comp|restored_annual|time_off_award] [--json] [--data-dir PATH]
+
+		Notes:
+			- Uses consume the lot with the earliest expiration first and retain `earned_transaction_id` links.
+			- Comp, travel comp, and restored annual leave are enabled by default. Time-off awards can be enabled in `config.json` when agency policy sets an expiration.
+			- Expiration periods, actions, extension permission, and reminder thresholds are configurable under `rules` in `config.json`.
+			- Active expiration lots carry into the next leave year individually during `rollover`.
+
+	expiration-extend
+		Extend an eligible earned lot and record the reason.
+
+		Syntax:
+			fedleave expiration-extend --id TRANSACTION_ID --new-date YYYY-MM-DD --reason TEXT [--json] [--data-dir PATH]
+
+	check-for-updates
+		Check the official GitHub releases endpoint for a newer FedLeave version.
+
+		Syntax:
+			fedleave check-for-updates [--json]
+
 	reconcile
 		Add or update a transaction from a payroll, clocking, or recurring reconciliation source.
 
@@ -463,6 +494,7 @@ Commands and common options:
 			- Matching transactions in the target leave year are replaced authoritatively; automatic accrual transactions and unrelated transaction categories are left alone.
 			- If the report belongs to a leave year that does not yet exist, FedLeave creates that leave year file before importing the transactions.
 			- Unsupported leave codes raise an error so new WMS leave types can be added explicitly rather than silently misfiled.
+			- Import failures provide a copyable diagnostic, GitHub issue URL, and instructions to attach the original HTML report.
 
 	list
 		List active transactions for a leave year.
@@ -983,12 +1015,16 @@ General rules:
 - Field names are stable for automation. New fields may be added in later versions, so consumers should ignore unknown fields.
 - Hour values are JSON numbers and represent decimal hours.
 - Date values are ISO `YYYY-MM-DD` strings. CLI date options also accept `today` as shorthand for the current local date. Timestamps are ISO date-time strings as produced by Python.
-- Category and direction values use the same names as the CLI: for example `annual`, `sick`, `credit`, `earned`, `used`, `worked`, and `starting_balance`.
+- Category and direction values use the same names as the CLI: for example `annual`, `sick`, `credit`, `earned`, `used`, `worked`, `forced_increase`, `forced_decrease`, and `starting_balance`.
 
 Commands with native JSON output:
 
 - `add`
 - `accrual-change`
+- `force-balance`
+- `expirations`
+- `expiration-extend`
+- `check-for-updates`
 - `reconcile`
 - `correct`
 - `void`

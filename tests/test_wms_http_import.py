@@ -81,6 +81,23 @@ def test_parse_wms_http_leave_report_rejects_unknown_codes() -> None:
         )
 
 
+def test_wms_error_report_is_copyable_and_actionable() -> None:
+    try:
+        parse_wms_http_leave_report(
+            _wms_html([_data_row(date="13-Jan-2026", code="ZZ", start_time="7.00", hours="1.00")])
+        )
+    except WmsImportError as exc:
+        report = exc.support_report(Path("clocking.html"))
+    else:
+        pytest.fail("Expected unsupported WMS code")
+
+    assert "Unsupported WMS leave code ZZ" in report
+    assert "Report row:" in report
+    assert "Row cells:" in report
+    assert "https://github.com/joshua-guthrie/fedleave/issues/new" in report
+    assert "Attach the original WMS HTML report" in report
+
+
 def test_import_wms_http_creates_missing_leave_year(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     report_file = tmp_path / "clocking.html"

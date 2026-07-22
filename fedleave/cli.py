@@ -10,6 +10,9 @@ from .commands.rollover import rollover
 from .commands.holidays import holidays
 from .commands.balances import balance, compare_leave_balances, daily_activity, month, pay_period_summary, pay_periods_summary, use_or_lose
 from .commands.accruals import accrual_change
+from .commands.forced_balance import force_balance
+from .commands.updates import check_for_updates_command
+from .commands.expirations import expiration_extend, expirations
 
 app.add_typer(starting_balance_app, name="starting-balance")
 

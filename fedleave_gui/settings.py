@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 
@@ -20,6 +20,10 @@ class GuiSettings:
     font_size: int = 10
     print_orientation: str = "Landscape"
     pdf_export_folder: str = ""
+    last_update_check_utc: str = ""
+    last_update_notified_version: str = ""
+    expiration_reminder_pay_periods: list[int] = field(default_factory=lambda: [1, 3, 6, 12])
+    last_expiration_reminder_date: str = ""
 
 
 def settings_path() -> Path:

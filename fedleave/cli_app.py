@@ -27,6 +27,13 @@ Primary commands:
     set-day     Authoritatively set signed leave values for one day
     accrual-change
                 Change automatic annual/sick accrual hours from a date forward
+    force-balance
+                Force one leave balance as of a date with an auditable adjustment
+    check-for-updates
+                Check GitHub for a newer FedLeave release
+    expirations Show expiring comp, travel comp, restored annual, and optional award leave lots
+    expiration-extend
+                Extend one eligible earned lot with a recorded reason
     reconcile   Add or update one reconciled transaction by date/category/direction
     list        List transactions for a leave year
     starting-balance
@@ -90,6 +97,21 @@ Command details and examples:
         Updates future automatic accrual transactions and records the change in accrual_rate_changes.
     Example:
         fedleave accrual-change --year 2026 --as-of 2026-07-12 --category annual --hours 6 --reason "15-year service accrual"
+
+    fedleave force-balance --date YYYY-MM-DD|today --category CATEGORY --hours HOURS --comment TEXT [--json] [--data-dir PATH]
+        Adds an auditable increase or decrease so the selected category has exactly HOURS on that date.
+        The adjustment remains in effect for all later balance calculations.
+
+    fedleave check-for-updates [--json]
+        Query the official GitHub releases endpoint once and report whether a newer version is available.
+        When an update exists, prints the release URL and installation instructions.
+
+    fedleave expirations [--year YEAR] [--within-pay-periods N] [--category CATEGORY] [--json] [--data-dir PATH]
+        Show each earned expiring-leave lot, remaining hours, expiration date, pay periods remaining,
+        and the hours per pay period needed to use it. Uses are linked FIFO to the earliest expiration.
+
+    fedleave expiration-extend --id TRANSACTION_ID --new-date YYYY-MM-DD --reason TEXT [--json] [--data-dir PATH]
+        Extend an eligible lot when the category's configurable rule permits extensions.
 
     fedleave reconcile --date YYYY-MM-DD|today --category CATEGORY --direction DIRECTION --hours HOURS --reason TEXT [--status STATUS] [--source SOURCE] [--id TRANSACTION_ID] [--json] [--data-dir PATH]
         Infer the leave year from the date, then set the active transaction for that date/category/direction to the requested hours.
