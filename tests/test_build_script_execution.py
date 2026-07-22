@@ -6,9 +6,12 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "scripts" / "lib" / "common" / "installer_engine.py"
+WINDOWS_INSTALLER = ROOT / "scripts" / "WindowsInstall.bat"
 
 
 def _last_json(stdout: str) -> dict:
@@ -22,6 +25,7 @@ def _last_json(stdout: str) -> dict:
     raise AssertionError(f"No JSON result in output:\n{stdout}")
 
 
+@pytest.mark.skipif(os.name == "nt", reason="The Linux shell launcher is executable only on POSIX hosts")
 def test_linux_build_script_executes_smoke_test_without_error(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["FEDLEAVE_BUILD_ROOT"] = str(tmp_path / "build")
@@ -41,11 +45,22 @@ def test_linux_build_script_executes_smoke_test_without_error(tmp_path: Path) ->
     assert payload["platform"] == "linux"
 
 
-def test_windows_build_engine_executes_smoke_test_without_error(tmp_path: Path) -> None:
+def test_windows_build_script_executes_smoke_test_without_error(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["FEDLEAVE_BUILD_ROOT"] = str(tmp_path / "build")
+    if os.name == "nt":
+        command = [
+            os.environ.get("COMSPEC", "cmd.exe"),
+            "/d",
+            "/c",
+            str(WINDOWS_INSTALLER),
+            "--unattended",
+            "--smoke-test",
+        ]
+    else:
+        command = [sys.executable, str(ENGINE), "--platform", "windows", "--unattended", "--smoke-test"]
     result = subprocess.run(
-        [sys.executable, str(ENGINE), "--platform", "windows", "--unattended", "--smoke-test"],
+        command,
         cwd=ROOT,
         env=env,
         text=True,
