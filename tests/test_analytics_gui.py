@@ -48,7 +48,7 @@ def test_main_window_has_required_pages_controls_without_backend_diagnostics():
     assert [window.pages.tabText(index) for index in range(window.pages.count())] == [
         "Summary", "Seasonality", "Calendar Heatmap", "Overtime, Comp, and Credit",
     ]
-    assert window.summary_table.rowCount() == 16
+    assert window.summary_table.rowCount() == 15
     assert window.refresh_button.text() == "Refresh"
     assert window.open_chart_button.text() == "Open Chart"
     assert window.csv_button.text() == "Save Table as CSV..."
@@ -72,7 +72,12 @@ def test_seasonality_views_are_explained_and_populated():
     assert not window.seasonality_chart_image.pixmap().isNull()
     window.seasonality_selector.setCurrentText("Leave Used by Day of Week")
     assert window.seasonality_table.rowCount() == 7
+    assert not window.seasonality_chart_image.source_pixmap().isNull()
     assert window.open_chart_button.isEnabled()
+    assert "Final-Quarter Leave Concentration" not in [
+        window.seasonality_selector.itemText(index)
+        for index in range(window.seasonality_selector.count())
+    ]
 
 
 def test_chart_renderers_create_full_size_graphics():
@@ -95,7 +100,7 @@ def test_chart_renderers_create_full_size_graphics():
     assert bars.width() == 1610
     assert bars.height() == 1000
     assert heatmap.width() == 1610
-    assert heatmap.height() == 1000
+    assert heatmap.height() < 450
     assert horizontal.width() == 1610
     assert horizontal.height() == 700
 
@@ -138,10 +143,18 @@ def test_dynamic_heatmaps_and_monthly_lifecycle_charts_are_populated():
     assert [window.heatmap_selector.itemText(index) for index in range(window.heatmap_selector.count())] == [
         "All Leave Used", "Annual — Used", "Sick — Used",
     ]
+    window.pages.setCurrentIndex(2)
+    assert window.heatmap_table.rowCount() == 2
+    assert "future scheduled" not in window.heatmap_description.text().lower()
     assert window.lifecycle_tabs.count() == 7
     assert not window.overtime_comp_image.pixmap().isNull()
     assert not window.comp_month_image.pixmap().isNull()
     assert not window.credit_month_image.pixmap().isNull()
+    credit_headers = [
+        window.credit_month_table.horizontalHeaderItem(index).text()
+        for index in range(window.credit_month_table.columnCount())
+    ]
+    assert "Credit Worked" not in credit_headers
 
 
 def test_current_analytics_table_can_be_exported_as_csv(monkeypatch, tmp_path):
@@ -171,3 +184,35 @@ def test_open_chart_creates_popup_with_graphic_and_data_table():
     chart = window._chart_windows[0]
     assert "Leave Used by Month" in chart.windowTitle()
     assert chart.centralWidget().count() == 2
+    assert chart._pixmap.toImage() == window.seasonality_chart_image.source_pixmap().toImage()
+
+
+def test_embedded_and_opened_charts_fit_their_available_space():
+    app = _application()
+    window = AnalyticsWindow(Path("fedleave"), "/data", 2026, auto_load=False)
+    window.set_data(_data())
+    window.pages.setCurrentIndex(1)
+    window.resize(900, 700)
+    window.show()
+    app.processEvents()
+
+    embedded = window.seasonality_chart_image.pixmap().size()
+    assert embedded.width() <= window.seasonality_chart_image.width()
+    assert embedded.height() <= window.seasonality_chart_image.height()
+    sizes = window.seasonality_splitter.sizes()
+    assert sizes[0] > sizes[1]
+
+    window.open_chart()
+    chart = window._chart_windows[0]
+    chart.resize(500, 400)
+    app.processEvents()
+    first = chart.image_label.pixmap().size()
+    chart.resize(900, 500)
+    app.processEvents()
+    second = chart.image_label.pixmap().size()
+
+    assert first.width() <= chart.scroll_area.viewport().width()
+    assert first.height() <= chart.scroll_area.viewport().height()
+    assert second.width() <= chart.scroll_area.viewport().width()
+    assert second.height() <= chart.scroll_area.viewport().height()
+    assert second != first

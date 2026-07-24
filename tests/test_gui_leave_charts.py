@@ -17,12 +17,12 @@ def _application() -> QApplication:
     return QApplication.instance() or QApplication([])
 
 
-def test_view_menu_includes_leave_charts_submenu(monkeypatch):
+def test_analysis_menu_includes_leave_charts_submenu(monkeypatch):
     _application()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
     window = MainWindow()
 
-    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     leave_charts_action = next(
         action for action in view_action.menu().actions() if action.menu() and action.text() == "Leave Charts"
     )
@@ -38,12 +38,12 @@ def test_view_menu_includes_leave_charts_submenu(monkeypatch):
     ]
 
 
-def test_view_menu_includes_yearly_leave_comparison_submenu(monkeypatch):
+def test_analysis_menu_includes_yearly_leave_comparison_submenu(monkeypatch):
     _application()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
     window = MainWindow()
 
-    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
         action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
     )
@@ -70,7 +70,7 @@ def test_yearly_leave_comparison_submenu_is_disabled_with_one_leave_year(monkeyp
 
     window = MainWindow()
 
-    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
         action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
     )

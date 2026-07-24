@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QResizeEvent
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QDialog,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QScrollArea,
+    QSizePolicy,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -27,6 +28,7 @@ SERIES_COLORS = [BLUE, "#82A9D1", RED, "#D99694", "#8064A2", "#4BACC6"]
 WIDTH = 1610
 HEIGHT = 1000
 HORIZONTAL_HEIGHT = 700
+AXIS_FONT_SIZE = 10
 NUMERIC_KEYS = {
     "value", "hours", "through_today", "future_scheduled", "full_leave_year", "full_day_total",
     "earned_or_added", "decreased", "used", "worked", "earned", "paid_out", "forfeited", "expired",
@@ -45,6 +47,38 @@ class SortableTableItem(QTableWidgetItem):
         return super().__lt__(other)
 
 
+class ResponsivePixmapLabel(QLabel):
+    """Display one source pixmap fitted to the label without losing export quality."""
+
+    def __init__(self, text: str = "") -> None:
+        super().__init__(text)
+        self._source_pixmap = QPixmap()
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumSize(1, 1)
+        self.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+
+    def set_source_pixmap(self, pixmap: QPixmap) -> None:
+        self._source_pixmap = QPixmap(pixmap)
+        self._fit_pixmap()
+
+    def source_pixmap(self) -> QPixmap:
+        return QPixmap(self._source_pixmap)
+
+    def resizeEvent(self, event: QResizeEvent) -> None:
+        super().resizeEvent(event)
+        self._fit_pixmap()
+
+    def _fit_pixmap(self) -> None:
+        if self._source_pixmap.isNull():
+            return
+        target = self.contentsRect().size()
+        if target.width() < 2 or target.height() < 2:
+            return
+        super().setPixmap(
+            self._source_pixmap.scaled(target, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        )
+
+
 def _display(value: Any) -> str:
     if value is None:
         return "N/A"
@@ -55,6 +89,8 @@ def _display(value: Any) -> str:
 
 def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> QTableWidget:
     table = QTableWidget(len(rows), len(columns))
+    table.setMinimumHeight(1)
+    table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
     table.setHorizontalHeaderLabels([label for _key, label in columns])
     for column_index, (key, _label) in enumerate(columns):
         header = table.horizontalHeaderItem(column_index)
@@ -127,6 +163,11 @@ def render_bar_chart(
         title_font.setBold(True)
         painter.setFont(title_font)
         painter.drawText(60, 35, WIDTH - 120, 55, Qt.AlignCenter, title)
+
+        axis_font = QFont(painter.font())
+        axis_font.setPointSize(AXIS_FONT_SIZE)
+        axis_font.setBold(False)
+        painter.setFont(axis_font)
 
         left, top, right, bottom = 110, 150, WIDTH - 55, HEIGHT - 145
         values = [float(row.get(key) or 0) for row in rows for key, _label in series]
@@ -202,7 +243,7 @@ def render_horizontal_bar_chart(
         painter.drawText(60, 30, WIDTH - 120, 55, Qt.AlignCenter, title)
 
         body_font = QFont(painter.font())
-        body_font.setPointSize(10)
+        body_font.setPointSize(AXIS_FONT_SIZE)
         body_font.setBold(False)
         painter.setFont(body_font)
 
@@ -261,7 +302,20 @@ def render_horizontal_bar_chart(
 
 
 def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
-    pixmap = QPixmap(WIDTH, HEIGHT)
+    parsed = [(date.fromisoformat(str(row["date"])), row) for row in rows]
+    if parsed:
+        first = parsed[0][0]
+        grid_start = first - timedelta(days=first.weekday())
+        last = parsed[-1][0]
+        weeks = ((last - grid_start).days // 7) + 1
+        left, top, right = 120, 125, WIDTH - 55
+        cell = min(24, max(10, int((right - left) / weeks)))
+        height = top + 7 * cell + 30
+    else:
+        grid_start = date.today()
+        left, top, right, cell, height = 120, 125, WIDTH - 55, 20, 340
+
+    pixmap = QPixmap(WIDTH, height)
     pixmap.fill(QColor(BACKGROUND))
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
@@ -273,16 +327,9 @@ def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
         painter.setFont(title_font)
         painter.drawText(60, 30, WIDTH - 120, 55, Qt.AlignCenter, title)
         if not rows:
-            painter.drawText(0, 0, WIDTH, HEIGHT, Qt.AlignCenter, "No heatmap data")
+            painter.drawText(0, 0, WIDTH, height, Qt.AlignCenter, "No heatmap data")
             return pixmap
 
-        parsed = [(date.fromisoformat(str(row["date"])), row) for row in rows]
-        first = parsed[0][0]
-        grid_start = first - timedelta(days=first.weekday())
-        last = parsed[-1][0]
-        weeks = ((last - grid_start).days // 7) + 1
-        left, top, right = 120, 155, WIDTH - 55
-        cell = min(24, max(10, int((right - left) / weeks)))
         maximum = max(float(row.get("full_day_total") or 0) for _day, row in parsed) or 1.0
 
         normal_font = QFont(painter.font())
@@ -316,12 +363,6 @@ def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
                 painter.drawText(x, top - 26, 100, 20, Qt.AlignLeft, day.strftime("%b %Y"))
                 last_month = month_key
 
-        legend_y = top + 7 * cell + 45
-        painter.setPen(QColor(TEXT))
-        painter.drawText(left, legend_y, 350, 25, Qt.AlignLeft, f"Intensity: 0 to {_display(maximum)} hours")
-        painter.setPen(QPen(QColor(RED), 2))
-        painter.drawRect(left + 370, legend_y, 18, 18)
-        painter.drawText(left + 396, legend_y - 3, 300, 25, Qt.AlignLeft, "F = Future scheduled")
     finally:
         painter.end()
     return pixmap
@@ -348,10 +389,10 @@ class AnalyticsChartWindow(QMainWindow):
         tabs = QTabWidget()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        image = QLabel()
-        image.setPixmap(pixmap)
-        image.setAlignment(Qt.AlignCenter)
-        scroll.setWidget(image)
+        self.image_label = ResponsivePixmapLabel()
+        self.image_label.set_source_pixmap(pixmap)
+        scroll.setWidget(self.image_label)
+        self.scroll_area = scroll
         tabs.addTab(scroll, "Graphic")
         tabs.addTab(table_widget(rows, columns), "Data Table")
         self.setCentralWidget(tabs)

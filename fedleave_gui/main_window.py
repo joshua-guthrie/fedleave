@@ -54,6 +54,7 @@ from .backend import BackendError, BackendMissingError, BackendOptions, Fedleave
 from .resources import asset_file, help_base_url, help_file, window_icon
 from fedleave.config import get_default_data_dir
 from fedleave.payperiods import calculate_pay_date
+from fedleave.update_check import REPOSITORY_URL
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
 from fedleave_month_report_graphic.report import ReportData as MonthReportData
 from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
@@ -1166,16 +1167,17 @@ class MainWindow(QMainWindow):
         self._action(view_menu, "Next Month", self.next_month)
         self._action(view_menu, "Select Month...", self.select_month)
         self._action(view_menu, "Today", self.go_today)
-        self._action(view_menu, "View Leave Transactions...", self.view_leave_transactions)
-        self._action(view_menu, "Analytics...", self.open_analytics)
-        leave_charts_menu = view_menu.addMenu("Leave Charts")
+        analysis_menu = self.menuBar().addMenu("Analysis")
+        self._action(analysis_menu, "View Leave Transactions...", self.view_leave_transactions)
+        self._action(analysis_menu, "Analytics...", self.open_analytics)
+        leave_charts_menu = analysis_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self.leave_chart_actions[CHART_APP_CATEGORIES[app_name]] = self._action(
                 leave_charts_menu,
                 label,
                 lambda _checked=False, app_name=app_name, label=label: self.open_leave_chart(app_name, label),
             )
-        self.yearly_comparison_menu = view_menu.addMenu("Yearly Leave Comparison")
+        self.yearly_comparison_menu = analysis_menu.addMenu("Yearly Leave Comparison")
         for label, app_name, category in YEARLY_COMPARISON_CHARTS:
             self.yearly_comparison_actions[category] = self._action(
                 self.yearly_comparison_menu,
@@ -1192,13 +1194,14 @@ class MainWindow(QMainWindow):
         self._action(tools_menu, "Force Leave Balance...", self.force_leave_balance)
         self._action(tools_menu, "Expiring Leave Status...", self.show_expirations)
         self._action(tools_menu, "Validate Data", self.validate_data)
-        self._action(tools_menu, "Export Data...", self.export_data)
+        self._action(tools_menu, "Export FedLeave Data...", self.export_data)
+        self._action(tools_menu, "Import FedLeave Data...", self.import_data)
         import_external_menu = tools_menu.addMenu("Import From External App")
         self._action(import_external_menu, "FRC-E WMS HTTP Leave Report", self.import_wms_http_leave_report)
-        self._action(tools_menu, "Import Data...", self.import_data)
         help_menu = self.menuBar().addMenu("Help")
         self._action(help_menu, "Help Contents", self.show_help)
         self._action(help_menu, "Leave Abbreviations", self.show_abbreviations)
+        self._action(help_menu, "Open GitHub Page", self.open_github_page)
         self._action(help_menu, "Check for Updates...", self.check_for_updates)
         self._action(help_menu, "About FedLeave Calendar", self.about_gui)
 
@@ -1488,7 +1491,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Validate Data", "Data is valid." if payload.get("ok") else "Validation found issues.")
 
     def export_data(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Export Data", "fedleave_backup.json", "JSON files (*.json)")
+        path, _ = QFileDialog.getSaveFileName(self, "Export FedLeave Data", "fedleave_backup.json", "JSON files (*.json)")
         if not path:
             return
         try:
@@ -1496,10 +1499,10 @@ class MainWindow(QMainWindow):
         except BackendError as exc:
             QMessageBox.warning(self, "Export Failed", str(exc))
             return
-        QMessageBox.information(self, "Export Data", "Export complete.")
+        QMessageBox.information(self, "Export FedLeave Data", "Export complete.")
 
     def import_data(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(self, "Import Data", "", "JSON files (*.json)")
+        path, _ = QFileDialog.getOpenFileName(self, "Import FedLeave Data", "", "JSON files (*.json)")
         if not path:
             return
         try:
@@ -1510,6 +1513,19 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def import_wms_http_leave_report(self) -> None:
+        if (
+            QMessageBox.warning(
+                self,
+                "Experimental WMS Import",
+                "This importer is experimental. Please report problems as GitHub issues. If the report "
+                "does not contain information you consider private, attaching the original HTML file "
+                "will make the issue much easier to diagnose.",
+                QMessageBox.Ok | QMessageBox.Cancel,
+                QMessageBox.Ok,
+            )
+            != QMessageBox.Ok
+        ):
+            return
         path, _ = QFileDialog.getOpenFileName(
             self,
             "Import FRC-E WMS HTTP Leave Report",
@@ -1788,6 +1804,9 @@ class MainWindow(QMainWindow):
 
     def show_help(self) -> None:
         self._show_html_file("fedleave-calendar-help.html", "Help Contents")
+
+    def open_github_page(self) -> None:
+        webbrowser.open(REPOSITORY_URL)
 
     def about_gui(self) -> None:
         self._show_html_file("about-fedleave-calendar.html", "About FedLeave Calendar")

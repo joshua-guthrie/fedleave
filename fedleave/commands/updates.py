@@ -18,14 +18,14 @@ def check_for_updates_command(
         return
     if result["status"] != "ok":
         console.print(f"[yellow]{result['message']}[/yellow]")
-        console.print(f"Release page: {result['release_url']}")
+        console.print(f"Master branch: {result['release_url']}")
         return
     if result["update_available"]:
         console.print(
             f"[green]FedLeave {result['latest_version']} is available[/green] "
             f"(installed: {result['current_version']})."
         )
-        console.print(f"Download: {result['release_url']}")
+        console.print(f"Master branch: {result['release_url']}")
         console.print(result["instructions"])
     else:
         console.print(f"FedLeave {result['current_version']} is current.")

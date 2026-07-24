@@ -103,8 +103,8 @@ Command details and examples:
         The adjustment remains in effect for all later balance calculations.
 
     fedleave check-for-updates [--json]
-        Query the official GitHub releases endpoint once and report whether a newer version is available.
-        When an update exists, prints the release URL and installation instructions.
+        Query the official GitHub master branch once and report whether a newer version is available.
+        When an update exists, prints the master branch URL and installation instructions.
 
     fedleave expirations [--year YEAR] [--within-pay-periods N] [--category CATEGORY] [--json] [--data-dir PATH]
         Show each earned expiring-leave lot, remaining hours, expiration date, pay periods remaining,

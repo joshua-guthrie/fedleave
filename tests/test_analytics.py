@@ -23,20 +23,11 @@ def test_analytics_uses_hours_and_separates_future_rows():
         {"id": "3", "date": "2026-01-04", "category": "annual", "direction": "used", "hours": 20, "status": "denied"},
     ]), date(2026, 6, 1))
     assert result["visible_categories"] == ["annual"]
-    assert result["final_quarter"]["total_hours"] == 12
+    assert "final_quarter" not in result
     december = next(row for row in result["months"] if row["month"] == "Dec 2026")
     assert december["future_scheduled"] == 4
     saturday = next(row for row in result["weekdays"] if row["weekday"] == "Saturday")
     assert saturday["through_today"] == 8
-
-
-def test_final_quarter_is_the_last_25_percent_of_inclusive_days():
-    result = analyze_leave_year(payload([
-        {"id": "1", "date": "2026-10-07", "category": "annual", "direction": "used", "hours": 2, "status": "approved"},
-        {"id": "2", "date": "2026-10-08", "category": "annual", "direction": "used", "hours": 3, "status": "approved"},
-    ]), date(2026, 10, 1))
-    assert result["final_quarter"]["start_date"] == "2026-10-01"
-    assert result["final_quarter"]["percentage"] == 100
 
 
 def test_analytics_builds_every_required_summary_and_seasonality_table():
@@ -92,7 +83,7 @@ def test_denied_and_disposition_transactions_are_not_absence_hours():
         {"id": "3", "date": "2026-02-03", "category": "annual", "direction": "used", "hours": 2, "status": "approved"},
     ]), date(2026, 2, 15))
 
-    assert result["final_quarter"]["total_hours"] == 2
+    assert next(row for row in result["summary"] if row["metric"] == "Total Leave Used or Scheduled")["value"] == 2
     assert result["source"]["transactions_received"] == 3
     assert result["source"]["transactions_included"] == 2
 
@@ -100,6 +91,8 @@ def test_denied_and_disposition_transactions_are_not_absence_hours():
 def test_credit_hours_are_analyzed_and_heatmaps_only_include_nonzero_series():
     data = payload([
         {"id": "annual-used", "date": "2026-02-01", "category": "annual", "direction": "used", "hours": 8, "status": "approved"},
+        {"id": "annual-earned", "date": "2026-02-01", "category": "annual", "direction": "earned", "hours": 4, "status": "reconciled"},
+        {"id": "sick-earned", "date": "2026-02-01", "category": "sick", "direction": "earned", "hours": 4, "status": "reconciled"},
         {"id": "credit-earned", "date": "2026-02-02", "category": "credit", "direction": "earned", "hours": 4, "status": "reconciled"},
         {"id": "credit-worked", "date": "2026-02-03", "category": "credit", "direction": "worked", "hours": 2, "status": "reconciled"},
         {"id": "credit-used", "date": "2026-02-04", "category": "credit", "direction": "used", "hours": 1, "status": "approved"},
@@ -121,6 +114,13 @@ def test_credit_hours_are_analyzed_and_heatmaps_only_include_nonzero_series():
         "all-used", "annual:used", "credit:earned", "credit:used",
     ]
     assert "annual:earned" not in result["heatmap_series"]
+    assert "sick:earned" not in result["heatmap_series"]
+    assert any(
+        warning["severity"] == "Error"
+        and warning["area"] == "Credit hours"
+        and "'worked' direction" in warning["message"]
+        for warning in result["warnings"]
+    )
 
 
 def test_analytics_package_entrypoint_supports_direct_execution():

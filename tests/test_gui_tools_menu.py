@@ -30,9 +30,9 @@ def test_tools_menu_hides_internal_data_folder(monkeypatch):
         "Force Leave Balance...",
         "Expiring Leave Status...",
         "Validate Data",
-        "Export Data...",
+        "Export FedLeave Data...",
+        "Import FedLeave Data...",
         "Import From External App",
-        "Import Data...",
     ]
     assert "Open Preferences Folder" not in labels
 
@@ -46,8 +46,12 @@ def test_view_menu_includes_select_month_action(monkeypatch):
     labels = [action.text() for action in view_action.menu().actions() if action.text()]
 
     assert "Select Month..." in labels
-    assert "View Leave Transactions..." in labels
-    assert "Analytics..." in labels
+    assert "View Leave Transactions..." not in labels
+    assert "Analytics..." not in labels
+    analysis_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
+    analysis_labels = [action.text() for action in analysis_action.menu().actions() if action.text()]
+    assert "View Leave Transactions..." in analysis_labels
+    assert "Analytics..." in analysis_labels
 
 
 def test_analytics_view_action_launches_companion_with_current_context(monkeypatch, tmp_path):
@@ -155,7 +159,7 @@ def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monk
     leave_years.mkdir()
     (leave_years / "2026.json").write_text("{}", encoding="utf-8")
 
-    view_action = next(action for action in window.menuBar().actions() if action.text() == "View")
+    view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
         action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
     )
@@ -282,12 +286,37 @@ def test_import_wms_http_report_uses_html_picker_and_refreshes(monkeypatch, tmp_
     report = tmp_path / "clocking.html"
     report.write_text("<html><body><table class='jrPage'></table></body></html>", encoding="utf-8")
     monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(report), "HTML files (*.html *.htm)"))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.Ok)
     monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
 
     window.import_wms_http_leave_report()
 
     assert captured == [["import-wms-http", "--input", str(report)]]
     assert refreshed == [True]
+
+
+def test_wms_import_warning_precedes_picker_and_can_cancel(monkeypatch):
+    _application()
+    events: list[str] = []
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    window = MainWindow()
+    monkeypatch.setattr(
+        QMessageBox,
+        "warning",
+        lambda _parent, _title, text, *_args: events.append(text) or QMessageBox.Cancel,
+    )
+    monkeypatch.setattr(
+        QFileDialog,
+        "getOpenFileName",
+        lambda *args, **kwargs: events.append("picker") or ("", ""),
+    )
+
+    window.import_wms_http_leave_report()
+
+    assert len(events) == 1
+    assert "experimental" in events[0].lower()
+    assert "GitHub issues" in events[0]
+    assert "private" in events[0]
 
 
 def test_wms_import_failure_uses_copyable_diagnostic_dialog(monkeypatch, tmp_path):
@@ -309,6 +338,7 @@ def test_wms_import_failure_uses_copyable_diagnostic_dialog(monkeypatch, tmp_pat
     monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
     monkeypatch.setattr("fedleave_gui.main_window.DiagnosticDialog", FakeDiagnosticDialog)
     monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(tmp_path / "clocking.html"), "HTML"))
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.Ok)
     monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
     window = MainWindow()
 
@@ -386,7 +416,22 @@ def test_help_menu_hides_backend_about_action(monkeypatch):
     help_action = next(action for action in window.menuBar().actions() if action.text() == "Help")
     labels = [action.text() for action in help_action.menu().actions() if action.text()]
 
-    assert labels == ["Help Contents", "Leave Abbreviations", "Check for Updates...", "About FedLeave Calendar"]
+    assert labels == [
+        "Help Contents", "Leave Abbreviations", "Open GitHub Page",
+        "Check for Updates...", "About FedLeave Calendar",
+    ]
+
+
+def test_open_github_page_uses_project_repository(monkeypatch):
+    _application()
+    opened: list[str] = []
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr("fedleave_gui.main_window.webbrowser.open", opened.append)
+    window = MainWindow()
+
+    window.open_github_page()
+
+    assert opened == ["https://github.com/joshua-guthrie/fedleave"]
 
 
 def test_select_month_action_updates_displayed_month(monkeypatch):

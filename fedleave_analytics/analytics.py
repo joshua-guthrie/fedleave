@@ -3,7 +3,6 @@ from __future__ import annotations
 import calendar
 from collections import defaultdict
 from datetime import date, timedelta
-from math import ceil
 from typing import Any, Callable
 
 
@@ -226,6 +225,7 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
     transactions = [row for row in all_payload_transactions if _included(row)]
     transactions = [row for row in transactions if (transaction_date := _date(row)) and start <= transaction_date <= end]
     absence = [row for row in transactions if row.get("direction") == "used"]
+    total_absence = sum(_hours(row) for row in absence)
     visible_categories = _visible_categories(payload, transactions)
     detail_transactions = [_transaction_detail(row, today) for row in transactions]
 
@@ -290,6 +290,8 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
     }]
     for category in visible_categories:
         for direction in ("earned", "used"):
+            if direction == "earned" and category in {"annual", "sick"}:
+                continue
             selected_rows = [
                 row for row in transactions
                 if row.get("category") == category and row.get("direction") == direction
@@ -383,23 +385,6 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
             },
         })
 
-    final_days = ceil(((end - start).days + 1) / 4)
-    final_start = end - timedelta(days=final_days - 1)
-    final_rows = [row for row in absence if (_date(row) or start) >= final_start]
-    rest_rows = [row for row in absence if (_date(row) or start) < final_start]
-    total_absence = sum(_hours(row) for row in absence)
-    final_hours = sum(_hours(row) for row in final_rows)
-    final_percentage = None if total_absence <= EPSILON else final_hours / total_absence * 100
-    final_quarter_rows = [
-        {"period": "Final Quarter", "start_date": final_start.isoformat(), "end_date": end.isoformat(),
-         "leave_hours": final_hours, "percentage": final_percentage},
-        {"period": "Rest of Leave Year", "start_date": start.isoformat(), "end_date": (final_start - timedelta(days=1)).isoformat(),
-         "leave_hours": sum(_hours(row) for row in rest_rows),
-         "percentage": None if total_absence <= EPSILON else 100 - float(final_percentage)},
-        {"period": "Full Leave Year", "start_date": start.isoformat(), "end_date": end.isoformat(),
-         "leave_hours": total_absence, "percentage": None if total_absence <= EPSILON else 100.0},
-    ]
-
     lifecycle_rows: list[dict[str, Any]] = []
     lifecycle_lookup: dict[tuple[str, str], dict[str, float]] = {}
     for category, direction, label in (
@@ -462,6 +447,21 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
     ])
 
     lots, allocations, warnings = _comp_lots(transactions, today)
+    credit_worked_rows = [
+        row for row in transactions
+        if row.get("category") == "credit" and row.get("direction") == "worked"
+    ]
+    if credit_worked_rows:
+        warnings.append({
+            "severity": "Error",
+            "area": "Credit hours",
+            "date_or_lot": ", ".join(sorted({str(row.get("date", "")) for row in credit_worked_rows})),
+            "message": (
+                f"{len(credit_worked_rows)} credit-hour transaction(s), totaling "
+                f"{sum(_hours(row) for row in credit_worked_rows):g} hours, use the unexpected "
+                "'worked' direction. Credit hours should be recorded as 'earned'."
+            ),
+        })
     allocated_uses = []
     earned_by_id = {str(row.get("id")): row for row in transactions if row.get("category") == "comp" and row.get("direction") == "earned"}
     for row in transactions:
@@ -519,8 +519,6 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
         {"metric": "Highest Leave-Use Pay Period", "value": highest_period["full_leave_year"] if highest_period else None,
          "units": "hours", "period_or_date": f"PP {highest_period['pay_period']}" if highest_period else "N/A",
          "basis": "Full leave year, including future scheduled leave"},
-        {"metric": "Final-Quarter Leave Concentration", "value": final_percentage, "units": "percent",
-         "period_or_date": f"{final_start.isoformat()} to {end.isoformat()}", "basis": "Leave hours used or scheduled"},
         {"metric": "Overtime Worked", "value": lifecycle_lookup[("overtime", "worked")]["full_leave_year"], "units": "hours",
          "period_or_date": "Full leave year", "basis": "Overtime worked transactions"},
         {"metric": "Comp Earned Instead of Paid Overtime", "value": comp_earned["full_leave_year"], "units": "hours",
@@ -576,10 +574,6 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
         "overtime_months": overtime_months,
         "net_accumulation": net_accumulation,
         "net_accumulation_categories": net_accumulation_categories,
-        "final_quarter": {
-            "start_date": final_start.isoformat(), "end_date": end.isoformat(), "hours": final_hours,
-            "percentage": final_percentage, "total_hours": total_absence, "rows": final_quarter_rows,
-        },
         "lifecycle": {
             "summary": lifecycle_rows,
             "lots": lots,

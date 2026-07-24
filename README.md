@@ -229,8 +229,8 @@ Current GUI features:
 - Separate Type/Earned/Used/Balance tables for pay periods touching the displayed month
 - As-of-today balance table
 - Authoritative day editing with explicit Use/Earn controls and positive hour entry
-- View > Leave Charts launches the annual, sick, credit hours, comp time, travel comp, and time-off award chart companion apps in their own windows
-- View > Yearly Leave Comparison launches the annual, sick, credit hours, comp time, travel comp, time-off award, and overtime yearly comparison chart companion apps in their own windows
+- Analysis > Leave Charts launches the annual, sick, credit hours, comp time, travel comp, and time-off award chart companion apps in their own windows
+- Analysis > Yearly Leave Comparison launches the annual, sick, credit hours, comp time, travel comp, time-off award, and overtime yearly comparison chart companion apps in their own windows
 - Tools > Import From External App > FRC-E WMS HTTP Leave Report imports the WMS HTML report and asks before replacing matching leave transactions
 - Leave chart windows include Save PNG, Save PDF, and Print actions
 - Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
@@ -401,7 +401,7 @@ Commands and common options:
 			fedleave expiration-extend --id TRANSACTION_ID --new-date YYYY-MM-DD --reason TEXT [--json] [--data-dir PATH]
 
 	check-for-updates
-		Check the official GitHub releases endpoint for a newer FedLeave version.
+		Check the version published on the GitHub master branch for a newer FedLeave version.
 
 		Syntax:
 			fedleave check-for-updates [--json]
@@ -630,7 +630,7 @@ The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Mi
 
 `FedLeaveAnalytics` is the read-only companion for seasonality, calendar
 heatmaps, overtime, compensatory-time, and credit-hour analysis. Launch it
-directly, or choose **View > Analytics...** in `FedLeaveCalendar`; the calendar
+directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calendar
 passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
 

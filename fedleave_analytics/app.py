@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QThread, Qt, Signal, Slot
+from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -37,7 +37,7 @@ from fedleave.config import get_default_data_dir
 from .analytics import analyze_leave_year
 from .charts import (
     AnalyticsChartWindow,
-    render_bar_chart,
+    ResponsivePixmapLabel,
     render_heatmap,
     render_horizontal_bar_chart,
     table_widget,
@@ -66,10 +66,6 @@ NET_COLUMNS = [
     ("month", "Month"), ("earned_or_added", "Earned or Added"), ("used", "Used"),
     ("paid_out", "Paid Out"), ("forfeited", "Forfeited"), ("expired", "Expired"),
     ("net_change", "Net Change"),
-]
-FINAL_COLUMNS = [
-    ("period", "Period"), ("start_date", "Start Date"), ("end_date", "End Date"),
-    ("leave_hours", "Leave Hours"), ("percentage", "Percentage"),
 ]
 LIFECYCLE_COLUMNS = [("metric", "Metric"), *TIME_COLUMNS, ("units", "Units")]
 LOT_COLUMNS = [
@@ -100,8 +96,8 @@ COMP_MONTH_COLUMNS = [
     ("paid_out", "Comp Paid Out"), ("forfeited", "Comp Forfeited"), ("expired", "Comp Expired"),
 ]
 CREDIT_MONTH_COLUMNS = [
-    ("month", "Month"), ("earned", "Credit Earned"), ("worked", "Credit Worked"),
-    ("used", "Credit Used"), ("forfeited", "Credit Forfeited"), ("expired", "Credit Expired"),
+    ("month", "Month"), ("earned", "Credit Earned"), ("used", "Credit Used"),
+    ("forfeited", "Credit Forfeited"), ("expired", "Credit Expired"),
 ]
 WARNING_COLUMNS = [
     ("severity", "Severity"), ("area", "Area"), ("date_or_lot", "Date or Lot"), ("message", "Message"),
@@ -129,9 +125,6 @@ SEASONALITY_VIEWS: dict[str, tuple[str, list[tuple[str, str]], str, list[tuple[s
     ]),
     "Net Leave Accumulation by Month": ("net_accumulation", NET_COLUMNS, "month", [
         ("earned_or_added", "Earned or Added"), ("used", "Used"), ("net_change", "Net Change"),
-    ]),
-    "Final-Quarter Leave Concentration": ("final_quarter.rows", FINAL_COLUMNS, "period", [
-        ("leave_hours", "Leave Hours"),
     ]),
 }
 
@@ -221,6 +214,8 @@ class AnalyticsWindow(QMainWindow):
         self._current_table: QTableWidget | None = None
         self._current_rows: list[dict[str, Any]] = []
         self._current_columns: list[tuple[str, str]] = []
+        self._defaulted_splitters: set[int] = set()
+        self._monthly_splitters: list[QSplitter] = []
 
         self.setWindowTitle("FedLeave Analytics")
         self.resize(1320, 860)
@@ -328,13 +323,14 @@ class AnalyticsWindow(QMainWindow):
         self.seasonality_splitter = QSplitter(Qt.Vertical)
         self.seasonality_chart_scroll = QScrollArea()
         self.seasonality_chart_scroll.setWidgetResizable(True)
-        self.seasonality_chart_image = QLabel()
-        self.seasonality_chart_image.setAlignment(Qt.AlignCenter)
+        self.seasonality_chart_image = ResponsivePixmapLabel()
         self.seasonality_chart_scroll.setWidget(self.seasonality_chart_image)
         self.seasonality_splitter.addWidget(self.seasonality_chart_scroll)
         self.seasonality_table = table_widget([], MONTH_COLUMNS)
         self.seasonality_splitter.addWidget(self.seasonality_table)
-        self.seasonality_splitter.setSizes([360, 430])
+        self.seasonality_splitter.setStretchFactor(0, 2)
+        self.seasonality_splitter.setStretchFactor(1, 1)
+        self.seasonality_splitter.setSizes([600, 300])
         layout.addWidget(self.seasonality_splitter, 1)
 
     def _build_heatmap_page(self) -> None:
@@ -349,18 +345,19 @@ class AnalyticsWindow(QMainWindow):
         self.heatmap_description = QLabel()
         self.heatmap_description.setWordWrap(True)
         layout.addWidget(self.heatmap_description)
-        splitter = QSplitter(Qt.Vertical)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        self.heatmap_image = QLabel("No heatmap loaded")
-        self.heatmap_image.setAlignment(Qt.AlignCenter)
-        scroll.setWidget(self.heatmap_image)
-        splitter.addWidget(scroll)
+        self.heatmap_splitter = QSplitter(Qt.Vertical)
+        self.heatmap_chart_scroll = QScrollArea()
+        self.heatmap_chart_scroll.setWidgetResizable(True)
+        self.heatmap_image = ResponsivePixmapLabel("No heatmap loaded")
+        self.heatmap_chart_scroll.setWidget(self.heatmap_image)
+        self.heatmap_splitter.addWidget(self.heatmap_chart_scroll)
         self.heatmap_table = table_widget([], HEATMAP_COLUMNS)
         self.heatmap_table.cellDoubleClicked.connect(self._heatmap_drilldown)
-        splitter.addWidget(self.heatmap_table)
-        splitter.setSizes([430, 320])
-        layout.addWidget(splitter)
+        self.heatmap_splitter.addWidget(self.heatmap_table)
+        self.heatmap_splitter.setStretchFactor(0, 2)
+        self.heatmap_splitter.setStretchFactor(1, 1)
+        self.heatmap_splitter.setSizes([600, 300])
+        layout.addWidget(self.heatmap_splitter)
 
     def _build_lifecycle_page(self) -> None:
         layout = QVBoxLayout(self.lifecycle_page)
@@ -387,21 +384,38 @@ class AnalyticsWindow(QMainWindow):
 
     def _monthly_lifecycle_page(
         self, columns: list[tuple[str, str]]
-    ) -> tuple[QWidget, QLabel, QTableWidget]:
+    ) -> tuple[QWidget, ResponsivePixmapLabel, QTableWidget]:
         page = QWidget()
         layout = QVBoxLayout(page)
         splitter = QSplitter(Qt.Vertical)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        image = QLabel()
-        image.setAlignment(Qt.AlignCenter)
+        image = ResponsivePixmapLabel()
         scroll.setWidget(image)
         splitter.addWidget(scroll)
         table = table_widget([], columns)
         splitter.addWidget(table)
-        splitter.setSizes([360, 380])
+        splitter.setStretchFactor(0, 2)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([600, 300])
+        self._monthly_splitters.append(splitter)
         layout.addWidget(splitter)
         return page, image, table
+
+    def _schedule_default_chart_ratio(self, splitter: QSplitter) -> None:
+        if id(splitter) in self._defaulted_splitters:
+            return
+
+        def apply_ratio() -> None:
+            if not splitter.isVisible():
+                return
+            total = sum(splitter.sizes())
+            if total < 3:
+                return
+            splitter.setSizes([total * 2 // 3, total - (total * 2 // 3)])
+            self._defaulted_splitters.add(id(splitter))
+
+        QTimer.singleShot(0, apply_ratio)
 
     def _replace_table(
         self,
@@ -541,7 +555,6 @@ class AnalyticsWindow(QMainWindow):
             "Leave Used by Pay Period": "Actual and scheduled absence assigned to the pay period containing each transaction date.",
             "Overtime Worked by Month": "Paid overtime worked; comp earned instead of paid overtime is excluded.",
             "Net Leave Accumulation by Month": "Balance-increasing hours minus used, paid-out, forfeited, and expired hours. Starting balances are excluded.",
-            "Final-Quarter Leave Concentration": "The final quarter is the final 25 percent of calendar days in the selected leave year.",
         }
         self.seasonality_description.setText(descriptions[name])
         new_table = table_widget(rows, columns)
@@ -551,14 +564,11 @@ class AnalyticsWindow(QMainWindow):
         self.seasonality_splitter.insertWidget(table_index, new_table)
         self.seasonality_table.deleteLater()
         self.seasonality_table = new_table
-        if label_key == "month":
-            chart = render_horizontal_bar_chart(f"{name} — {self.data['year']}", rows, label_key, series)
-            self.seasonality_chart_image.setPixmap(chart.scaled(1180, 345, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-            self.seasonality_chart_scroll.show()
-            self.seasonality_splitter.setSizes([360, 430])
-        else:
-            self.seasonality_chart_scroll.hide()
-            self.seasonality_splitter.setSizes([0, 790])
+        chart = render_horizontal_bar_chart(f"{name} — {self.data['year']}", rows, label_key, series)
+        self.seasonality_chart_image.set_source_pixmap(chart)
+        self.seasonality_chart_scroll.show()
+        self.seasonality_splitter.setSizes([600, 300])
+        self._schedule_default_chart_ratio(self.seasonality_splitter)
         self._page_changed()
 
     def _render_heatmap(self) -> None:
@@ -578,12 +588,13 @@ class AnalyticsWindow(QMainWindow):
         option = next(item for item in self.data["heatmap_options"] if item["key"] == selected_key)
         activity = "used" if option["direction"] == "used" else "earned"
         self.heatmap_description.setText(
-            f"Each cell represents hours {activity} on that date. Darker cells contain more hours; "
-            "a red outline and F indicate a future-dated transaction."
+            f"Each cell represents hours {activity} on that date. Darker cells contain more hours."
         )
         pixmap = render_heatmap(f"{title} Heatmap — {self.data['year']}", rows)
-        self.heatmap_image.setPixmap(pixmap.scaled(1200, 440, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-        new_table = table_widget(rows, HEATMAP_COLUMNS)
+        self.heatmap_image.set_source_pixmap(pixmap)
+        self._schedule_default_chart_ratio(self.heatmap_splitter)
+        table_rows = self._nonzero_heatmap_rows(rows)
+        new_table = table_widget(table_rows, HEATMAP_COLUMNS)
         new_table.cellDoubleClicked.connect(self._heatmap_drilldown)
         parent = self.heatmap_table.parentWidget()
         if isinstance(parent, QSplitter):
@@ -618,13 +629,13 @@ class AnalyticsWindow(QMainWindow):
                 self.credit_month_image,
                 "Monthly Credit Lifecycle",
                 lifecycle["monthly_credit"],
-                [("earned", "Earned"), ("worked", "Worked"), ("used", "Used"),
+                [("earned", "Earned"), ("used", "Used"),
                  ("forfeited", "Forfeited"), ("expired", "Expired")],
             ),
         )
         for image, title, rows, series in chart_specs:
             chart = render_horizontal_bar_chart(f"{title} — {self.data['year']}", rows, "month", series)
-            image.setPixmap(chart.scaled(1180, 345, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            image.set_source_pixmap(chart)
 
     def _year_changed(self) -> None:
         selected = self.year_combo.currentData()
@@ -643,9 +654,10 @@ class AnalyticsWindow(QMainWindow):
             path, columns, _label, _series = SEASONALITY_VIEWS[name]
             self._set_current_table(self.seasonality_table, list(_payload_value(self.data, path)) if self.data else [], columns)
         elif page == 2:
+            self._schedule_default_chart_ratio(self.heatmap_splitter)
             selected_key = str(self.heatmap_selector.currentData() or "all-used")
             rows = self.data.get("heatmap_series", {}).get(selected_key, []) if self.data else []
-            self._set_current_table(self.heatmap_table, rows, HEATMAP_COLUMNS)
+            self._set_current_table(self.heatmap_table, self._nonzero_heatmap_rows(rows), HEATMAP_COLUMNS)
         elif self.data:
             lifecycle = self.data["lifecycle"]
             mappings = [
@@ -658,6 +670,8 @@ class AnalyticsWindow(QMainWindow):
                 (self.credit_month_table, lifecycle["monthly_credit"], CREDIT_MONTH_COLUMNS),
             ]
             index = self.lifecycle_tabs.currentIndex()
+            if index >= 4:
+                self._schedule_default_chart_ratio(self._monthly_splitters[index - 4])
             self._set_current_table(*mappings[index])
 
     def _set_current_table(self, table: QTableWidget, rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> None:
@@ -679,7 +693,8 @@ class AnalyticsWindow(QMainWindow):
             rows = self.data["heatmap_series"][selected_key]
             columns = HEATMAP_COLUMNS
             title = f"{self.heatmap_selector.currentText()} Heatmap — {self.data['year']}"
-            pixmap = render_heatmap(title, rows)
+            pixmap = self.heatmap_image.source_pixmap()
+            rows = self._nonzero_heatmap_rows(rows)
             self._show_chart(title, pixmap, rows, columns, f"{selected_key}-heatmap")
             return
         elif page == 3:
@@ -692,7 +707,7 @@ class AnalyticsWindow(QMainWindow):
                     ("comp_earned", "Comp Earned"),
                     ("credit_earned", "Credit Earned or Worked"),
                 ]
-                title = f"Monthly Overtime, Comp, and Credit — {self.data['year']}"
+                title = f"Overtime, Comp, and Credit by Month — {self.data['year']}"
             elif index == 5:
                 rows = self.data["lifecycle"]["monthly_comp"]
                 columns, label_key = COMP_MONTH_COLUMNS, "month"
@@ -701,14 +716,21 @@ class AnalyticsWindow(QMainWindow):
             elif index == 6:
                 rows = self.data["lifecycle"]["monthly_credit"]
                 columns, label_key = CREDIT_MONTH_COLUMNS, "month"
-                series = [("earned", "Earned"), ("worked", "Worked"), ("used", "Used"), ("forfeited", "Forfeited"), ("expired", "Expired")]
+                series = [("earned", "Earned"), ("used", "Used"), ("forfeited", "Forfeited"), ("expired", "Expired")]
                 title = f"Monthly Credit Lifecycle — {self.data['year']}"
             else:
                 QMessageBox.information(self, "Open Chart", "Select one of the monthly lifecycle tabs to open a chart. The other tabs are structured tables.")
                 return
         else:
             return
-        pixmap = render_bar_chart(title, rows, label_key, series)
+        if page == 1:
+            pixmap = self.seasonality_chart_image.source_pixmap()
+        elif self.lifecycle_tabs.currentIndex() == 4:
+            pixmap = self.overtime_comp_image.source_pixmap()
+        elif self.lifecycle_tabs.currentIndex() == 5:
+            pixmap = self.comp_month_image.source_pixmap()
+        else:
+            pixmap = self.credit_month_image.source_pixmap()
         self._show_chart(title, pixmap, rows, columns, title.lower().replace(" ", "-"))
 
     def _show_chart(
@@ -763,15 +785,13 @@ class AnalyticsWindow(QMainWindow):
             transactions = [row for row in transactions if datetime.fromisoformat(row["date"]).strftime("%A") == selected["weekday"]]
         elif name == "Leave Used by Pay Period":
             transactions = [row for row in transactions if selected["start_date"] <= row["date"] <= selected["end_date"]]
-        elif name == "Final-Quarter Leave Concentration":
-            transactions = [row for row in transactions if selected["start_date"] <= row["date"] <= selected["end_date"]]
         TransactionDialog(transactions, self).exec()
 
     def _heatmap_drilldown(self, row_index: int, _column: int) -> None:
         if not self.data:
             return
         selected_key = str(self.heatmap_selector.currentData() or "all-used")
-        heatmap_rows = self.data["heatmap_series"][selected_key]
+        heatmap_rows = self._nonzero_heatmap_rows(self.data["heatmap_series"][selected_key])
         row_index = self._source_row_index(self.heatmap_table, row_index)
         if not 0 <= row_index < len(heatmap_rows):
             return
@@ -787,6 +807,10 @@ class AnalyticsWindow(QMainWindow):
             and (option["category"] == "all" or row["category"] == option["category"])
         ]
         TransactionDialog(rows, self).exec()
+
+    @staticmethod
+    def _nonzero_heatmap_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [row for row in rows if abs(float(row.get("full_day_total") or 0)) > 1e-9]
 
     @staticmethod
     def _source_row_index(table: QTableWidget, displayed_row: int) -> int:
