@@ -21,6 +21,7 @@ scripts/lib/**/*.pyc
 .dist/
 dist/
 build/
+artifacts/
 
 # Local data
 .data/

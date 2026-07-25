@@ -24,19 +24,63 @@ I would not be using this application for any thing critical.  For me, it's a fu
 
 ## Installation
 
-FedLeave's Linux installer and packaged desktop applications are written and tested for Debian-based distributions, including Ubuntu. Other Linux distributions may work from source, but are not currently supported by the installer.
+Release installers contain the complete PyInstaller application bundles,
+including their Python runtime. End users do not need Python, Git, compilers, or
+the source repository.
 
-End users should use the platform installer script instead of setting up a development environment manually:
+### Windows installation
 
-```bash
-./scripts/LinuxInstall.sh
-```
+Download `FedLeave-Setup-<version>-Windows-x64.exe` from the
+[latest GitHub Release](https://github.com/joshua-guthrie/fedleave/releases/latest)
+and run the installation wizard. It installs FedLeave in
+`C:\Program Files\FedLeave`, registers it in Windows Installed Apps, creates a
+FedLeave Start menu folder, and offers an optional desktop shortcut.
+
+For an unattended installation:
 
 ```bat
-scripts\WindowsInstall.bat
+FedLeave-Setup-<version>-Windows-x64.exe /S
 ```
 
-The installer requires Python 3 to be available so it can run the build and packaging steps. On Linux, the script can install Python 3 automatically when `apt-get` is available. System-wide installation may also prompt for `sudo` during the final install step. On Windows, the script asks after a successful build whether to install the bundle in `C:\Program Files\fedleave`; accepting the prompt requests administrator approval when needed and creates public Desktop and all-users Start Menu shortcuts for FedLeave Calendar.
+Uninstall from Windows Installed Apps, the Start menu shortcut, or run:
+
+```bat
+"C:\Program Files\FedLeave\Uninstall.exe" /S
+```
+
+Upgrades and uninstall remove application files only. Leave records, reports,
+settings, and other user data remain in the user's application-data directory.
+The installer is not code-signed, so Microsoft SmartScreen may warn about an
+unrecognized publisher.
+
+### Linux installation
+
+FedLeave supports 64-bit Ubuntu, Debian, and Debian-based distributions. Install
+the latest release with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash
+```
+
+For unattended installation:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash -s -- --unattended
+```
+
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash -s -- --version 1.2.0
+```
+
+The bootstrap downloads the prebuilt archive and SHA-256 checksum from GitHub
+Releases, verifies it, and then installs into
+`/opt/fedleave/releases/<version>`. `/opt/fedleave/current` is switched only
+after validation, and commands are linked beneath `/usr/local/bin`. The archive
+contains its own Python runtime; the destination does not need Python, `pip`, a
+virtual environment, Git, or build tools. Use `--help` to see custom
+`--install-root` and `--bin-dir` options.
 
 ## Development Setup
 
@@ -62,9 +106,10 @@ pip install -r requirements-gui.txt
 pip install -e .
 ```
 
-## Building and Installing FedLeave
+## Developer packaging
 
-This section is for the packaged installer workflow: creating the bundled applications, installing them system-wide, or managing upgrades and repairs. It is separate from the source-development setup above.
+The commands below build from source for development and release engineering.
+They are separate from the prebuilt end-user installers above.
 
 FedLeave now uses two platform entry scripts only:
 
@@ -295,6 +340,77 @@ checks referenced modules and assets, writes each generated bootstrap, and
 constructs every platform-specific PyInstaller command. The test suite executes
 both platform configurations. A full build still remains the final packaging
 validation before a release.
+
+### Building release packages locally
+
+The authoritative version and application list come from `pyproject.toml`.
+Inspect them and validate version conversion with:
+
+```bash
+python installer/package.py version
+python installer/package.py numeric-version
+python installer/package.py verify-tag v0.2.0
+```
+
+Build and package Linux:
+
+```bash
+./scripts/LinuxInstall.sh --unattended --build-only --verbose
+python installer/package.py validate-bundle --platform linux --bundle-dir dist/fedleave-Ubuntu
+python installer/package.py linux-archive \
+  --bundle-dir dist/fedleave-Ubuntu \
+  --output-dir artifacts \
+  --version "$(python installer/package.py version)"
+shellcheck installer/linux/install.sh
+```
+
+Build Windows applications from `cmd.exe`:
+
+```bat
+scripts\WindowsInstall.bat --unattended --build-only --verbose
+python installer\package.py validate-bundle --platform windows --bundle-dir dist\fedleave-Windows
+```
+
+After installing NSIS, compile the Windows installer from `cmd.exe`:
+
+```bat
+for /f %V in ('python installer\package.py version') do set VERSION=%V
+for /f %V in ('python installer\package.py numeric-version') do set NUMERIC_VERSION=%V
+mkdir artifacts
+makensis /DVERSION=%VERSION% /DNUMERIC_VERSION=%NUMERIC_VERSION% /DSOURCE_DIR=%CD%\dist\fedleave-Windows /DOUTPUT_DIR=%CD%\artifacts installer\windows\FedLeave.nsi
+python installer\package.py checksum artifacts\FedLeave-Setup-%VERSION%-Windows-x64.exe
+```
+
+Package validation fails if any command declared in `project.scripts`, its
+PyInstaller executable, or its embedded support directory is absent.
+
+### CI artifacts and official releases
+
+The Distribution workflow builds both platform packages on every pushed
+branch, on pull requests, and when manually dispatched. Ordinary builds use a
+development version containing the abbreviated commit hash and appear as
+downloadable artifacts on that workflow run; they do not create public
+releases.
+
+An official release uses a tag whose value exactly matches the version in
+`pyproject.toml`. For version `0.2.0`:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The tag build verifies the match, generates release notes, and publishes the
+Windows installer/checksum, Linux archive/checksum, and `install.sh` to the
+corresponding GitHub Release. The GitHub-provided token is used; no personal
+access token or paid packaging service is required.
+
+Before a release, run the test suite and the platform build commands above.
+GitHub Actions performs silent install/uninstall and user-data preservation
+checks on Windows. Because Windows binaries cannot be executed in a Linux
+development environment, a clean Windows 11 virtual-machine wizard test and
+SmartScreen review remain prudent final manual checks. Code signing is not
+included.
 
 ## CLI Detailed Help
 

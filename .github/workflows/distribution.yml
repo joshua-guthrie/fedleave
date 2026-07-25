@@ -1,0 +1,240 @@
+name: Distribution
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  metadata:
+    name: package metadata
+    runs-on: ubuntu-latest
+    outputs:
+      package-version: ${{ steps.version.outputs.package-version }}
+      numeric-version: ${{ steps.version.outputs.numeric-version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Resolve and verify version
+        id: version
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            python installer/package.py verify-tag "$GITHUB_REF_NAME"
+            package_version="$(python installer/package.py version)"
+          else
+            package_version="$(python installer/package.py version --development --sha "$GITHUB_SHA")"
+          fi
+          numeric_version="$(python installer/package.py numeric-version --version "$package_version")"
+          echo "package-version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "numeric-version=$numeric_version" >> "$GITHUB_OUTPUT"
+
+  windows:
+    name: Windows installer
+    needs: metadata
+    runs-on: windows-latest
+    env:
+      PACKAGE_VERSION: ${{ needs.metadata.outputs.package-version }}
+      NUMERIC_VERSION: ${{ needs.metadata.outputs.numeric-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+            requirements-gui.txt
+            scripts/lib/common/installer-requirements.txt
+
+      - name: Build PyInstaller applications
+        shell: cmd
+        run: scripts\WindowsInstall.bat --unattended --build-only --verbose
+
+      - name: Verify complete Windows bundle
+        run: python installer/package.py validate-bundle --platform windows --bundle-dir dist/fedleave-Windows
+
+      - name: Remove duplicate build workspace
+        shell: pwsh
+        run: Remove-Item -Recurse -Force .build
+
+      - name: Install NSIS
+        shell: pwsh
+        run: choco install nsis --no-progress -y
+
+      - name: Compile installer and checksum
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $artifactDir = Join-Path $PWD "artifacts"
+          $sourceDir = Join-Path $PWD "dist\fedleave-Windows"
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          $makensis = (Get-Command makensis).Source
+          & $makensis `
+            "/DVERSION=$env:PACKAGE_VERSION" `
+            "/DNUMERIC_VERSION=$env:NUMERIC_VERSION" `
+            "/DSOURCE_DIR=$sourceDir" `
+            "/DOUTPUT_DIR=$artifactDir" `
+            "installer\windows\FedLeave.nsi"
+          if ($LASTEXITCODE -ne 0) { throw "NSIS compilation failed with exit code $LASTEXITCODE" }
+          $installer = Join-Path $artifactDir "FedLeave-Setup-$env:PACKAGE_VERSION-Windows-x64.exe"
+          if (-not (Test-Path $installer)) { throw "NSIS did not create $installer" }
+          python installer/package.py checksum $installer
+
+      - name: Silent install, CLI, uninstall, and data-preservation smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $installer = Join-Path $PWD "artifacts\FedLeave-Setup-$env:PACKAGE_VERSION-Windows-x64.exe"
+          $installDir = Join-Path $env:ProgramFiles "FedLeave"
+          $userDataDir = Join-Path $env:LOCALAPPDATA "fedleave"
+          $sentinel = Join-Path $userDataDir "ci-user-data-preserved.txt"
+          New-Item -ItemType Directory -Force -Path $userDataDir | Out-Null
+          Set-Content -Path $sentinel -Value "must survive install and uninstall"
+
+          $install = Start-Process -FilePath $installer -ArgumentList "/S" -Wait -PassThru
+          if ($install.ExitCode -ne 0) { throw "Silent installation failed: $($install.ExitCode)" }
+          python installer/package.py validate-bundle --platform windows --bundle-dir $installDir
+          & "$installDir\fedleave\fedleave.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw "Installed CLI smoke test failed" }
+
+          $uninstall = Start-Process -FilePath "$installDir\Uninstall.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Silent uninstall failed: $($uninstall.ExitCode)" }
+          for ($attempt = 0; $attempt -lt 30 -and (Test-Path $installDir); $attempt++) {
+            Start-Sleep -Seconds 1
+          }
+          if (Test-Path $installDir) { throw "Application files remain after uninstall: $installDir" }
+          if (-not (Test-Path $sentinel)) { throw "Uninstall incorrectly removed user data: $sentinel" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fedleave-windows-${{ needs.metadata.outputs.package-version }}
+          path: |
+            artifacts/FedLeave-Setup-*-Windows-x64.exe
+            artifacts/FedLeave-Setup-*-Windows-x64.exe.sha256
+          if-no-files-found: error
+
+  linux:
+    name: Linux package
+    needs: metadata
+    runs-on: ubuntu-latest
+    env:
+      PACKAGE_VERSION: ${{ needs.metadata.outputs.package-version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements.txt
+            requirements-gui.txt
+            scripts/lib/common/installer-requirements.txt
+
+      - name: Install Linux packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 shellcheck
+          chmod +x scripts/LinuxInstall.sh installer/linux/install.sh installer/package.py
+
+      - name: Build PyInstaller applications
+        run: ./scripts/LinuxInstall.sh --unattended --build-only --verbose
+
+      - name: Verify complete Linux bundle
+        run: python installer/package.py validate-bundle --platform linux --bundle-dir dist/fedleave-Ubuntu
+
+      - name: Remove duplicate build workspace
+        run: rm -rf .build
+
+      - name: Create archive and checksum
+        run: |
+          python installer/package.py linux-archive \
+            --bundle-dir dist/fedleave-Ubuntu \
+            --output-dir artifacts \
+            --version "$PACKAGE_VERSION"
+
+      - name: Validate extracted archive and CLI
+        run: |
+          set -Eeuo pipefail
+          extract_dir="$(mktemp -d)"
+          tar -xzf "artifacts/FedLeave-${PACKAGE_VERSION}-Linux-x86_64.tar.gz" -C "$extract_dir"
+          python installer/package.py validate-bundle --platform linux --bundle-dir "$extract_dir/FedLeave"
+          "$extract_dir/FedLeave/fedleave/fedleave" --version
+
+      - name: Validate and exercise bootstrap installer
+        run: |
+          set -Eeuo pipefail
+          shellcheck installer/linux/install.sh
+          install_root="$RUNNER_TEMP/fedleave-bootstrap"
+          bin_dir="$RUNNER_TEMP/fedleave-bin"
+          installer/linux/install.sh \
+            --unattended \
+            --version "$PACKAGE_VERSION" \
+            --asset-base-url "file://$PWD/artifacts" \
+            --install-root "$install_root" \
+            --bin-dir "$bin_dir"
+          "$bin_dir/fedleave" --version
+          test -L "$install_root/current"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fedleave-linux-${{ needs.metadata.outputs.package-version }}
+          path: |
+            artifacts/FedLeave-*-Linux-x86_64.tar.gz
+            artifacts/FedLeave-*-Linux-x86_64.tar.gz.sha256
+            installer/linux/install.sh
+          if-no-files-found: error
+
+  release:
+    name: GitHub Release
+    if: github.ref_type == 'tag'
+    needs: [metadata, windows, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: fedleave-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -Eeuo pipefail
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          [[ "${#assets[@]}" -eq 5 ]] || {
+            printf 'Expected 5 release assets, found %s\n' "${#assets[@]}" >&2
+            printf '%s\n' "${assets[@]}" >&2
+            exit 1
+          }
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" --verify-tag --generate-notes --title "FedLeave $TAG"
+          fi
