@@ -46,6 +46,14 @@ def _fake_bundle(module, root: Path, platform: str = "linux") -> Path:
     return bundle
 
 
+def _rolling_linux_assets(module, bundle: Path, artifacts: Path, version: str) -> None:
+    archive, checksum = module.create_linux_archive(bundle, artifacts, version)
+    rolling_archive = artifacts / "FedLeave-Latest-Linux-x86_64.tar.gz"
+    archive.replace(rolling_archive)
+    checksum.unlink()
+    module.write_checksum(rolling_archive)
+
+
 def test_version_and_windows_metadata_come_from_pyproject() -> None:
     module = _load_packaging_module()
     declared_version = module.project_metadata()["version"]
@@ -83,10 +91,31 @@ def test_linux_archive_has_stable_root_and_matching_checksum(tmp_path: Path) -> 
 
     with tarfile.open(archive, "r:gz") as handle:
         names = handle.getnames()
+        version_file = handle.extractfile("FedLeave/VERSION")
+        version = version_file.read() if version_file is not None else None
     assert names[0] == "FedLeave"
     assert "FedLeave/fedleave/fedleave" in names
+    assert version == b"0.2.0\n"
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     assert checksum.read_text(encoding="utf-8") == f"{digest}  {archive.name}\n"
+
+
+def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "distribution.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "github.ref == 'refs/heads/master'" in workflow
+    assert "github.ref_type == 'tag'" not in workflow
+    assert "\n    tags:\n" not in workflow
+    for asset_name in (
+        "FedLeave-Setup-Latest-Windows-x64.exe",
+        "FedLeave-Setup-Latest-Windows-x64.exe.sha256",
+        "FedLeave-Latest-Linux-x86_64.tar.gz",
+        "FedLeave-Latest-Linux-x86_64.tar.gz.sha256",
+        "install.sh",
+    ):
+        assert asset_name in workflow
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
@@ -94,7 +123,7 @@ def test_bootstrap_installs_local_verified_release_without_python(tmp_path: Path
     module = _load_packaging_module()
     bundle = _fake_bundle(module, tmp_path / "bundle")
     artifacts = tmp_path / "assets"
-    module.create_linux_archive(bundle, artifacts, "0.2.0")
+    _rolling_linux_assets(module, bundle, artifacts, "0.2.0")
     install_root = tmp_path / "install root"
     bin_dir = tmp_path / "command links"
 
@@ -102,8 +131,6 @@ def test_bootstrap_installs_local_verified_release_without_python(tmp_path: Path
         [
             str(BOOTSTRAP),
             "--unattended",
-            "--version",
-            "0.2.0",
             "--asset-base-url",
             artifacts.as_uri(),
             "--install-root",
@@ -128,7 +155,9 @@ def test_bootstrap_checksum_failure_does_not_create_install_root(tmp_path: Path)
     module = _load_packaging_module()
     bundle = _fake_bundle(module, tmp_path / "bundle")
     artifacts = tmp_path / "assets"
-    archive, checksum = module.create_linux_archive(bundle, artifacts, "0.2.0")
+    _rolling_linux_assets(module, bundle, artifacts, "0.2.0")
+    archive = artifacts / "FedLeave-Latest-Linux-x86_64.tar.gz"
+    checksum = archive.with_name(archive.name + ".sha256")
     checksum.write_text(f"{'0' * 64}  {archive.name}\n", encoding="utf-8")
     install_root = tmp_path / "must-not-exist"
 
@@ -136,8 +165,6 @@ def test_bootstrap_checksum_failure_does_not_create_install_root(tmp_path: Path)
         [
             str(BOOTSTRAP),
             "--unattended",
-            "--version",
-            "0.2.0",
             "--asset-base-url",
             artifacts.as_uri(),
             "--install-root",

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import os
 from pathlib import Path
 import re
@@ -143,6 +144,11 @@ def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tu
             pending_archive, "w:gz", format=tarfile.PAX_FORMAT, dereference=False
         ) as tar:
             tar.add(bundle_dir, arcname="FedLeave", recursive=True)
+            version_bytes = f"{version}\n".encode()
+            version_info = tarfile.TarInfo("FedLeave/VERSION")
+            version_info.size = len(version_bytes)
+            version_info.mode = 0o644
+            tar.addfile(version_info, io.BytesIO(version_bytes))
         pending_archive.replace(archive)
     except BaseException:
         pending_archive.unlink(missing_ok=True)

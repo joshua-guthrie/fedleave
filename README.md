@@ -24,22 +24,23 @@ I would not be using this application for any thing critical.  For me, it's a fu
 
 ## Installation
 
-Release installers contain the complete PyInstaller application bundles,
+Rolling installers contain the complete PyInstaller application bundles,
 including their Python runtime. End users do not need Python, Git, compilers, or
 the source repository.
 
 ### Windows installation
 
-Download `FedLeave-Setup-<version>-Windows-x64.exe` from the
-[latest GitHub Release](https://github.com/joshua-guthrie/fedleave/releases/latest)
-and run the installation wizard. It installs FedLeave in
+Download
+[FedLeave-Setup-Latest-Windows-x64.exe](https://github.com/joshua-guthrie/fedleave/releases/download/beta/FedLeave-Setup-Latest-Windows-x64.exe)
+and run the installation wizard. This stable link is replaced after every
+successful `master` build. It installs FedLeave in
 `C:\Program Files\FedLeave`, registers it in Windows Installed Apps, creates a
 FedLeave Start menu folder, and offers an optional desktop shortcut.
 
 For an unattended installation:
 
 ```bat
-FedLeave-Setup-<version>-Windows-x64.exe /S
+FedLeave-Setup-Latest-Windows-x64.exe /S
 ```
 
 Uninstall from Windows Installed Apps, the Start menu shortcut, or run:
@@ -56,7 +57,7 @@ unrecognized publisher.
 ### Linux installation
 
 FedLeave supports 64-bit Ubuntu, Debian, and Debian-based distributions. Install
-the latest release with:
+the latest successful `master` build with:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash
@@ -68,14 +69,9 @@ For unattended installation:
 curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash -s -- --unattended
 ```
 
-To install a specific version:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash -s -- --version 1.2.0
-```
-
 The bootstrap downloads the prebuilt archive and SHA-256 checksum from GitHub
-Releases, verifies it, and then installs into
+through the rolling `beta` asset channel, verifies it, reads the exact
+commit-derived build version embedded in the archive, and then installs into
 `/opt/fedleave/releases/<version>`. `/opt/fedleave/current` is switched only
 after validation, and commands are linked beneath `/usr/local/bin`. The archive
 contains its own Python runtime; the destination does not need Python, `pip`, a
@@ -108,7 +104,7 @@ pip install -e .
 
 ## Developer packaging
 
-The commands below build from source for development and release engineering.
+The commands below build from source for development and packaging.
 They are separate from the prebuilt end-user installers above.
 
 FedLeave now uses two platform entry scripts only:
@@ -339,9 +335,9 @@ The smoke test parses every project entry point and packaging-manifest entry,
 checks referenced modules and assets, writes each generated bootstrap, and
 constructs every platform-specific PyInstaller command. The test suite executes
 both platform configurations. A full build still remains the final packaging
-validation before a release.
+validation before publishing an installer.
 
-### Building release packages locally
+### Building packages locally
 
 The authoritative version and application list come from `pyproject.toml`.
 Inspect them and validate version conversion with:
@@ -349,7 +345,6 @@ Inspect them and validate version conversion with:
 ```bash
 python installer/package.py version
 python installer/package.py numeric-version
-python installer/package.py verify-tag v0.2.0
 ```
 
 Build and package Linux:
@@ -384,28 +379,25 @@ python installer\package.py checksum artifacts\FedLeave-Setup-%VERSION%-Windows-
 Package validation fails if any command declared in `project.scripts`, its
 PyInstaller executable, or its embedded support directory is absent.
 
-### CI artifacts and official releases
+### CI artifacts and the rolling installer channel
 
 The Distribution workflow builds both platform packages on every pushed
-branch, on pull requests, and when manually dispatched. Ordinary builds use a
+branch, on pull requests, and when manually dispatched. Builds use a
 development version containing the abbreviated commit hash and appear as
-downloadable artifacts on that workflow run; they do not create public
-releases.
+downloadable artifacts on that workflow run.
 
-An official release uses a tag whose value exactly matches the version in
-`pyproject.toml`. For version `0.2.0`:
+After both platform jobs pass for `master`, the workflow also replaces five
+stable public assets on the existing `beta` prerelease: the Windows
+installer/checksum, Linux archive/checksum, and `install.sh`. The `beta` tag is
+advanced to that commit. It is a rolling download bucket, not a versioned
+release; no version tags or manual release process are used. Feature branches
+and pull requests cannot replace the public installers.
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
+The Linux archive embeds its exact development version and commit hash even
+though its public download filename is stable. The bootstrap installs that
+identity into a separate version directory, preserving rollback behavior.
 
-The tag build verifies the match, generates release notes, and publishes the
-Windows installer/checksum, Linux archive/checksum, and `install.sh` to the
-corresponding GitHub Release. The GitHub-provided token is used; no personal
-access token or paid packaging service is required.
-
-Before a release, run the test suite and the platform build commands above.
+Before changing packaging, run the test suite and the platform build commands above.
 GitHub Actions performs silent install/uninstall and user-data preservation
 checks on Windows. Because Windows binaries cannot be executed in a Linux
 development environment, a clean Windows 11 virtual-machine wizard test and

@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - "**"
-    tags:
-      - "v*"
   pull_request:
   workflow_dispatch:
 
@@ -14,7 +12,7 @@ permissions:
 
 concurrency:
   group: distribution-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  cancel-in-progress: true
 
 jobs:
   metadata:
@@ -32,17 +30,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Resolve and verify version
+      - name: Resolve development version
         id: version
         shell: bash
         run: |
           set -Eeuo pipefail
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            python installer/package.py verify-tag "$GITHUB_REF_NAME"
-            package_version="$(python installer/package.py version)"
-          else
-            package_version="$(python installer/package.py version --development --sha "$GITHUB_SHA")"
-          fi
+          package_version="$(python installer/package.py version --development --sha "$GITHUB_SHA")"
           numeric_version="$(python installer/package.py numeric-version --version "$package_version")"
           echo "package-version=$package_version" >> "$GITHUB_OUTPUT"
           echo "numeric-version=$numeric_version" >> "$GITHUB_OUTPUT"
@@ -194,10 +187,18 @@ jobs:
           shellcheck installer/linux/install.sh
           install_root="$RUNNER_TEMP/fedleave-bootstrap"
           bin_dir="$RUNNER_TEMP/fedleave-bin"
+          rolling_dir="$RUNNER_TEMP/fedleave-rolling-assets"
+          mkdir "$rolling_dir"
+          cp "artifacts/FedLeave-${PACKAGE_VERSION}-Linux-x86_64.tar.gz" \
+            "$rolling_dir/FedLeave-Latest-Linux-x86_64.tar.gz"
+          (
+            cd "$rolling_dir"
+            sha256sum FedLeave-Latest-Linux-x86_64.tar.gz \
+              > FedLeave-Latest-Linux-x86_64.tar.gz.sha256
+          )
           installer/linux/install.sh \
             --unattended \
-            --version "$PACKAGE_VERSION" \
-            --asset-base-url "file://$PWD/artifacts" \
+            --asset-base-url "file://$rolling_dir" \
             --install-root "$install_root" \
             --bin-dir "$bin_dir"
           "$bin_dir/fedleave" --version
@@ -212,9 +213,9 @@ jobs:
             installer/linux/install.sh
           if-no-files-found: error
 
-  release:
-    name: GitHub Release
-    if: github.ref_type == 'tag'
+  publish-latest:
+    name: Publish latest master installers
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     needs: [metadata, windows, linux]
     runs-on: ubuntu-latest
     permissions:
@@ -226,20 +227,76 @@ jobs:
           path: release-assets
           merge-multiple: true
 
-      - name: Create or update release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+      - name: Prepare stable rolling assets
+        shell: bash
         run: |
           set -Eeuo pipefail
-          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          mkdir rolling-assets
+          windows_installer="$(find release-assets -maxdepth 1 -name 'FedLeave-Setup-*-Windows-x64.exe' -print -quit)"
+          linux_archive="$(find release-assets -maxdepth 1 -name 'FedLeave-*-Linux-x86_64.tar.gz' -print -quit)"
+          [[ -n "$windows_installer" && -n "$linux_archive" && -f release-assets/install.sh ]]
+          cp "$windows_installer" rolling-assets/FedLeave-Setup-Latest-Windows-x64.exe
+          cp "$linux_archive" rolling-assets/FedLeave-Latest-Linux-x86_64.tar.gz
+          cp release-assets/install.sh rolling-assets/install.sh
+          (
+            cd rolling-assets
+            sha256sum FedLeave-Setup-Latest-Windows-x64.exe \
+              > FedLeave-Setup-Latest-Windows-x64.exe.sha256
+            sha256sum FedLeave-Latest-Linux-x86_64.tar.gz \
+              > FedLeave-Latest-Linux-x86_64.tar.gz.sha256
+          )
+
+      - name: Replace rolling beta-channel assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_VERSION: ${{ needs.metadata.outputs.package-version }}
+        run: |
+          set -Eeuo pipefail
+          mapfile -t assets < <(find rolling-assets -maxdepth 1 -type f -print | sort)
           [[ "${#assets[@]}" -eq 5 ]] || {
-            printf 'Expected 5 release assets, found %s\n' "${#assets[@]}" >&2
+            printf 'Expected 5 rolling assets, found %s\n' "${#assets[@]}" >&2
             printf '%s\n' "${assets[@]}" >&2
             exit 1
           }
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${assets[@]}" --clobber
+          if gh release view beta >/dev/null 2>&1; then
+            gh release upload beta "${assets[@]}" --clobber
           else
-            gh release create "$TAG" "${assets[@]}" --verify-tag --generate-notes --title "FedLeave $TAG"
+            gh release create beta "${assets[@]}" \
+              --prerelease \
+              --target "$GITHUB_SHA" \
+              --title "Latest successful master build" \
+              --notes "Rolling installer channel; assets are replaced after every successful master build."
           fi
+          gh api --method PATCH \
+            "repos/$GITHUB_REPOSITORY/git/refs/tags/beta" \
+            -f sha="$GITHUB_SHA" \
+            -F force=true
+          notes="$(printf \
+            'Build: %s\nCommit: %s\n\nThese rolling assets are replaced after every successful master build.' \
+            "$BUILD_VERSION" "$GITHUB_SHA")"
+          gh release edit beta \
+            --title "Latest successful master build" \
+            --notes "$notes"
+
+      - name: Remove obsolete beta-channel assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          while IFS=$'\t' read -r asset_id asset_name; do
+            case "$asset_name" in
+              FedLeave-Setup-Latest-Windows-x64.exe|\
+              FedLeave-Setup-Latest-Windows-x64.exe.sha256|\
+              FedLeave-Latest-Linux-x86_64.tar.gz|\
+              FedLeave-Latest-Linux-x86_64.tar.gz.sha256|\
+              install.sh)
+                ;;
+              *)
+                gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
+                ;;
+            esac
+          done < <(
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/beta" \
+              --jq '.assets[] | [.id, .name] | @tsv'
+          )

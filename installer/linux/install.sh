@@ -13,6 +13,8 @@ INSTALL_ROOT="$DEFAULT_INSTALL_ROOT"
 BIN_DIR="$DEFAULT_BIN_DIR"
 RELEASE_VERSION=""
 ASSET_BASE_URL=""
+ARCHIVE_NAME=""
+DOWNLOAD_BASE_URL=""
 UNATTENDED=0
 TEMP_DIR=""
 SUDO=()
@@ -43,14 +45,14 @@ trap on_error ERR
 
 usage() {
   cat <<'EOF'
-Install the latest prebuilt FedLeave release for 64-bit Debian/Ubuntu.
+Install the latest successful FedLeave master build for 64-bit Debian/Ubuntu.
 
 Usage:
   install.sh [OPTIONS]
 
 Options:
   --unattended             Run without interactive input.
-  --version VERSION        Install a specific release (for example, 1.2.0).
+  --version VERSION        Install a legacy versioned package instead of the rolling build.
   --install-root PATH      Installation root (default: /opt/fedleave).
   --bin-dir PATH           Command-link directory (default: /usr/local/bin).
   --asset-base-url URL     Override the release asset directory (primarily for testing).
@@ -59,7 +61,6 @@ Options:
 Examples:
   curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash
   curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash -s -- --unattended
-  curl -fsSL https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installer/linux/install.sh | bash -s -- --version 1.2.0
 EOF
 }
 
@@ -147,32 +148,25 @@ install_runtime_tools() {
   "${SUDO[@]}" apt-get install -y --no-install-recommends "${packages[@]}"
 }
 
-resolve_version() {
+resolve_download() {
   if [[ -n "$RELEASE_VERSION" ]]; then
+    ARCHIVE_NAME="FedLeave-${RELEASE_VERSION}-Linux-x86_64.tar.gz"
+    DOWNLOAD_BASE_URL="${ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download/v${RELEASE_VERSION}}"
     return
   fi
-  [[ -z "$ASSET_BASE_URL" ]] ||
-    die "--version is required when --asset-base-url is used."
-  log "Resolving the latest GitHub Release."
-  local final_url tag
-  final_url="$(curl -fsSL -o /dev/null -w '%{url_effective}' \
-    "https://github.com/${REPOSITORY}/releases/latest")"
-  tag="${final_url%/}"
-  tag="${tag##*/}"
-  [[ "$tag" == v* && ${#tag} -gt 1 ]] || die "GitHub did not return a valid v<version> release tag."
-  RELEASE_VERSION="${tag#v}"
+  ARCHIVE_NAME="FedLeave-Latest-Linux-x86_64.tar.gz"
+  DOWNLOAD_BASE_URL="${ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download/beta}"
+  log "Using the rolling package from the latest successful master push."
 }
 
 download_and_verify() {
-  local archive_name checksum_name base_url
-  archive_name="FedLeave-${RELEASE_VERSION}-Linux-x86_64.tar.gz"
-  checksum_name="${archive_name}.sha256"
-  base_url="${ASSET_BASE_URL:-https://github.com/${REPOSITORY}/releases/download/v${RELEASE_VERSION}}"
+  local checksum_name archive_version
+  checksum_name="${ARCHIVE_NAME}.sha256"
 
   TEMP_DIR="$(mktemp -d)"
-  log "Downloading FedLeave ${RELEASE_VERSION}."
-  curl -fsSL --retry 3 --output "$TEMP_DIR/$archive_name" "$base_url/$archive_name"
-  curl -fsSL --retry 3 --output "$TEMP_DIR/$checksum_name" "$base_url/$checksum_name"
+  log "Downloading $ARCHIVE_NAME."
+  curl -fsSL --retry 3 --output "$TEMP_DIR/$ARCHIVE_NAME" "$DOWNLOAD_BASE_URL/$ARCHIVE_NAME"
+  curl -fsSL --retry 3 --output "$TEMP_DIR/$checksum_name" "$DOWNLOAD_BASE_URL/$checksum_name"
 
   log "Verifying SHA-256 checksum before installation."
   (
@@ -183,11 +177,20 @@ download_and_verify() {
   while IFS= read -r member; do
     [[ "$member" != /* && "/$member/" != *"/../"* ]] ||
       die "The release archive contains an unsafe path: $member"
-  done < <(tar -tzf "$TEMP_DIR/$archive_name")
+  done < <(tar -tzf "$TEMP_DIR/$ARCHIVE_NAME")
 
-  tar -xzf "$TEMP_DIR/$archive_name" -C "$TEMP_DIR"
+  tar -xzf "$TEMP_DIR/$ARCHIVE_NAME" -C "$TEMP_DIR"
   [[ -d "$TEMP_DIR/$TOP_LEVEL_DIRECTORY" ]] ||
     die "The archive is missing its $TOP_LEVEL_DIRECTORY top-level directory."
+  [[ -f "$TEMP_DIR/$TOP_LEVEL_DIRECTORY/VERSION" ]] ||
+    die "The archive does not identify the source build version."
+  archive_version="$(tr -d '\r\n' < "$TEMP_DIR/$TOP_LEVEL_DIRECTORY/VERSION")"
+  [[ "$archive_version" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] ||
+    die "The archive contains an invalid build version: $archive_version"
+  if [[ -n "$RELEASE_VERSION" && "$archive_version" != "$RELEASE_VERSION" ]]; then
+    die "Requested version $RELEASE_VERSION does not match archive version $archive_version."
+  fi
+  RELEASE_VERSION="$archive_version"
 }
 
 nearest_existing_parent() {
@@ -291,9 +294,7 @@ main() {
   parse_args "$@"
   detect_platform
   install_runtime_tools
-  resolve_version
-  [[ "$RELEASE_VERSION" =~ ^[A-Za-z0-9][A-Za-z0-9._+-]*$ ]] ||
-    die "Invalid version: $RELEASE_VERSION"
+  resolve_download
   ((UNATTENDED == 1)) && log "Running in unattended mode."
   download_and_verify
   install_release
