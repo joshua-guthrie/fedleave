@@ -11,12 +11,12 @@ if not exist "%ENGINE%" (
 )
 
 set "PYTHON_CMD="
-where py >nul 2>nul
+where python >nul 2>nul
 if %ERRORLEVEL%==0 (
-  set "PYTHON_CMD=py -3"
+  set "PYTHON_CMD=python"
 ) else (
-  where python >nul 2>nul
-  if %ERRORLEVEL%==0 set "PYTHON_CMD=python"
+  where py >nul 2>nul
+  if %ERRORLEVEL%==0 set "PYTHON_CMD=py -3"
 )
 
 if not defined PYTHON_CMD (

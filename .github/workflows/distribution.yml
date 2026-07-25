@@ -89,7 +89,12 @@ jobs:
           $artifactDir = Join-Path $PWD "artifacts"
           $sourceDir = Join-Path $PWD "dist\fedleave-Windows"
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-          $makensis = (Get-Command makensis).Source
+          # Chocolatey updates the machine PATH after this job has already
+          # started, so use its deterministic install path in the next step.
+          $makensis = Join-Path ${env:ProgramFiles(x86)} "NSIS\makensis.exe"
+          if (-not (Test-Path $makensis)) {
+            $makensis = (Get-Command makensis -ErrorAction Stop).Source
+          }
           & $makensis `
             "/DVERSION=$env:PACKAGE_VERSION" `
             "/DNUMERIC_VERSION=$env:NUMERIC_VERSION" `
