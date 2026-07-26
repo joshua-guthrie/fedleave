@@ -276,14 +276,17 @@ jobs:
             printf '%s\n' "${assets[@]}" >&2
             exit 1
           }
-          if gh release view beta >/dev/null 2>&1; then
-            gh release upload beta "${assets[@]}" --clobber
+          if gh release view beta --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload beta "${assets[@]}" \
+              --clobber \
+              --repo "$GITHUB_REPOSITORY"
           else
             gh release create beta "${assets[@]}" \
               --prerelease \
               --target "$GITHUB_SHA" \
               --title "Latest successful master build" \
-              --notes "Rolling installer channel; assets are replaced after every successful master build."
+              --notes "Rolling installer channel; assets are replaced after every successful master build." \
+              --repo "$GITHUB_REPOSITORY"
           fi
           gh api --method PATCH \
             "repos/$GITHUB_REPOSITORY/git/refs/tags/beta" \
@@ -294,7 +297,8 @@ jobs:
             "$BUILD_VERSION" "$GITHUB_SHA")"
           gh release edit beta \
             --title "Latest successful master build" \
-            --notes "$notes"
+            --notes "$notes" \
+            --repo "$GITHUB_REPOSITORY"
 
       - name: Remove obsolete beta-channel assets
         env:
