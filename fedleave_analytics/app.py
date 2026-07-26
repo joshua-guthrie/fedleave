@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from fedleave.config import get_default_data_dir
+from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
 from .charts import (
@@ -899,7 +900,11 @@ class AnalyticsWindow(QMainWindow):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Read-only FedLeave seasonality and lifecycle analytics.")
+    parser = argparse.ArgumentParser(
+        description="Read-only FedLeave seasonality and lifecycle analytics.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--backend", help="Path to the fedleave executable")
     parser.add_argument("--data-dir")
     parser.add_argument("--year", type=int)

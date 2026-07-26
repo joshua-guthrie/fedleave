@@ -19,6 +19,7 @@ from .cli_helpers import load_leave_year, parse_iso_date
 from .config import get_default_data_dir as resolve_default_data_dir
 from .ledger import calculate_balances
 from .executable_search import is_executable, iter_executable_candidates
+from .project_info import HELP_EPILOG
 from .chart_style import (
     BACKGROUND,
     BASE_ASPECT_RATIO,
@@ -38,8 +39,6 @@ from .chart_style import (
 )
 
 Y_MIN = Decimal("0")
-
-FEDLEAVE_REPO_URL = "https://github.com/joshua-guthrie/fedleave"
 
 
 @dataclass(frozen=True)
@@ -142,7 +141,7 @@ def find_companion_app(app_name: str, explicit: str | None = None) -> Path:
     raise FileNotFoundError(
         f"{app_name} executable was not found.\n\n"
         f"Searched:\n{details}\n\n"
-        f"Install FedLeave from {FEDLEAVE_REPO_URL} or place the companion app next to this application."
+        "Install the current FedLeave suite or place the companion app next to this application."
     )
 
 
@@ -557,7 +556,11 @@ def run_fedleave(args: list[str]) -> Any:
 
 
 def run_chart_app(spec: LeaveChartSpec) -> None:
-    parser = argparse.ArgumentParser(description=f"Create {spec.title.lower()} balance chart PNG using fedleave data.")
+    parser = argparse.ArgumentParser(
+        description=f"Create {spec.title.lower()} balance chart PNG using fedleave data.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--year", type=int, help="Leave year. Defaults to current leave year.")
     parser.add_argument("--outputFile", required=True, help="Output PNG file path")
     parser.add_argument(
@@ -616,7 +619,11 @@ def run_chart_app(spec: LeaveChartSpec) -> None:
 
 
 def run_comparison_chart_app(spec: ComparisonChartSpec) -> None:
-    parser = argparse.ArgumentParser(description=f"Create {spec.title.lower()} PNG using fedleave data.")
+    parser = argparse.ArgumentParser(
+        description=f"Create {spec.title.lower()} PNG using fedleave data.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--as-of", default="today", help="Comparison date YYYY-MM-DD or today.")
     parser.add_argument("--outputFile", required=True, help="Output PNG file path")
     parser.add_argument(

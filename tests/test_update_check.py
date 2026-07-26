@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fedleave.project_info import OFFICIAL_PROJECT_URL
 from fedleave.update_check import check_for_updates
 
 
@@ -29,8 +30,8 @@ def test_update_check_reports_new_master_version_and_instructions() -> None:
     assert result["status"] == "ok"
     assert result["update_available"] is True
     assert result["latest_version"] == "0.3.0"
-    assert result["release_url"].endswith("/tree/master")
-    assert "LinuxInstall.sh" in result["instructions"]
+    assert result["release_url"] == OFFICIAL_PROJECT_URL
+    assert "official FedLeave project webpage" in result["instructions"]
     assert requests[0][0].get_header("User-agent") == "FedLeave/0.2.0"
 
 
@@ -42,4 +43,5 @@ def test_update_check_handles_offline_without_raising() -> None:
 
     assert result["status"] == "unavailable"
     assert result["update_available"] is False
+    assert result["release_url"] == OFFICIAL_PROJECT_URL
     assert "offline" in result["message"]

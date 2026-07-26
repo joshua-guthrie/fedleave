@@ -12,6 +12,14 @@ def test_gui_resource_helpers_find_packaged_files():
     assert asset_file("fedleave-icon.ico").is_file()
 
 
+def test_about_identifies_author_and_official_website_without_email():
+    about = help_file("about-fedleave-calendar.html").read_text(encoding="utf-8")
+
+    assert "Joshua Guthrie" in about
+    assert "https://www.westmouthbay.com/fedleave-application/" in about
+    assert "@" not in about
+
+
 def test_gui_window_icon_loads_from_asset():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])

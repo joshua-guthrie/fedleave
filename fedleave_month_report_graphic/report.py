@@ -19,6 +19,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.project_info import HELP_EPILOG
 
 from . import __version__
 
@@ -27,7 +28,6 @@ BASE_WIDTH = 1920
 BASE_HEIGHT = 1080
 MIN_RESOLUTION = 800
 MAX_RESOLUTION = 7680
-FEDLEAVE_REPO_URL = "https://github.com/joshua-guthrie/fedleave"
 
 TEXT = "#1f2937"
 MUTED = "#64748b"
@@ -150,6 +150,8 @@ def parse_args(argv: list[str] | None = None) -> Options:
     parser = argparse.ArgumentParser(
         prog="fedleaveMonthReportGraphic",
         description="Generate a landscape FedLeave graphical month report.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--outputFile", help="Output .png or .svg file path.")
     parser.add_argument("--year", type=int, help="Calendar year to report.")
@@ -224,7 +226,7 @@ def find_fedleave(explicit: Path | None = None) -> Path:
     raise FedleaveMissingError(
         "fedleave executable not found.\n\n"
         f"Searched:\n{details}\n\n"
-        f"Install fedleave from {FEDLEAVE_REPO_URL} or pass --fedleave PATH."
+        "Install the current FedLeave suite or pass --fedleave PATH."
     )
 
 

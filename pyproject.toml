@@ -3,11 +3,17 @@ name = "fedleave"
 version = "0.2.0"
 description = "Federal leave and time tracker"
 authors = [
-  {name = "Your Name", email = "you@example.com"}
+  {name = "Joshua Guthrie"}
 ]
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+
+[project.urls]
+Homepage = "https://www.westmouthbay.com/fedleave-application/"
+Documentation = "https://www.westmouthbay.com/fedleave-application/"
+Support = "https://www.westmouthbay.com/fedleave-application/"
+Repository = "https://github.com/joshua-guthrie/fedleave"
 
 [project.scripts]
 fedleave = "fedleave.__main__:main"

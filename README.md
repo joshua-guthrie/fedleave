@@ -2,6 +2,10 @@
 
 Federal leave and time tracker.
 
+Official project website: [https://www.westmouthbay.com/fedleave-application/](https://www.westmouthbay.com/fedleave-application/)
+
+Author: Joshua Guthrie
+
 <p align="center">
   <img src="assets/fedleave-logo.png" alt="FedLeave logo" width="640">
 </p>
@@ -508,7 +512,7 @@ Commands and common options:
 			fedleave expiration-extend --id TRANSACTION_ID --new-date YYYY-MM-DD --reason TEXT [--json] [--data-dir PATH]
 
 	check-for-updates
-		Check the version published on the GitHub master branch for a newer FedLeave version.
+		Check the published source version for a newer FedLeave version and direct users to the official project website.
 
 		Syntax:
 			fedleave check-for-updates [--json]
@@ -816,7 +820,7 @@ The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of
 2. In the system PATH
 3. Beside the companion executable in the shared distribution suite
 
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+If `fedleave` cannot be found, the application exits with a helpful error explaining that the current FedLeave suite and its companion applications must remain together.
 
 ### Companion Application: SickLeaveChartForTheYear
 
@@ -853,7 +857,7 @@ The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of t
 2. In the system PATH
 3. Beside the companion executable in the shared distribution suite
 
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+If `fedleave` cannot be found, the application exits with a helpful error explaining that the current FedLeave suite and its companion applications must remain together.
 
 ### Companion Application: CreditHoursChartForTheYear
 
@@ -885,7 +889,7 @@ The `CreditHoursChartForTheYear` application requires `fedleave` to be in one of
 2. In the system PATH
 3. Beside the companion executable in the shared distribution suite
 
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+If `fedleave` cannot be found, the application exits with a helpful error explaining that the current FedLeave suite and its companion applications must remain together.
 
 ### Companion Application: CompTimeChartForTheYear
 
@@ -917,7 +921,7 @@ The `CompTimeChartForTheYear` application requires `fedleave` to be in one of th
 2. In the system PATH
 3. Beside the companion executable in the shared distribution suite
 
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+If `fedleave` cannot be found, the application exits with a helpful error explaining that the current FedLeave suite and its companion applications must remain together.
 
 ### Companion Application: TravelCompChartForTheYear
 
@@ -949,7 +953,7 @@ The `TravelCompChartForTheYear` application requires `fedleave` to be in one of 
 2. In the system PATH
 3. Beside the companion executable in the shared distribution suite
 
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+If `fedleave` cannot be found, the application exits with a helpful error explaining that the current FedLeave suite and its companion applications must remain together.
 
 ### Companion Application: TimeOffAwardChartForTheYear
 
@@ -981,7 +985,7 @@ The `TimeOffAwardChartForTheYear` application requires `fedleave` to be in one o
 2. In the system PATH
 3. Beside the companion executable in the shared distribution suite
 
-If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
+If `fedleave` cannot be found, the application exits with a helpful error explaining that the current FedLeave suite and its companion applications must remain together.
 
 ## Yearly Comparison Companion Applications
 

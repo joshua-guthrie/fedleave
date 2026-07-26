@@ -6,6 +6,7 @@ import typer
 from rich.console import Console
 
 from . import __version__
+from .project_info import OFFICIAL_PROJECT_URL, PROJECT_AUTHOR
 
 
 console = Console()
@@ -17,6 +18,11 @@ def _print_json(data: dict | list) -> None:
 
 HELP_TEXT = """
 fedleave — Federal leave and time tracker
+
+Official project website:
+    __OFFICIAL_PROJECT_URL__
+Author:
+    __PROJECT_AUTHOR__
 
 Usage:
     fedleave COMMAND [OPTIONS]
@@ -30,7 +36,7 @@ Primary commands:
     force-balance
                 Force one leave balance as of a date with an auditable adjustment
     check-for-updates
-                Check GitHub for a newer FedLeave release
+                Check for a newer FedLeave release
     expirations Show expiring comp, travel comp, restored annual, and optional award leave lots
     expiration-extend
                 Extend one eligible earned lot with a recorded reason
@@ -103,8 +109,8 @@ Command details and examples:
         The adjustment remains in effect for all later balance calculations.
 
     fedleave check-for-updates [--json]
-        Query the official GitHub master branch once and report whether a newer version is available.
-        When an update exists, prints the master branch URL and installation instructions.
+        Check the published source version once and report whether a newer version is available.
+        When an update exists, prints the official project webpage and installation instructions.
 
     fedleave expirations [--year YEAR] [--within-pay-periods N] [--category CATEGORY] [--json] [--data-dir PATH]
         Show each earned expiring-leave lot, remaining hours, expiration date, pay periods remaining,
@@ -200,7 +206,9 @@ Exit codes:
     9  Holiday fetch/import/generation error
 
 For full project specification and advanced usage, see the README in the project root.
-"""
+""".replace("__OFFICIAL_PROJECT_URL__", OFFICIAL_PROJECT_URL).replace(
+    "__PROJECT_AUTHOR__", PROJECT_AUTHOR
+)
 
 def _version_callback(value: bool) -> None:
     if value:

@@ -6,10 +6,9 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from . import __version__
+from .project_info import OFFICIAL_PROJECT_URL
 
 
-REPOSITORY_URL = "https://github.com/joshua-guthrie/fedleave"
-MASTER_BRANCH_URL = f"{REPOSITORY_URL}/tree/master"
 MASTER_VERSION_URL = "https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/pyproject.toml"
 
 
@@ -41,12 +40,12 @@ def check_for_updates(*, current_version: str = __version__, opener=urlopen, tim
             "current_version": current_version,
             "latest_version": latest,
             "update_available": update_available,
-            "release_url": MASTER_BRANCH_URL,
+            "release_url": OFFICIAL_PROJECT_URL,
             "assets": [],
             "instructions": (
-                "Open the master branch, download its source archive, close all FedLeave applications, "
-                "build the package for your operating system, and run the included LinuxInstall.sh or "
-                "WindowsInstall.bat installer. Your leave data directory is preserved during an upgrade."
+                "Visit the official FedLeave project webpage for the current Windows and Linux "
+                "installation instructions. Close all FedLeave applications before upgrading. "
+                "Your leave data directory is preserved during an upgrade."
             ),
         }
     except (HTTPError, URLError, OSError, UnicodeDecodeError, ValueError) as exc:
@@ -55,6 +54,6 @@ def check_for_updates(*, current_version: str = __version__, opener=urlopen, tim
             "current_version": current_version,
             "latest_version": None,
             "update_available": False,
-            "release_url": MASTER_BRANCH_URL,
-            "message": f"Could not check GitHub for updates: {exc}",
+            "release_url": OFFICIAL_PROJECT_URL,
+            "message": f"Could not check for updates: {exc}",
         }

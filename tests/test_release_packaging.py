@@ -190,6 +190,80 @@ def test_bootstrap_installs_local_verified_release_without_python(tmp_path: Path
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
+def test_bootstrap_migrates_legacy_fedleave_command_wrappers(tmp_path: Path) -> None:
+    module = _load_packaging_module()
+    bundle = _fake_bundle(module, tmp_path / "bundle")
+    artifacts = tmp_path / "assets"
+    _rolling_linux_assets(module, bundle, artifacts, "0.2.0")
+    install_root = tmp_path / "install root"
+    bin_dir = tmp_path / "command links"
+    bin_dir.mkdir()
+    legacy_wrapper = bin_dir / "fedleave"
+    legacy_wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        f'exec {install_root}/current/fedleave/fedleave "$@"\n',
+        encoding="utf-8",
+    )
+    legacy_wrapper.chmod(0o755)
+
+    result = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--unattended",
+            "--asset-base-url",
+            artifacts.as_uri(),
+            "--install-root",
+            str(install_root),
+            "--bin-dir",
+            str(bin_dir),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr or result.stdout
+    assert "Migrating legacy FedLeave command wrapper" in result.stdout
+    assert legacy_wrapper.is_symlink()
+    assert legacy_wrapper.readlink() == install_root / "current" / "fedleave"
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
+def test_bootstrap_preserves_unrelated_regular_commands(tmp_path: Path) -> None:
+    module = _load_packaging_module()
+    bundle = _fake_bundle(module, tmp_path / "bundle")
+    artifacts = tmp_path / "assets"
+    _rolling_linux_assets(module, bundle, artifacts, "0.2.0")
+    install_root = tmp_path / "install root"
+    bin_dir = tmp_path / "command links"
+    bin_dir.mkdir()
+    unrelated = bin_dir / "fedleave"
+    original = "#!/usr/bin/env bash\necho unrelated\n"
+    unrelated.write_text(original, encoding="utf-8")
+    unrelated.chmod(0o755)
+
+    result = subprocess.run(
+        [
+            str(BOOTSTRAP),
+            "--unattended",
+            "--asset-base-url",
+            artifacts.as_uri(),
+            "--install-root",
+            str(install_root),
+            "--bin-dir",
+            str(bin_dir),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "not owned by FedLeave" in result.stderr
+    assert unrelated.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
 def test_bootstrap_checksum_failure_does_not_create_install_root(tmp_path: Path) -> None:
     module = _load_packaging_module()
     bundle = _fake_bundle(module, tmp_path / "bundle")

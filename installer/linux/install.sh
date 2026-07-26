@@ -47,6 +47,12 @@ usage() {
   cat <<'EOF'
 Install the latest successful FedLeave master build for 64-bit Debian/Ubuntu.
 
+Official project website:
+  https://www.westmouthbay.com/fedleave-application/
+
+Author:
+  Joshua Guthrie
+
 Usage:
   install.sh [OPTIONS]
 
@@ -236,6 +242,16 @@ find_packaged_command() {
   find "$root" -type f -name "$command" -perm -u+x -print -quit
 }
 
+is_legacy_fedleave_wrapper() {
+  local path="$1" command="$2" wrapper_line
+  [[ -f "$path" && -r "$path" ]] || return 1
+  wrapper_line="$(sed -n '2p' "$path")"
+  case "$wrapper_line" in
+    "exec $INSTALL_ROOT/current/"*"/$command \"\$@\"") return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 install_release() {
   local extracted="$TEMP_DIR/$TOP_LEVEL_DIRECTORY"
   local releases_dir="$INSTALL_ROOT/releases"
@@ -285,10 +301,15 @@ install_release() {
     relative="${path#"$release_dir"/}"
     link="$BIN_DIR/$command"
     if [[ -e "$link" || -L "$link" ]]; then
-      [[ -L "$link" ]] || die "Refusing to replace non-symbolic-link command: $link"
-      existing_target="$(readlink "$link")"
-      [[ "$existing_target" == "$INSTALL_ROOT/current/"* ]] ||
-        die "Refusing to replace command link not owned by FedLeave: $link"
+      if [[ -L "$link" ]]; then
+        existing_target="$(readlink "$link")"
+        [[ "$existing_target" == "$INSTALL_ROOT/current/"* ]] ||
+          die "Refusing to replace command link not owned by FedLeave: $link"
+      elif is_legacy_fedleave_wrapper "$link" "$command"; then
+        log "Migrating legacy FedLeave command wrapper: $link"
+      else
+        die "Refusing to replace non-symbolic-link command not owned by FedLeave: $link"
+      fi
     fi
     # Command links target "current", not a version, so the final atomic link
     # switch activates every application at the same instant.

@@ -17,6 +17,7 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 from fedleave.executable_search import is_executable, iter_executable_candidates
 from fedleave.chart_style import draw_historical_and_future_line
+from fedleave.project_info import HELP_EPILOG
 
 
 # Chart rendering constants (base dimensions)
@@ -35,10 +36,6 @@ GRID_MINOR = "#A9A9A9"
 BORDER = "#808080"
 TEXT = "#000000"
 BACKGROUND = "#FFFFFF"
-
-# GitHub URL for fedleave
-FEDLEAVE_REPO_URL = "https://github.com/joshua-guthrie/fedleave"
-
 
 class ChartDimensions:
     """Chart dimensions scaled to specific pixel width."""
@@ -90,7 +87,7 @@ Error: fedleave application not found.
 
 The SickLeaveChartForTheYear application requires fedleave to be installed.
 
-To install fedleave, visit: {FEDLEAVE_REPO_URL}
+Install the current FedLeave suite and keep its companion applications together.
 
 Searched:
 {details}
@@ -438,7 +435,9 @@ def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensio
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
-        description="Create sick leave balance chart PNG using fedleave data."
+        description="Create sick leave balance chart PNG using fedleave data.",
+        epilog=HELP_EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--year", type=int, help="Leave year. Defaults to current leave year."

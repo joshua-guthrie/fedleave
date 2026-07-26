@@ -417,21 +417,21 @@ def test_help_menu_hides_backend_about_action(monkeypatch):
     labels = [action.text() for action in help_action.menu().actions() if action.text()]
 
     assert labels == [
-        "Help Contents", "Leave Abbreviations", "Open GitHub Page",
+        "Help Contents", "Leave Abbreviations", "Official Project Website",
         "Check for Updates...", "About FedLeave Calendar",
     ]
 
 
-def test_open_github_page_uses_project_repository(monkeypatch):
+def test_open_project_website_uses_official_url(monkeypatch):
     _application()
     opened: list[str] = []
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
     monkeypatch.setattr("fedleave_gui.main_window.webbrowser.open", opened.append)
     window = MainWindow()
 
-    window.open_github_page()
+    window.open_project_website()
 
-    assert opened == ["https://github.com/joshua-guthrie/fedleave"]
+    assert opened == ["https://www.westmouthbay.com/fedleave-application/"]
 
 
 def test_select_month_action_updates_displayed_month(monkeypatch):

@@ -35,7 +35,8 @@ SetCompressor /SOLID lzma
 !endif
 
 !define PRODUCT_NAME "FedLeave"
-!define PRODUCT_PUBLISHER "FedLeave"
+!define PRODUCT_PUBLISHER "Joshua Guthrie"
+!define PRODUCT_URL "https://www.westmouthbay.com/fedleave-application/"
 !define PRODUCT_REG_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\FedLeave"
 !define MUI_ABORTWARNING
 !define MUI_ICON "..\..\assets\fedleave-icon.ico"
@@ -52,6 +53,7 @@ VIAddVersionKey /LANG=1033 "ProductName" "${PRODUCT_NAME}"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${VERSION}"
 VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "${PRODUCT_PUBLISHER}"
+VIAddVersionKey /LANG=1033 "Comments" "${PRODUCT_URL}"
 VIAddVersionKey /LANG=1033 "FileDescription" "FedLeave Setup"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "MIT License"
 
@@ -86,6 +88,8 @@ Section "FedLeave application files" SEC_CORE
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "DisplayName" "${PRODUCT_NAME}"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+  WriteRegStr HKLM "${PRODUCT_REG_KEY}" "URLInfoAbout" "${PRODUCT_URL}"
+  WriteRegStr HKLM "${PRODUCT_REG_KEY}" "HelpLink" "${PRODUCT_URL}"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "DisplayIcon" "$INSTDIR\FedLeaveCalendar.exe"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'

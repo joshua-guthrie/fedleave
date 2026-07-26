@@ -54,7 +54,7 @@ from .backend import BackendError, BackendMissingError, BackendOptions, Fedleave
 from .resources import asset_file, help_base_url, help_file, window_icon
 from fedleave.config import get_default_data_dir
 from fedleave.payperiods import calculate_pay_date
-from fedleave.update_check import REPOSITORY_URL
+from fedleave.project_info import OFFICIAL_PROJECT_URL
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
 from fedleave_month_report_graphic.report import ReportData as MonthReportData
 from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
@@ -1201,7 +1201,7 @@ class MainWindow(QMainWindow):
         help_menu = self.menuBar().addMenu("Help")
         self._action(help_menu, "Help Contents", self.show_help)
         self._action(help_menu, "Leave Abbreviations", self.show_abbreviations)
-        self._action(help_menu, "Open GitHub Page", self.open_github_page)
+        self._action(help_menu, "Official Project Website", self.open_project_website)
         self._action(help_menu, "Check for Updates...", self.check_for_updates)
         self._action(help_menu, "About FedLeave Calendar", self.about_gui)
 
@@ -1805,8 +1805,8 @@ class MainWindow(QMainWindow):
     def show_help(self) -> None:
         self._show_html_file("fedleave-calendar-help.html", "Help Contents")
 
-    def open_github_page(self) -> None:
-        webbrowser.open(REPOSITORY_URL)
+    def open_project_website(self) -> None:
+        webbrowser.open(OFFICIAL_PROJECT_URL)
 
     def about_gui(self) -> None:
         self._show_html_file("about-fedleave-calendar.html", "About FedLeave Calendar")
@@ -1818,6 +1818,7 @@ class MainWindow(QMainWindow):
         dialog.resize(760, 620)
         layout = QVBoxLayout(dialog)
         browser = QTextBrowser()
+        browser.setOpenExternalLinks(True)
         if path.exists():
             if filename == "about-fedleave-calendar.html":
                 browser.document().addResource(
