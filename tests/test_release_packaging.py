@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tarfile
@@ -79,7 +80,7 @@ def test_bundle_validation_is_driven_by_all_project_scripts(tmp_path: Path) -> N
     assert len(module.validate_bundle(bundle, "linux")) == len(module.project_scripts())
     missing = bundle / module.project_scripts()[-1] / module.project_scripts()[-1]
     missing.unlink()
-    with pytest.raises(module.PackagingError, match=str(missing)):
+    with pytest.raises(module.PackagingError, match=re.escape(str(missing))):
         module.validate_bundle(bundle, "linux")
 
 
