@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +49,7 @@ def test_linux_bundle_deduplicates_large_identical_runtime_files(tmp_path: Path)
     assert duplicate.read_bytes() == payload
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Linux runtime symlinks are POSIX-only")
 def test_publish_preserves_internal_deduplication_links(tmp_path: Path) -> None:
     module = _load_engine_module()
     engine = _engine(module)
