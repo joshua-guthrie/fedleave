@@ -232,12 +232,30 @@ jobs:
         run: |
           set -Eeuo pipefail
           mkdir rolling-assets
-          windows_installer="$(find release-assets -maxdepth 1 -name 'FedLeave-Setup-*-Windows-x64.exe' -print -quit)"
-          linux_archive="$(find release-assets -maxdepth 1 -name 'FedLeave-*-Linux-x86_64.tar.gz' -print -quit)"
-          [[ -n "$windows_installer" && -n "$linux_archive" && -f release-assets/install.sh ]]
-          cp "$windows_installer" rolling-assets/FedLeave-Setup-Latest-Windows-x64.exe
-          cp "$linux_archive" rolling-assets/FedLeave-Latest-Linux-x86_64.tar.gz
-          cp release-assets/install.sh rolling-assets/install.sh
+          mapfile -t windows_installers < <(
+            find release-assets -type f -name 'FedLeave-Setup-*-Windows-x64.exe' -print
+          )
+          mapfile -t linux_archives < <(
+            find release-assets -type f -name 'FedLeave-*-Linux-x86_64.tar.gz' -print
+          )
+          mapfile -t bootstrap_installers < <(
+            find release-assets -type f -path '*/installer/linux/install.sh' -print
+          )
+          [[ "${#windows_installers[@]}" -eq 1 ]] || {
+            printf 'Expected one Windows installer, found %s\n' "${#windows_installers[@]}" >&2
+            exit 1
+          }
+          [[ "${#linux_archives[@]}" -eq 1 ]] || {
+            printf 'Expected one Linux archive, found %s\n' "${#linux_archives[@]}" >&2
+            exit 1
+          }
+          [[ "${#bootstrap_installers[@]}" -eq 1 ]] || {
+            printf 'Expected one Linux bootstrap, found %s\n' "${#bootstrap_installers[@]}" >&2
+            exit 1
+          }
+          cp "${windows_installers[0]}" rolling-assets/FedLeave-Setup-Latest-Windows-x64.exe
+          cp "${linux_archives[0]}" rolling-assets/FedLeave-Latest-Linux-x86_64.tar.gz
+          cp "${bootstrap_installers[0]}" rolling-assets/install.sh
           (
             cd rolling-assets
             sha256sum FedLeave-Setup-Latest-Windows-x64.exe \
