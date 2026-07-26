@@ -1501,12 +1501,38 @@ class MainWindow(QMainWindow):
             return
         QMessageBox.information(self, "Export FedLeave Data", "Export complete.")
 
+    def _select_import_mode(self) -> str | None:
+        prompt = QMessageBox(self)
+        prompt.setWindowTitle("Import FedLeave Data")
+        prompt.setIcon(QMessageBox.Question)
+        prompt.setText("How should the selected backup be imported?")
+        prompt.setInformativeText(
+            "Merge adds transactions that are missing from the current data and keeps current "
+            "transactions when IDs match.\n\n"
+            "Replace restores the selected backup over matching files. Current files are backed "
+            "up first."
+        )
+        merge_button = prompt.addButton("Merge", QMessageBox.AcceptRole)
+        replace_button = prompt.addButton("Replace", QMessageBox.DestructiveRole)
+        prompt.addButton(QMessageBox.Cancel)
+        prompt.exec()
+        selected_button = prompt.clickedButton()
+        if selected_button is merge_button:
+            return "--merge"
+        if selected_button is replace_button:
+            return "--overwrite"
+        return None
+
     def import_data(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Import FedLeave Data", "", "JSON files (*.json)")
         if not path:
             return
+        import_option = self._select_import_mode()
+        if import_option is None:
+            return
+
         try:
-            self.backend.run_text(["import-data", "--input", path])
+            self.backend.run_text(["import-data", "--input", path, import_option])
         except BackendError as exc:
             QMessageBox.warning(self, "Import Failed", str(exc))
             return

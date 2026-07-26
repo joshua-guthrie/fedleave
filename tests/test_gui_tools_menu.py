@@ -243,7 +243,7 @@ def test_change_accrual_action_updates_backend_and_refreshes(monkeypatch):
     assert refreshed[-1] == window.year
 
 
-def test_import_data_uses_safe_default_and_refreshes(monkeypatch, tmp_path):
+def test_import_data_can_merge_and_refreshes(monkeypatch, tmp_path):
     _application()
     captured: list[list[str]] = []
     refreshed: list[bool] = []
@@ -257,6 +257,7 @@ def test_import_data_uses_safe_default_and_refreshes(monkeypatch, tmp_path):
     monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
     window = MainWindow()
     window.refresh = lambda: refreshed.append(True)
+    monkeypatch.setattr(window, "_select_import_mode", lambda: "--merge")
 
     archive = tmp_path / "backup.json"
     archive.write_text("{}", encoding="utf-8")
@@ -264,8 +265,54 @@ def test_import_data_uses_safe_default_and_refreshes(monkeypatch, tmp_path):
 
     window.import_data()
 
-    assert captured == [["import-data", "--input", str(archive)]]
+    assert captured == [["import-data", "--input", str(archive), "--merge"]]
     assert refreshed == [True]
+
+
+def test_import_data_can_replace(monkeypatch, tmp_path):
+    _application()
+    captured: list[list[str]] = []
+
+    class FakeBackend:
+        def run_text(self, args, include_data_dir=True):
+            captured.append(list(args))
+            return "imported"
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    window = MainWindow()
+    monkeypatch.setattr(window, "_select_import_mode", lambda: "--overwrite")
+
+    archive = tmp_path / "backup.json"
+    archive.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(archive), "JSON files (*.json)"))
+
+    window.import_data()
+
+    assert captured == [["import-data", "--input", str(archive), "--overwrite"]]
+
+
+def test_import_data_cancel_does_not_run_backend(monkeypatch, tmp_path):
+    _application()
+    captured: list[list[str]] = []
+
+    class FakeBackend:
+        def run_text(self, args, include_data_dir=True):
+            captured.append(list(args))
+            return "imported"
+
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
+    window = MainWindow()
+    monkeypatch.setattr(window, "_select_import_mode", lambda: None)
+
+    archive = tmp_path / "backup.json"
+    archive.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(archive), "JSON files (*.json)"))
+
+    window.import_data()
+
+    assert captured == []
 
 
 def test_import_wms_http_report_uses_html_picker_and_refreshes(monkeypatch, tmp_path):

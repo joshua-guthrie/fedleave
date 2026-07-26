@@ -147,17 +147,61 @@ def _normalize_import_archive(data: dict) -> tuple[dict, str]:
     raise ValueError("Import archive missing leave_years mapping")
 
 
+def _merge_leave_year(existing: dict, imported: dict) -> dict:
+    """Add imported transactions that are not already in an existing leave year."""
+    existing_transactions = existing.get("transactions")
+    imported_transactions = imported.get("transactions")
+    if not isinstance(existing_transactions, list):
+        raise ValueError("Existing leave year transactions must be a list")
+    if not isinstance(imported_transactions, list):
+        raise ValueError("Imported leave year transactions must be a list")
+
+    merged = dict(existing)
+    merged_transactions = list(existing_transactions)
+    existing_ids = {
+        str(transaction.get("id"))
+        for transaction in existing_transactions
+        if isinstance(transaction, dict) and transaction.get("id") is not None
+    }
+    for transaction in imported_transactions:
+        if not isinstance(transaction, dict):
+            raise ValueError("Imported leave year transactions must contain objects")
+        transaction_id = transaction.get("id")
+        if transaction_id is None:
+            raise ValueError("Imported leave year transaction is missing an id")
+        if str(transaction_id) in existing_ids:
+            continue
+        merged_transactions.append(transaction)
+        existing_ids.add(str(transaction_id))
+
+    merged["transactions"] = merged_transactions
+    for key, value in imported.items():
+        if key not in merged:
+            merged[key] = value
+    return merged
+
+
 @app.command("import-data")
 def import_data(
     input: Path = typer.Option(..., help="Input JSON archive path."),
     overwrite: bool = typer.Option(False, help="Overwrite existing files, creating backups first."),
+    merge: bool = typer.Option(
+        False,
+        help="Merge missing transactions into existing leave years; keep current data on conflicts.",
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     """Import a JSON archive created by export-data or a single leave-year backup."""
     if not isinstance(overwrite, bool):
         overwrite = False
+    if not isinstance(merge, bool):
+        merge = False
     if isinstance(data_dir, OptionInfo):
         data_dir = None
+
+    if overwrite and merge:
+        console.print("[red]ERROR:[/red] Choose either --merge or --overwrite, not both")
+        raise typer.Exit(code=2)
 
     if not input.exists():
         console.print(f"[red]ERROR:[/red] Import archive not found: {input}")
@@ -199,7 +243,18 @@ def import_data(
                 raise ValueError(f"Invalid holiday cache entry: {name}")
             write_items.append((base / "holiday_cache" / f"{name}.json", cache))
 
-        if not overwrite:
+        if merge:
+            merged_items: list[tuple[Path, dict]] = []
+            for path, payload in write_items:
+                if not path.exists():
+                    merged_items.append((path, payload))
+                elif path.parent.name == "leave_years":
+                    existing = load_json(path)
+                    merged_items.append((path, _merge_leave_year(existing, payload)))
+                # Existing config and holiday-cache files remain authoritative
+                # during a merge.
+            write_items = merged_items
+        elif not overwrite:
             for path, _ in write_items:
                 if path.exists():
                     console.print(f"[red]ERROR:[/red] Refusing to overwrite existing file: {path}")
@@ -212,7 +267,7 @@ def import_data(
 
     try:
         for path, payload in write_items:
-            _write_import_file(path, payload, overwrite=overwrite)
+            _write_import_file(path, payload, overwrite=overwrite or merge)
     except FileExistsError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)

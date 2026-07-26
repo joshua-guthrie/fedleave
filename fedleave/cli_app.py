@@ -156,8 +156,8 @@ Command details and examples:
     fedleave export-data --output fedleave_backup.json [--data-dir PATH]
         Export config, leave year files, and holiday cache to a portable JSON archive.
 
-    fedleave import-data --input fedleave_backup.json [--overwrite] [--data-dir PATH]
-        Import a JSON archive created by export-data or a single leave-year backup. Existing files are preserved unless --overwrite is used.
+    fedleave import-data --input fedleave_backup.json [--merge | --overwrite] [--data-dir PATH]
+        Import a JSON archive created by export-data or a single leave-year backup. Existing files are preserved unless --merge or --overwrite is used.
 
     fedleave import-wms-http --input path/to/FRC-E-WMS-leave-report.html [--data-dir PATH]
         Import a FRC-E WMS HTTP Leave Report from HTML and replace matching transactions in the target leave year.

@@ -57,6 +57,68 @@ def test_import_refuses_overwrite_without_flag(tmp_path: Path):
         import_data(input=archive, data_dir=target)
 
 
+def test_import_merge_adds_missing_transactions_and_keeps_current_conflicts(tmp_path: Path):
+    target = tmp_path / "target"
+    archive = tmp_path / "backup.json"
+    _init_data_dir(target)
+    year_path = target / "leave_years" / "2026.json"
+    current = json.loads(year_path.read_text(encoding="utf-8"))
+    current["transactions"] = [
+        {
+            "id": "20260701-001",
+            "date": "2026-07-01",
+            "description": "Current version",
+        }
+    ]
+    year_path.write_text(json.dumps(current), encoding="utf-8")
+
+    imported = dict(current)
+    imported["transactions"] = [
+        {
+            "id": "20260701-001",
+            "date": "2026-07-01",
+            "description": "Imported version",
+        },
+        {
+            "id": "20260702-001",
+            "date": "2026-07-02",
+            "description": "Imported missing transaction",
+        },
+    ]
+    archive.write_text(json.dumps(imported), encoding="utf-8")
+
+    import_data(input=archive, merge=True, data_dir=target)
+
+    merged = json.loads(year_path.read_text(encoding="utf-8"))
+    assert merged["transactions"] == [
+        {
+            "id": "20260701-001",
+            "date": "2026-07-01",
+            "description": "Current version",
+        },
+        {
+            "id": "20260702-001",
+            "date": "2026-07-02",
+            "description": "Imported missing transaction",
+        },
+    ]
+    backups = list((target / "backups").glob("2026.json.*.bak"))
+    assert len(backups) == 1
+
+
+def test_import_rejects_merge_and_overwrite_together(tmp_path: Path):
+    archive = tmp_path / "backup.json"
+    archive.write_text(
+        json.dumps({"schema_version": 1, "leave_years": {}, "holiday_cache": {}}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(typer.Exit) as excinfo:
+        import_data(input=archive, merge=True, overwrite=True, data_dir=tmp_path / "target")
+
+    assert excinfo.value.exit_code == 2
+
+
 def test_import_accepts_single_leave_year_backup(tmp_path: Path):
     target = tmp_path / "target"
     archive = tmp_path / "single-leave-year-backup.json"
