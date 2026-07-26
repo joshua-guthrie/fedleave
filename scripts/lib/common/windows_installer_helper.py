@@ -77,7 +77,7 @@ def install_system(
             backup.rename(target)
         raise
 
-    calendar = target / "FedLeaveCalendar" / "FedLeaveCalendar.exe"
+    calendar = target / "FedLeaveCalendar.exe"
     if not calendar.is_file():
         if target.exists():
             shutil.rmtree(target)

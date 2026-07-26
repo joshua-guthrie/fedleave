@@ -98,11 +98,11 @@ def test_windows_unattended_install_skips_prompt_when_already_elevated(tmp_path,
 def test_windows_helper_installs_bundle_and_creates_both_shortcuts(tmp_path, monkeypatch):
     module = _load_module("windows_install_helper", HELPER_PATH)
     source = tmp_path / "dist" / "fedleave-Windows"
-    calendar = source / "FedLeaveCalendar" / "FedLeaveCalendar.exe"
+    calendar = source / "FedLeaveCalendar.exe"
     calendar.parent.mkdir(parents=True)
     calendar.write_bytes(b"calendar")
-    (source / "fedleave" / "fedleave.exe").parent.mkdir()
-    (source / "fedleave" / "fedleave.exe").write_bytes(b"backend")
+    (source / "fedleave.exe").write_bytes(b"backend")
+    (source / "_internal").mkdir()
     target = tmp_path / "Program Files" / "fedleave"
     target.mkdir(parents=True)
     (target / "old.txt").write_text("old", encoding="utf-8")
@@ -117,9 +117,9 @@ def test_windows_helper_installs_bundle_and_creates_both_shortcuts(tmp_path, mon
 
     module.install_system(source, target, desktop, start_menu)
 
-    installed_calendar = target / "FedLeaveCalendar" / "FedLeaveCalendar.exe"
+    installed_calendar = target / "FedLeaveCalendar.exe"
     assert installed_calendar.read_bytes() == b"calendar"
-    assert (target / "fedleave" / "fedleave.exe").read_bytes() == b"backend"
+    assert (target / "fedleave.exe").read_bytes() == b"backend"
     assert not (target / "old.txt").exists()
     assert not target.with_name("fedleave.previous").exists()
     assert shortcuts == [

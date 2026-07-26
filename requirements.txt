@@ -4,10 +4,4 @@ python-dateutil
 holidays
 icalendar
 rich
-pytest
-pytest-cov
-pytest-qt
-hypothesis
-pyinstaller
 Pillow
-numpy

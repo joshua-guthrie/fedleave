@@ -29,10 +29,9 @@ def _load_packaging_module():
 def _fake_bundle(module, root: Path, platform: str = "linux") -> Path:
     bundle = root / ("fedleave-Ubuntu" if platform == "linux" else "fedleave-Windows")
     suffix = ".exe" if platform == "windows" else ""
+    bundle.mkdir(parents=True)
     for command in module.project_scripts():
-        app_dir = bundle / command
-        app_dir.mkdir(parents=True)
-        executable = app_dir / f"{command}{suffix}"
+        executable = bundle / f"{command}{suffix}"
         if platform == "linux":
             executable.write_text(
                 "#!/usr/bin/env bash\n"
@@ -42,8 +41,8 @@ def _fake_bundle(module, root: Path, platform: str = "linux") -> Path:
             executable.chmod(0o755)
         else:
             executable.write_bytes(b"not a real Windows executable")
-        (app_dir / "_internal").mkdir()
-        (app_dir / "_internal" / "runtime.dat").write_bytes(b"embedded runtime")
+    (bundle / "_internal").mkdir()
+    (bundle / "_internal" / "runtime.dat").write_bytes(b"embedded runtime")
     return bundle
 
 
@@ -78,7 +77,7 @@ def test_bundle_validation_is_driven_by_all_project_scripts(tmp_path: Path) -> N
     bundle = _fake_bundle(module, tmp_path)
 
     assert len(module.validate_bundle(bundle, "linux")) == len(module.project_scripts())
-    missing = bundle / module.project_scripts()[-1] / module.project_scripts()[-1]
+    missing = bundle / module.project_scripts()[-1]
     missing.unlink()
     with pytest.raises(module.PackagingError, match=re.escape(str(missing))):
         module.validate_bundle(bundle, "linux")
@@ -95,10 +94,20 @@ def test_linux_archive_has_stable_root_and_matching_checksum(tmp_path: Path) -> 
         version_file = handle.extractfile("FedLeave/VERSION")
         version = version_file.read() if version_file is not None else None
     assert names[0] == "FedLeave"
-    assert "FedLeave/fedleave/fedleave" in names
+    assert "FedLeave/fedleave" in names
     assert version == b"0.2.0\n"
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     assert checksum.read_text(encoding="utf-8") == f"{digest}  {archive.name}\n"
+
+
+def test_artifact_size_gate_reports_regressions(tmp_path: Path) -> None:
+    module = _load_packaging_module()
+    artifact = tmp_path / "artifact.bin"
+    artifact.write_bytes(b"x" * 2048)
+
+    assert module.validate_file_size(artifact, 1) == 2048
+    with pytest.raises(module.PackagingError, match="packaging limit"):
+        module.validate_file_size(artifact, 0.001)
 
 
 def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> None:
@@ -109,6 +118,7 @@ def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> Non
     assert "github.ref == 'refs/heads/master'" in workflow
     assert "github.ref_type == 'tag'" not in workflow
     assert "\n    tags:\n" not in workflow
+    assert 'check-size "$archive" --max-mib 300' in workflow
     for asset_name in (
         "FedLeave-Setup-Latest-Windows-x64.exe",
         "FedLeave-Setup-Latest-Windows-x64.exe.sha256",
@@ -117,6 +127,34 @@ def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> Non
         "install.sh",
     ):
         assert asset_name in workflow
+
+
+def test_runtime_dependencies_and_bundle_manifest_remain_lean() -> None:
+    runtime_requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
+    development_requirements = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8").lower()
+    manifest = (
+        ROOT / "scripts" / "lib" / "common" / "application_manifest.toml"
+    ).read_text(encoding="utf-8")
+    charting = (ROOT / "fedleave" / "charting.py").read_text(encoding="utf-8")
+
+    for dependency in ("numpy", "pytest", "hypothesis", "pyinstaller"):
+        assert dependency not in runtime_requirements
+    for dependency in ("pytest", "hypothesis", "pyinstaller"):
+        assert dependency in development_requirements
+    assert 'collect_all = ["shiboken6"]' not in manifest
+    assert '"numpy"' not in manifest
+    assert "import numpy" not in charting
+
+
+def test_linux_bootstrap_checks_tmp_capacity_before_extracting() -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+
+    assert 'df -Pk "$TEMP_DIR"' in bootstrap
+    assert "unpacked_bytes" in bootstrap
+    assert "Temporary-space check passed" in bootstrap
+    assert bootstrap.index("Temporary-space check passed") < bootstrap.index(
+        'tar -xzf "$TEMP_DIR/$ARCHIVE_NAME"'
+    )
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
@@ -148,7 +186,7 @@ def test_bootstrap_installs_local_verified_release_without_python(tmp_path: Path
     assert (install_root / "current").is_symlink()
     assert (bin_dir / "fedleave").is_symlink()
     assert (bin_dir / "FedLeaveCalendar").is_symlink()
-    assert (install_root / "releases" / "0.2.0" / "fedleave" / "fedleave").is_file()
+    assert (install_root / "releases" / "0.2.0" / "fedleave").is_file()
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")

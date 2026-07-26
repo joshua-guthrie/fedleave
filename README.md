@@ -87,8 +87,7 @@ Linux / macOS:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -r requirements.txt
-pip install -r requirements-gui.txt
+pip install -r requirements-dev.txt
 pip install -e .
 ```
 
@@ -97,8 +96,7 @@ Windows PowerShell:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install -r requirements-gui.txt
+pip install -r requirements-dev.txt
 pip install -e .
 ```
 
@@ -302,18 +300,19 @@ Build-only mode (useful for CI or local packaging validation):
 
 ```bash
 ./scripts/LinuxInstall.sh --unattended --build-only --verbose
-./dist/fedleave-Ubuntu/FedLeaveCalendar/FedLeaveCalendar
+./dist/fedleave-Ubuntu/FedLeaveCalendar
 ```
 
 ```bat
 scripts\WindowsInstall.bat --unattended --build-only --verbose
-dist\fedleave-Windows\FedLeaveCalendar\FedLeaveCalendar.exe
+dist\fedleave-Windows\FedLeaveCalendar.exe
 ```
 
-The consolidated scripts place each application in its own bundle directory
-under `dist/` (for example `dist/fedleave-Ubuntu/FedLeaveCalendar` and
-`dist/fedleave-Windows/FedLeaveCalendar`). The GUI uses the sibling `fedleave`
-bundle as its backend, so the backend is not duplicated inside the GUI bundle.
+The consolidated scripts build one suite per platform under `dist/`. All 17
+application executables are at the suite root and use one shared `_internal`
+runtime directory. Python, Qt, Pillow, and the other packaged dependencies are
+therefore stored once instead of being duplicated in every companion app. The
+GUI uses the sibling `fedleave` executable as its backend.
 Use `--offline` with the Linux build-only command when all dependencies are
 already installed in the build virtual environment.
 
@@ -333,7 +332,7 @@ python scripts/lib/common/installer_engine.py --platform windows --unattended --
 
 The smoke test parses every project entry point and packaging-manifest entry,
 checks referenced modules and assets, writes each generated bootstrap, and
-constructs every platform-specific PyInstaller command. The test suite executes
+constructs the shared platform-specific PyInstaller command. The test suite executes
 both platform configurations. A full build still remains the final packaging
 validation before publishing an installer.
 
@@ -815,7 +814,7 @@ The `AnnualLeaveChartForTheYear` application requires `fedleave` to be in one of
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -852,7 +851,7 @@ The `SickLeaveChartForTheYear` application requires `fedleave` to be in one of t
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -884,7 +883,7 @@ The `CreditHoursChartForTheYear` application requires `fedleave` to be in one of
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -916,7 +915,7 @@ The `CompTimeChartForTheYear` application requires `fedleave` to be in one of th
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -948,7 +947,7 @@ The `TravelCompChartForTheYear` application requires `fedleave` to be in one of 
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -980,7 +979,7 @@ The `TimeOffAwardChartForTheYear` application requires `fedleave` to be in one o
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, the application will exit with a helpful error message including the GitHub URL for installation.
 
@@ -1142,7 +1141,7 @@ The `fedleaveMonthReportGraphic` application requires `fedleave` to be available
 
 1. Same directory as the executable
 2. In the system PATH
-3. In the sibling `fedleave` bundle under `dist/fedleave-Ubuntu/` when built from source
+3. Beside the companion executable in the shared distribution suite
 
 If `fedleave` cannot be found, pass `--fedleave PATH` or install/build the main `fedleave` executable.
 

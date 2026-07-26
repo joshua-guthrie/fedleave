@@ -160,7 +160,7 @@ resolve_download() {
 }
 
 download_and_verify() {
-  local checksum_name archive_version
+  local checksum_name archive_version unpacked_bytes available_bytes reserve_bytes required_bytes
   checksum_name="${ARCHIVE_NAME}.sha256"
 
   TEMP_DIR="$(mktemp -d)"
@@ -178,6 +178,24 @@ download_and_verify() {
     [[ "$member" != /* && "/$member/" != *"/../"* ]] ||
       die "The release archive contains an unsafe path: $member"
   done < <(tar -tzf "$TEMP_DIR/$ARCHIVE_NAME")
+
+  # The archive and its expanded files coexist briefly in /tmp. Check before
+  # extraction so a small tmpfs produces one actionable error instead of
+  # thousands of partial "No space left on device" messages from tar.
+  unpacked_bytes="$(
+    tar -tvzf "$TEMP_DIR/$ARCHIVE_NAME" |
+      awk '{ total += $3 } END { printf "%.0f\n", total }'
+  )"
+  available_bytes="$(
+    df -Pk "$TEMP_DIR" |
+      awk 'NR == 2 { printf "%.0f\n", $4 * 1024 }'
+  )"
+  reserve_bytes=$((128 * 1024 * 1024))
+  required_bytes=$((unpacked_bytes + reserve_bytes))
+  if ((available_bytes < required_bytes)); then
+    die "The temporary filesystem needs $((required_bytes / 1024 / 1024)) MiB free to extract this package, but only $((available_bytes / 1024 / 1024)) MiB is available."
+  fi
+  log "Temporary-space check passed ($((unpacked_bytes / 1024 / 1024)) MiB package expansion)."
 
   tar -xzf "$TEMP_DIR/$ARCHIVE_NAME" -C "$TEMP_DIR"
   [[ -d "$TEMP_DIR/$TOP_LEVEL_DIRECTORY" ]] ||

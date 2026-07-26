@@ -24,13 +24,13 @@ SetCompressor /SOLID lzma
 
 ; These checks complement package.py's pyproject-driven full validation and
 ; make a direct NSIS invocation fail clearly for the core applications.
-!if ! /FileExists "${SOURCE_DIR}\fedleave\fedleave.exe"
+!if ! /FileExists "${SOURCE_DIR}\fedleave.exe"
   !error "Required fedleave CLI is missing from SOURCE_DIR"
 !endif
-!if ! /FileExists "${SOURCE_DIR}\FedLeaveCalendar\FedLeaveCalendar.exe"
+!if ! /FileExists "${SOURCE_DIR}\FedLeaveCalendar.exe"
   !error "Required FedLeave Calendar executable is missing from SOURCE_DIR"
 !endif
-!if ! /FileExists "${SOURCE_DIR}\FedLeaveAnalytics\FedLeaveAnalytics.exe"
+!if ! /FileExists "${SOURCE_DIR}\FedLeaveAnalytics.exe"
   !error "Required FedLeave Analytics executable is missing from SOURCE_DIR"
 !endif
 
@@ -87,7 +87,7 @@ Section "FedLeave application files" SEC_CORE
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "DisplayVersion" "${VERSION}"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKLM "${PRODUCT_REG_KEY}" "DisplayIcon" "$INSTDIR\FedLeaveCalendar\FedLeaveCalendar.exe"
+  WriteRegStr HKLM "${PRODUCT_REG_KEY}" "DisplayIcon" "$INSTDIR\FedLeaveCalendar.exe"
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "UninstallString" '"$INSTDIR\Uninstall.exe"'
   WriteRegStr HKLM "${PRODUCT_REG_KEY}" "QuietUninstallString" '"$INSTDIR\Uninstall.exe" /S'
   WriteRegDWORD HKLM "${PRODUCT_REG_KEY}" "NoModify" 1
@@ -96,11 +96,11 @@ Section "FedLeave application files" SEC_CORE
   RMDir /r "$SMPROGRAMS\FedLeave"
   CreateDirectory "$SMPROGRAMS\FedLeave"
   CreateShortcut "$SMPROGRAMS\FedLeave\FedLeave Calendar.lnk" \
-    "$INSTDIR\FedLeaveCalendar\FedLeaveCalendar.exe" "" \
-    "$INSTDIR\FedLeaveCalendar\FedLeaveCalendar.exe"
+    "$INSTDIR\FedLeaveCalendar.exe" "" \
+    "$INSTDIR\FedLeaveCalendar.exe"
   CreateShortcut "$SMPROGRAMS\FedLeave\FedLeave Analytics.lnk" \
-    "$INSTDIR\FedLeaveAnalytics\FedLeaveAnalytics.exe" "" \
-    "$INSTDIR\FedLeaveAnalytics\FedLeaveAnalytics.exe"
+    "$INSTDIR\FedLeaveAnalytics.exe" "" \
+    "$INSTDIR\FedLeaveAnalytics.exe"
   CreateShortcut "$SMPROGRAMS\FedLeave\Uninstall FedLeave.lnk" "$INSTDIR\Uninstall.exe"
 SectionEnd
 
@@ -108,8 +108,8 @@ Section /o "Desktop shortcut" SEC_DESKTOP
   SetShellVarContext all
   ; Optional in the wizard and omitted by default during /S installation.
   CreateShortcut "$DESKTOP\FedLeave Calendar.lnk" \
-    "$INSTDIR\FedLeaveCalendar\FedLeaveCalendar.exe" "" \
-    "$INSTDIR\FedLeaveCalendar\FedLeaveCalendar.exe"
+    "$INSTDIR\FedLeaveCalendar.exe" "" \
+    "$INSTDIR\FedLeaveCalendar.exe"
 SectionEnd
 
 LangString DESC_SEC_CORE ${LANG_ENGLISH} "Install FedLeave and all packaged companion applications."

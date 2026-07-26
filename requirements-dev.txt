@@ -1,0 +1,8 @@
+-r requirements.txt
+-r requirements-gui.txt
+
+pytest
+pytest-cov
+pytest-qt
+hypothesis
+pyinstaller

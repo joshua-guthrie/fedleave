@@ -13,7 +13,6 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from .cli_helpers import load_leave_year, parse_iso_date
@@ -322,21 +321,24 @@ def catmull_rom(points: list[tuple[float, float]], samples_per_segment: int = 18
     smooth: list[tuple[float, float]] = []
     extended = [points[0], *points, points[-1]]
     for index in range(1, len(extended) - 2):
-        p0 = np.array(extended[index - 1], dtype=float)
-        p1 = np.array(extended[index], dtype=float)
-        p2 = np.array(extended[index + 1], dtype=float)
-        p3 = np.array(extended[index + 2], dtype=float)
+        p0 = extended[index - 1]
+        p1 = extended[index]
+        p2 = extended[index + 1]
+        p3 = extended[index + 2]
         for step in range(samples_per_segment):
             t = step / samples_per_segment
             t2 = t * t
             t3 = t2 * t
-            point = 0.5 * (
-                (2 * p1)
-                + (-p0 + p2) * t
-                + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2
-                + (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-            )
-            smooth.append((float(point[0]), float(point[1])))
+            coordinates = []
+            for axis in (0, 1):
+                value = 0.5 * (
+                    (2 * p1[axis])
+                    + (-p0[axis] + p2[axis]) * t
+                    + (2 * p0[axis] - 5 * p1[axis] + 4 * p2[axis] - p3[axis]) * t2
+                    + (-p0[axis] + 3 * p1[axis] - 3 * p2[axis] + p3[axis]) * t3
+                )
+                coordinates.append(float(value))
+            smooth.append((coordinates[0], coordinates[1]))
     smooth.append(points[-1])
     return smooth
 

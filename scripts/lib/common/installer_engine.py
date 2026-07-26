@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -212,9 +214,16 @@ class InstallerEngine:
         self._install_build_requirements(py_exe)
         targets = self._load_targets()
 
+        entry_paths: dict[str, Path] = {}
         for target in targets:
-            self._build_target(py_exe, target, entries_dir, work_dir, spec_dir, platform_dist)
+            entry_paths[target.name] = self._write_entry(target, entries_dir)
+        config_path = self._write_suite_config(
+            targets, entry_paths, spec_dir / "fedleave-suite.json", platform_dist.name
+        )
+        self.log(f"Building shared suite with {len(targets)} entry points")
+        self._run(self._build_suite_command(py_exe, config_path, work_dir, platform_dist))
 
+        self._deduplicate_linux_bundle(platform_dist)
         self._validate_build(platform_dist, targets)
 
         repo_dist = self._repo_dist_dir()
@@ -225,20 +234,41 @@ class InstallerEngine:
             for entry in entries_dir.glob("*.py"):
                 entry.unlink(missing_ok=True)
 
-    def _build_target(
+    def _write_suite_config(
         self,
-        py_exe: Path,
-        target: BuildTarget,
-        entries_dir: Path,
-        work_dir: Path,
-        spec_dir: Path,
-        platform_dist: Path,
-    ) -> None:
-        entry_path = self._write_entry(target, entries_dir)
-        cmd = self._build_target_command(py_exe, target, entry_path, work_dir, spec_dir, platform_dist)
-
-        self.log(f"Building {target.name}")
-        self._run(cmd)
+        targets: list[BuildTarget],
+        entry_paths: dict[str, Path],
+        config_path: Path,
+        suite_name: str,
+    ) -> Path:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        config = {
+            "repo_root": str(self.repo_root),
+            "suite_name": suite_name,
+            # These are development/test-only or an intentionally removed
+            # heavyweight optional dependency. Excluding them also keeps a
+            # reused build venv from silently reintroducing package bloat.
+            "excludes": ["_pytest", "hypothesis", "numpy", "pytest"],
+            "targets": [],
+        }
+        for target in targets:
+            datas = []
+            for data_spec in target.add_data:
+                source, destination = data_spec.split(":", 1)
+                datas.append([str(self.repo_root / source), destination])
+            config["targets"].append(
+                {
+                    "name": target.name,
+                    "entry": str(entry_paths[target.name]),
+                    "console": target.mode != "windowed",
+                    "hidden_imports": target.hidden_imports,
+                    "datas": datas,
+                    "collect_all": target.collect_all,
+                    "icon": str(self.repo_root / target.icon) if target.icon else None,
+                }
+            )
+        config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+        return config_path
 
     def _write_entry(self, target: BuildTarget, entries_dir: Path) -> Path:
         entries_dir.mkdir(parents=True, exist_ok=True)
@@ -252,49 +282,27 @@ class InstallerEngine:
         )
         return entry_path
 
-    def _build_target_command(
+    def _build_suite_command(
         self,
         py_exe: Path,
-        target: BuildTarget,
-        entry_path: Path,
+        config_path: Path,
         work_dir: Path,
-        spec_dir: Path,
         platform_dist: Path,
     ) -> list[str]:
-        cmd = [
+        return [
             str(py_exe),
             "-m",
             "PyInstaller",
             "--noconfirm",
-            "--onedir",
-            "--name",
-            target.name,
-            "--windowed" if target.mode == "windowed" else "--console",
             "--distpath",
-            str(platform_dist),
+            str(platform_dist.parent),
             "--workpath",
             str(work_dir),
-            "--specpath",
-            str(spec_dir),
+            str(self.repo_root / "scripts" / "lib" / "common" / "fedleave_suite.spec"),
+            "--",
+            "--config",
+            str(config_path),
         ]
-
-        for hidden in target.hidden_imports:
-            cmd.extend(["--hidden-import", hidden])
-
-        sep = ";" if self.options.platform == "windows" else ":"
-        for data_spec in target.add_data:
-            src, dst = data_spec.split(":", 1)
-            src_path = self.repo_root / src
-            cmd.extend(["--add-data", f"{src_path}{sep}{dst}"])
-
-        for package in target.collect_all:
-            cmd.extend(["--collect-all", package])
-
-        if target.icon:
-            cmd.extend(["--icon", str(self.repo_root / target.icon)])
-
-        cmd.append(str(entry_path))
-        return cmd
 
     def _smoke_test_build_configuration(self) -> None:
         """Exercise build discovery and command construction without running PyInstaller."""
@@ -311,6 +319,7 @@ class InstallerEngine:
         for path in (entries_dir, work_dir, spec_dir, platform_dist):
             path.mkdir(parents=True, exist_ok=True)
 
+        entry_paths: dict[str, Path] = {}
         for target in targets:
             try:
                 module_spec = importlib.util.find_spec(target.module)
@@ -324,12 +333,16 @@ class InstallerEngine:
                     raise InstallerError(f"Build data source does not exist: {source}")
             if target.icon and not (self.repo_root / target.icon).exists():
                 raise InstallerError(f"Build icon does not exist: {target.icon}")
-            entry_path = self._write_entry(target, entries_dir)
-            command = self._build_target_command(
-                Path(sys.executable), target, entry_path, work_dir, spec_dir, platform_dist
-            )
-            if "PyInstaller" not in command or str(entry_path) != command[-1]:
-                raise InstallerError(f"Invalid PyInstaller command for {target.name}")
+            entry_paths[target.name] = self._write_entry(target, entries_dir)
+
+        config_path = self._write_suite_config(
+            targets, entry_paths, spec_dir / "fedleave-suite.json", platform_dist.name
+        )
+        command = self._build_suite_command(
+            Path(sys.executable), config_path, work_dir, platform_dist
+        )
+        if "PyInstaller" not in command or str(config_path) != command[-1]:
+            raise InstallerError("Invalid shared PyInstaller suite command")
 
         self.log(f"Build-script smoke test passed for {len(targets)} application targets.")
         if not self.options.keep_build:
@@ -346,7 +359,9 @@ class InstallerEngine:
         token = f"{os.getpid()}-{time.time_ns()}"
         staging = repo_dist.parent / f".{repo_dist.name}.staging-{token}"
         previous = repo_dist.parent / f".{repo_dist.name}.previous-{token}"
-        shutil.copytree(platform_dist, staging)
+        # Linux bundle deduplication uses relative links within _internal.
+        # Preserve them while staging instead of expanding the linked files.
+        shutil.copytree(platform_dist, staging, symlinks=True)
         moved_previous = False
         try:
             if repo_dist.exists():
@@ -400,11 +415,56 @@ class InstallerEngine:
         missing: list[str] = []
         for target in targets:
             exe_name = f"{target.name}.exe" if self.options.platform == "windows" else target.name
-            exe = dist_dir / target.name / exe_name
+            exe = dist_dir / exe_name
             if not exe.exists():
                 missing.append(str(exe))
+        if not (dist_dir / "_internal").is_dir():
+            missing.append(str(dist_dir / "_internal"))
         if missing:
             raise InstallerError("Build validation failed. Missing:\n" + "\n".join(missing), EXIT_BUILD_FAILED)
+
+    def _deduplicate_linux_bundle(self, dist_dir: Path) -> None:
+        """Replace large byte-identical support files with relative symlinks."""
+        if self.options.platform != "linux":
+            return
+        support_dir = dist_dir / "_internal"
+        if not support_dir.is_dir():
+            return
+
+        groups: dict[tuple[int, int, str], list[Path]] = {}
+        for path in sorted(support_dir.rglob("*")):
+            if path.is_symlink() or not path.is_file():
+                continue
+            metadata = path.stat()
+            if metadata.st_size < 1024 * 1024:
+                continue
+            digest = hashlib.sha256()
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                    digest.update(chunk)
+            key = (metadata.st_size, stat.S_IMODE(metadata.st_mode), digest.hexdigest())
+            groups.setdefault(key, []).append(path)
+
+        linked_files = 0
+        saved_bytes = 0
+        for (size, _mode, _digest), paths in groups.items():
+            if len(paths) < 2:
+                continue
+            canonical = min(paths, key=lambda path: (len(path.parts), str(path)))
+            for duplicate in paths:
+                if duplicate == canonical:
+                    continue
+                relative_target = os.path.relpath(canonical, duplicate.parent)
+                duplicate.unlink()
+                duplicate.symlink_to(relative_target)
+                linked_files += 1
+                saved_bytes += size
+
+        if linked_files:
+            self.log(
+                f"Deduplicated {linked_files} Linux runtime files "
+                f"({saved_bytes / 1024 / 1024:.1f} MiB saved)"
+            )
 
     def _create_or_reuse_venv(self, venv_dir: Path) -> Path:
         py_exe = self._venv_python(venv_dir)
@@ -477,7 +537,9 @@ class InstallerEngine:
 
     def _repo_dist_dir(self) -> Path:
         folder = "fedleave-Windows" if self.options.platform == "windows" else "fedleave-Ubuntu"
-        return self.repo_root / "dist" / folder
+        configured_dist_root = os.environ.get("FEDLEAVE_DIST_ROOT")
+        dist_root = Path(configured_dist_root).resolve() if configured_dist_root else self.repo_root / "dist"
+        return dist_root / folder
 
     def _build_dist_dir(self) -> Path:
         folder = "fedleave-Windows" if self.options.platform == "windows" else "fedleave-Ubuntu"

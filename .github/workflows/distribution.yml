@@ -113,7 +113,7 @@ jobs:
           $install = Start-Process -FilePath $installer -ArgumentList "/S" -Wait -PassThru
           if ($install.ExitCode -ne 0) { throw "Silent installation failed: $($install.ExitCode)" }
           python installer/package.py validate-bundle --platform windows --bundle-dir $installDir
-          & "$installDir\fedleave\fedleave.exe" --version
+          & "$installDir\fedleave.exe" --version
           if ($LASTEXITCODE -ne 0) { throw "Installed CLI smoke test failed" }
 
           $uninstall = Start-Process -FilePath "$installDir\Uninstall.exe" -ArgumentList "/S" -Wait -PassThru
@@ -172,6 +172,11 @@ jobs:
             --bundle-dir dist/fedleave-Ubuntu \
             --output-dir artifacts \
             --version "$PACKAGE_VERSION"
+          archive="artifacts/FedLeave-${PACKAGE_VERSION}-Linux-x86_64.tar.gz"
+          python installer/package.py check-size "$archive" --max-mib 300
+          archive_size="$(du -h "$archive" | cut -f1)"
+          printf '### Linux installer size\n\n- Compressed archive: %s\n- Enforced limit: 300 MiB\n' \
+            "$archive_size" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Validate extracted archive and CLI
         run: |
@@ -179,7 +184,7 @@ jobs:
           extract_dir="$(mktemp -d)"
           tar -xzf "artifacts/FedLeave-${PACKAGE_VERSION}-Linux-x86_64.tar.gz" -C "$extract_dir"
           python installer/package.py validate-bundle --platform linux --bundle-dir "$extract_dir/FedLeave"
-          "$extract_dir/FedLeave/fedleave/fedleave" --version
+          "$extract_dir/FedLeave/fedleave" --version
 
       - name: Validate and exercise bootstrap installer
         run: |

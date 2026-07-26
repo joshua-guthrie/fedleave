@@ -89,7 +89,7 @@ def numeric_windows_version(version: str) -> str:
 
 def expected_executable(bundle_dir: Path, platform: str, command: str) -> Path:
     suffix = ".exe" if platform == "windows" else ""
-    return bundle_dir / command / f"{command}{suffix}"
+    return bundle_dir / f"{command}{suffix}"
 
 
 def validate_bundle(bundle_dir: Path, platform: str) -> list[Path]:
@@ -100,17 +100,17 @@ def validate_bundle(bundle_dir: Path, platform: str) -> list[Path]:
 
     missing: list[str] = []
     executables: list[Path] = []
+    support_dir = bundle_dir / "_internal"
+    if not support_dir.is_dir():
+        missing.append(str(support_dir))
     for command in project_scripts():
         executable = expected_executable(bundle_dir, platform, command)
-        support_dir = executable.parent / "_internal"
         if not executable.is_file():
             missing.append(str(executable))
         elif platform == "linux" and not os.access(executable, os.X_OK):
             missing.append(f"{executable} (not executable)")
         else:
             executables.append(executable)
-        if not support_dir.is_dir():
-            missing.append(str(support_dir))
 
     if missing:
         detail = "\n".join(f"  - {path}" for path in missing)
@@ -127,6 +127,21 @@ def write_checksum(path: Path) -> Path:
     checksum_path = path.with_name(path.name + ".sha256")
     checksum_path.write_text(f"{digest}  {path.name}\n", encoding="utf-8")
     return checksum_path
+
+
+def validate_file_size(path: Path, max_mib: float) -> int:
+    if not path.is_file():
+        raise PackagingError(f"File does not exist: {path}")
+    if max_mib <= 0:
+        raise PackagingError("Maximum size must be greater than zero")
+    size = path.stat().st_size
+    limit = int(max_mib * 1024 * 1024)
+    if size > limit:
+        raise PackagingError(
+            f"{path.name} is {size / 1024 / 1024:.1f} MiB; "
+            f"the packaging limit is {max_mib:g} MiB"
+        )
+    return size
 
 
 def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tuple[Path, Path]:
@@ -189,6 +204,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     checksum_parser = subparsers.add_parser("checksum", help="write FILE.sha256")
     checksum_parser.add_argument("file", type=Path)
+
+    size_parser = subparsers.add_parser("check-size", help="enforce a maximum artifact size")
+    size_parser.add_argument("file", type=Path)
+    size_parser.add_argument("--max-mib", type=float, required=True)
     return parser
 
 
@@ -215,6 +234,9 @@ def main(argv: list[str] | None = None) -> int:
             if not args.file.is_file():
                 raise PackagingError(f"File does not exist: {args.file}")
             print(write_checksum(args.file.resolve()))
+        elif args.command == "check-size":
+            size = validate_file_size(args.file.resolve(), args.max_mib)
+            print(f"{args.file.name}: {size / 1024 / 1024:.1f} MiB (limit {args.max_mib:g} MiB)")
     except (OSError, PackagingError, subprocess.CalledProcessError) as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
     return 0

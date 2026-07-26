@@ -9,11 +9,6 @@ from pathlib import Path
 
 
 def _install_chart_import_stubs(monkeypatch) -> None:
-    numpy_stub = types.ModuleType("numpy")
-    numpy_stub.array = lambda *args, **kwargs: []
-    numpy_stub.zeros = lambda *args, **kwargs: []
-    monkeypatch.setitem(sys.modules, "numpy", numpy_stub)
-
     pil_module = types.ModuleType("PIL")
     image_module = types.ModuleType("PIL.Image")
     image_draw_module = types.ModuleType("PIL.ImageDraw")

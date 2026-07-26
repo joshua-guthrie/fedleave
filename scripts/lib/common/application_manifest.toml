@@ -18,13 +18,12 @@ hidden_imports = [
   "shiboken6",
   "shiboken6.Shiboken",
 ]
-collect_all = ["shiboken6"]
 
 [FedLeaveAnalytics]
 mode = "windowed"
 icon = "assets/fedleave-icon.ico"
 hidden_imports = ["PySide6.QtCore", "PySide6.QtGui", "PySide6.QtWidgets", "PySide6.QtPrintSupport", "shiboken6", "shiboken6.Shiboken"]
-collect_all = ["shiboken6", "fedleave_analytics"]
+collect_all = ["fedleave_analytics"]
 
 [AnnualLeaveChartForTheYear]
 mode = "console"
@@ -36,47 +35,47 @@ hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [CreditHoursChartForTheYear]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [CompTimeChartForTheYear]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [TravelCompChartForTheYear]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [TimeOffAwardChartForTheYear]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [AnnualLeaveYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [SickLeaveYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [CreditHoursYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [CompTimeYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [TravelCompYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [TimeOffAwardYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [OvertimeYearlyComparison]
 mode = "console"
-hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont", "numpy"]
+hidden_imports = ["PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont"]
 
 [fedleaveMonthReportGraphic]
 mode = "console"
