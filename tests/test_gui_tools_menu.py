@@ -149,6 +149,88 @@ def test_change_leave_year_action_updates_displayed_year(monkeypatch, tmp_path):
     assert refreshed[-1] == 2024
 
 
+def test_startup_loads_current_leave_year_when_available(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(
+        "fedleave_gui.main_window.load_settings",
+        lambda: GuiSettings(data_dir=str(tmp_path)),
+    )
+    window = MainWindow()
+    leave_years = tmp_path / "leave_years"
+    leave_years.mkdir()
+    (leave_years / f"{window.today.year}.json").write_text("{}", encoding="utf-8")
+    refreshed = []
+    window.refresh = lambda: refreshed.append(window.year)
+
+    window.start_initial_load()
+
+    assert window.year == window.today.year
+    assert refreshed == [window.today.year]
+
+
+def test_startup_uses_latest_available_leave_year_when_current_is_missing(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(
+        "fedleave_gui.main_window.load_settings",
+        lambda: GuiSettings(data_dir=str(tmp_path)),
+    )
+    window = MainWindow()
+    leave_years = tmp_path / "leave_years"
+    leave_years.mkdir()
+    (leave_years / "2024.json").write_text("{}", encoding="utf-8")
+    (leave_years / "2025.json").write_text("{}", encoding="utf-8")
+    refreshed = []
+    window.refresh = lambda: refreshed.append(window.year)
+
+    window.start_initial_load()
+
+    assert window.year == 2025
+    assert refreshed == [2025]
+
+
+def test_first_run_offers_to_open_new_leave_year_dialog(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(
+        "fedleave_gui.main_window.load_settings",
+        lambda: GuiSettings(data_dir=str(tmp_path)),
+    )
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.Yes,
+    )
+    window = MainWindow()
+    opened = []
+    window.new_leave_year = lambda: opened.append(True)
+
+    window.start_initial_load()
+
+    assert opened == [True]
+
+
+def test_first_run_can_decline_new_leave_year_without_backend_error(monkeypatch, tmp_path):
+    _application()
+    refresh_calls = []
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: refresh_calls.append(True))
+    monkeypatch.setattr(
+        "fedleave_gui.main_window.load_settings",
+        lambda: GuiSettings(data_dir=str(tmp_path)),
+    )
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *_args, **_kwargs: QMessageBox.No,
+    )
+    window = MainWindow()
+
+    window.start_initial_load()
+
+    assert refresh_calls == []
+
+
 def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monkeypatch, tmp_path):
     _application()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)

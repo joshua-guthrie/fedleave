@@ -1046,7 +1046,27 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("FedLeave Calendar")
         self.resize(1320, 860)
         self._build_ui()
-        self.refresh()
+
+    def start_initial_load(self) -> None:
+        """Load an existing leave year or guide a first-time user through setup."""
+        years = _available_leave_years(self.settings.data_dir or None)
+        if years:
+            if self.year not in years:
+                self.year = max(years)
+            self.refresh()
+            return
+
+        if (
+            QMessageBox.question(
+                self,
+                "Create a Leave Year",
+                "No leave year is available. Would you like to create one now?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes,
+            )
+            == QMessageBox.Yes
+        ):
+            self.new_leave_year()
 
     def start_background_checks(self) -> None:
         """Start low-frequency network and expiration reminders after the window is shown."""

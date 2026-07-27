@@ -1,0 +1,18 @@
+[console_scripts]
+AnnualLeaveChartForTheYear = annual_leave_chart.__main__:main
+AnnualLeaveYearlyComparison = yearly_leave_comparison_chart.annual:main
+CompTimeChartForTheYear = comp_time_chart.__main__:main
+CompTimeYearlyComparison = yearly_leave_comparison_chart.comp:main
+CreditHoursChartForTheYear = credit_hours_chart.__main__:main
+CreditHoursYearlyComparison = yearly_leave_comparison_chart.credit:main
+FedLeaveAnalytics = fedleave_analytics.app:main
+FedLeaveCalendar = fedleave_gui.__main__:main
+OvertimeYearlyComparison = yearly_leave_comparison_chart.overtime:main
+SickLeaveChartForTheYear = sick_leave_chart.__main__:main
+SickLeaveYearlyComparison = yearly_leave_comparison_chart.sick:main
+TimeOffAwardChartForTheYear = time_off_award_chart.__main__:main
+TimeOffAwardYearlyComparison = yearly_leave_comparison_chart.time_off_award:main
+TravelCompChartForTheYear = travel_comp_chart.__main__:main
+TravelCompYearlyComparison = yearly_leave_comparison_chart.travel_comp:main
+fedleave = fedleave.__main__:main
+fedleaveMonthReportGraphic = fedleave_month_report_graphic.__main__:main
