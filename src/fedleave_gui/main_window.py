@@ -1681,16 +1681,25 @@ class MainWindow(QMainWindow):
                 )
             return
         latest = str(result.get("latest_version") or "")
+        latest_build = str(result.get("latest_build") or "")
+        current_build = str(result.get("current_build") or "")
+        notification_id = latest_build or latest
         if result.get("update_available"):
-            if not interactive and latest == self.settings.last_update_notified_version:
+            if not interactive and notification_id == self.settings.last_update_notified_version:
                 return
+            latest_label = latest
+            if latest_build and latest_build[:8] not in latest_label:
+                latest_label = f"{latest_label} ({latest_build[:8]})"
+            installed_label = str(result.get("current_version", ""))
+            if current_build and current_build[:8] not in installed_label:
+                installed_label = f"{installed_label} ({current_build[:8]})"
             QMessageBox.information(
                 self,
                 "FedLeave Update Available",
-                f"FedLeave {latest} is available (installed: {result.get('current_version', '')}).\n\n"
+                f"FedLeave {latest_label} is available (installed: {installed_label}).\n\n"
                 f"Download: {result.get('release_url', '')}\n\n{result.get('instructions', '')}",
             )
-            self.settings.last_update_notified_version = latest
+            self.settings.last_update_notified_version = notification_id
             save_settings(self.settings)
         elif interactive:
             QMessageBox.information(self, "Check for Updates", "This installation is up to date.")

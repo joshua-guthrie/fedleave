@@ -47,6 +47,8 @@ jobs:
     env:
       PACKAGE_VERSION: ${{ needs.metadata.outputs.package-version }}
       NUMERIC_VERSION: ${{ needs.metadata.outputs.numeric-version }}
+      FEDLEAVE_BUILD_VERSION: ${{ needs.metadata.outputs.package-version }}
+      FEDLEAVE_SOURCE_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 
@@ -134,6 +136,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PACKAGE_VERSION: ${{ needs.metadata.outputs.package-version }}
+      FEDLEAVE_BUILD_VERSION: ${{ needs.metadata.outputs.package-version }}
+      FEDLEAVE_SOURCE_COMMIT: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
 

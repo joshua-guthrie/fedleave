@@ -10,10 +10,10 @@ SetCompressor /SOLID lzma
 !include "LogicLib.nsh"
 
 !ifndef VERSION
-  !error "VERSION is required (for example /DVERSION=0.2.1)"
+  !error "VERSION is required (for example /DVERSION=1.2.3)"
 !endif
 !ifndef NUMERIC_VERSION
-  !error "NUMERIC_VERSION is required (for example /DNUMERIC_VERSION=0.2.1.0)"
+  !error "NUMERIC_VERSION is required (for example /DNUMERIC_VERSION=1.2.3.0)"
 !endif
 !ifndef SOURCE_DIR
   !error "SOURCE_DIR is required and must point to the verified PyInstaller bundle"

@@ -5,39 +5,56 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from . import __version__
+from . import __build_commit__, __version__
 from .project_info import OFFICIAL_PROJECT_URL
 
-MASTER_VERSION_URL = "https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/pyproject.toml"
+PUBLISHED_BUILD_URL = "https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installers/BUILD.txt"
 
 
-def _version_parts(value: str) -> tuple[int, ...]:
-    match = re.match(r"^v?(\d+(?:\.\d+)*)", value.strip())
-    if not match:
-        raise ValueError(f"Unrecognized version: {value}")
-    return tuple(int(part) for part in match.group(1).split("."))
+def _parse_build_metadata(content: str) -> tuple[str, str]:
+    fields: dict[str, str] = {}
+    for line in content.splitlines():
+        key, separator, value = line.partition("=")
+        if separator:
+            fields[key.strip()] = value.strip()
+    version = fields.get("version", "")
+    source_commit = fields.get("source_commit", "").lower()
+    if not version:
+        raise ValueError("The published installer metadata did not include a version.")
+    if not re.fullmatch(r"[0-9a-f]{7,64}", source_commit):
+        raise ValueError("The published installer metadata did not include a valid source commit.")
+    return version, source_commit
 
 
-def check_for_updates(*, current_version: str = __version__, opener=urlopen, timeout: float = 5.0) -> dict[str, Any]:
+def check_for_updates(
+    *,
+    current_version: str = __version__,
+    current_build: str = __build_commit__,
+    opener=urlopen,
+    timeout: float = 5.0,
+) -> dict[str, Any]:
     request = Request(
-        MASTER_VERSION_URL,
+        PUBLISHED_BUILD_URL,
         headers={
             "Accept": "text/plain",
-            "User-Agent": f"FedLeave/{current_version}",
+            "User-Agent": f"FedLeave/{current_version} ({current_build[:12] or 'legacy'})",
         },
     )
     try:
         with opener(request, timeout=timeout) as response:
-            project_file = response.read().decode("utf-8")
-        match = re.search(r'^version\s*=\s*"([^"]+)"', project_file, re.MULTILINE)
-        if not match:
-            raise ValueError("The master branch project file did not include a version.")
-        latest = match.group(1)
-        update_available = _version_parts(latest) > _version_parts(current_version)
+            build_file = response.read().decode("utf-8")
+        latest_version, latest_build = _parse_build_metadata(build_file)
+        normalized_current_build = current_build.strip().lower()
+        # Releases without an embedded build identity predate rolling-build
+        # detection and need one upgrade. Thereafter, BUILD.txt changes only
+        # after both platform installers have successfully published.
+        update_available = not normalized_current_build or latest_build != normalized_current_build
         return {
             "status": "ok",
             "current_version": current_version,
-            "latest_version": latest,
+            "current_build": normalized_current_build or None,
+            "latest_version": latest_version,
+            "latest_build": latest_build,
             "update_available": update_available,
             "release_url": OFFICIAL_PROJECT_URL,
             "assets": [],
@@ -51,7 +68,9 @@ def check_for_updates(*, current_version: str = __version__, opener=urlopen, tim
         return {
             "status": "unavailable",
             "current_version": current_version,
+            "current_build": current_build.strip().lower() or None,
             "latest_version": None,
+            "latest_build": None,
             "update_available": False,
             "release_url": OFFICIAL_PROJECT_URL,
             "message": f"Could not check for updates: {exc}",

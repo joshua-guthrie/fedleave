@@ -413,6 +413,17 @@ The Linux archive embeds its exact development version and commit hash even
 though its public download filename is stable. The bootstrap installs that
 identity into a separate version directory, preserving rollback behavior.
 
+Every packaged executable also embeds that source commit. The GUI and
+`fedleave check-for-updates` compare it with `installers/BUILD.txt`, which is
+updated only after both platform installers pass and publish. The semantic
+project version remains manually controlled; every successful `master` push
+automatically advances the rolling build identity instead.
+
+Version `0.2.2` is the one-time migration from semantic-only update checks to
+rolling build checks. An installed `0.2.1` can discover `0.2.2` through the old
+comparison; after that upgrade, each successfully published build is detected
+by its embedded commit identity.
+
 Before changing packaging, run the test suite and the platform build commands above.
 GitHub Actions performs silent install/uninstall and user-data preservation
 checks on Windows. Because Windows binaries cannot be executed in a Linux
@@ -525,7 +536,7 @@ Commands and common options:
 			fedleave expiration-extend --id TRANSACTION_ID --new-date YYYY-MM-DD --reason TEXT [--json] [--data-dir PATH]
 
 	check-for-updates
-		Check the published source version for a newer FedLeave version and direct users to the official project website.
+		Check the last successfully published installer build and report whether it differs from the installed build.
 
 		Syntax:
 			fedleave check-for-updates [--json]

@@ -50,5 +50,7 @@ def test_every_application_uses_the_authoritative_project_version() -> None:
         fedleave_month_report_graphic,
     ]
 
-    assert declared_version == "0.2.1"
+    assert declared_version == "0.2.2"
+    assert fedleave.__base_version__ == declared_version
+    assert fedleave.__build_commit__ == ""
     assert {package.__version__ for package in packages} == {declared_version}

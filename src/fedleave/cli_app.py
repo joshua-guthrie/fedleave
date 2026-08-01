@@ -109,7 +109,7 @@ Command details and examples:
         The adjustment remains in effect for all later balance calculations.
 
     fedleave check-for-updates [--json]
-        Check the published source version once and report whether a newer version is available.
+        Check the last successfully published installer build and report whether it differs from the installed build.
         When an update exists, prints the official project webpage and installation instructions.
 
     fedleave expirations [--year YEAR] [--within-pay-periods N] [--category CATEGORY] [--json] [--data-dir PATH]

@@ -28,8 +28,10 @@ def _last_json(stdout: str) -> dict:
 def test_linux_build_script_executes_smoke_test_without_error(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["FEDLEAVE_BUILD_ROOT"] = str(tmp_path / "build")
+    env["FEDLEAVE_BUILD_VERSION"] = "0.2.1.dev0+g12345678"
+    env["FEDLEAVE_SOURCE_COMMIT"] = "1234567890abcdef1234567890abcdef12345678"
     result = subprocess.run(
-        [str(ROOT / "scripts" / "LinuxInstall.sh"), "--unattended", "--smoke-test"],
+        [str(ROOT / "scripts" / "LinuxInstall.sh"), "--unattended", "--smoke-test", "--keep-build"],
         cwd=ROOT,
         env=env,
         text=True,
@@ -42,6 +44,11 @@ def test_linux_build_script_executes_smoke_test_without_error(tmp_path: Path) ->
     assert payload["status"] == "ok"
     assert payload["operation"] == "smoke-test"
     assert payload["platform"] == "linux"
+    bootstrap = (tmp_path / "build" / "linux" / "smoke-test" / "entries" / "fedleave_bootstrap.py").read_text(
+        encoding="utf-8"
+    )
+    assert "os.environ['FEDLEAVE_BUILD_VERSION'] = '0.2.1.dev0+g12345678'" in bootstrap
+    assert "os.environ['FEDLEAVE_SOURCE_COMMIT'] = '1234567890abcdef1234567890abcdef12345678'" in bootstrap
 
 
 def test_windows_build_script_executes_smoke_test_without_error(tmp_path: Path) -> None:

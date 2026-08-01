@@ -5,6 +5,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -212,10 +213,17 @@ class InstallerEngine:
         py_exe = self._create_or_reuse_venv(venv_dir)
         self._install_build_requirements(py_exe)
         targets = self._load_targets()
+        build_version, source_commit = self._build_identity()
+        self.log(f"Build identity: {build_version} ({source_commit[:12] or 'source-only'})")
 
         entry_paths: dict[str, Path] = {}
         for target in targets:
-            entry_paths[target.name] = self._write_entry(target, entries_dir)
+            entry_paths[target.name] = self._write_entry(
+                target,
+                entries_dir,
+                build_version=build_version,
+                source_commit=source_commit,
+            )
         config_path = self._write_suite_config(
             targets, entry_paths, spec_dir / "fedleave-suite.json", platform_dist.name
         )
@@ -270,11 +278,21 @@ class InstallerEngine:
         config_path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
         return config_path
 
-    def _write_entry(self, target: BuildTarget, entries_dir: Path) -> Path:
+    def _write_entry(
+        self,
+        target: BuildTarget,
+        entries_dir: Path,
+        *,
+        build_version: str,
+        source_commit: str,
+    ) -> Path:
         entries_dir.mkdir(parents=True, exist_ok=True)
         entry_filename = f"{target.name}.py" if target.name != "fedleave" else "fedleave_bootstrap.py"
         entry_path = entries_dir / entry_filename
         entry_path.write_text(
+            "import os\n\n"
+            f"os.environ['FEDLEAVE_BUILD_VERSION'] = {build_version!r}\n"
+            f"os.environ['FEDLEAVE_SOURCE_COMMIT'] = {source_commit!r}\n\n"
             f"from {target.module} import {target.func}\n\n"
             "if __name__ == '__main__':\n"
             f"    raise SystemExit({target.func}())\n",
@@ -308,6 +326,7 @@ class InstallerEngine:
         """Exercise build discovery and command construction without running PyInstaller."""
         self._ensure_python()
         targets = self._load_targets()
+        build_version, source_commit = self._build_identity()
         source_path = str(self.repo_root / "src")
         if source_path not in sys.path:
             sys.path.insert(0, source_path)
@@ -333,7 +352,12 @@ class InstallerEngine:
                     raise InstallerError(f"Build data source does not exist: {source}")
             if target.icon and not (self.repo_root / target.icon).exists():
                 raise InstallerError(f"Build icon does not exist: {target.icon}")
-            entry_paths[target.name] = self._write_entry(target, entries_dir)
+            entry_paths[target.name] = self._write_entry(
+                target,
+                entries_dir,
+                build_version=build_version,
+                source_commit=source_commit,
+            )
 
         config_path = self._write_suite_config(
             targets, entry_paths, spec_dir / "fedleave-suite.json", platform_dist.name
@@ -345,6 +369,30 @@ class InstallerEngine:
         self.log(f"Build-script smoke test passed for {len(targets)} application targets.")
         if not self.options.keep_build:
             shutil.rmtree(smoke_root, ignore_errors=True)
+
+    def _build_identity(self) -> tuple[str, str]:
+        source_commit = (os.environ.get("FEDLEAVE_SOURCE_COMMIT") or os.environ.get("GITHUB_SHA") or "").strip().lower()
+        if not source_commit:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.repo_root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if result.returncode == 0:
+                source_commit = result.stdout.strip().lower()
+        if source_commit and not re.fullmatch(r"[0-9a-f]{7,64}", source_commit):
+            raise InstallerError(f"Invalid build source commit: {source_commit!r}")
+
+        build_version = (os.environ.get("FEDLEAVE_BUILD_VERSION") or os.environ.get("PACKAGE_VERSION") or "").strip()
+        if not build_version:
+            build_version = self._project_version()
+            if source_commit:
+                build_version = f"{build_version}.dev0+g{source_commit[:8]}"
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]*", build_version):
+            raise InstallerError(f"Invalid build version: {build_version!r}")
+        return build_version, source_commit
 
     def _publish_build(self, platform_dist: Path, repo_dist: Path) -> None:
         """Publish a complete build without deleting files from the active Windows tree."""

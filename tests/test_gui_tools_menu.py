@@ -572,7 +572,7 @@ def test_force_balance_dialog_calls_backend_and_refreshes(monkeypatch):
     assert refreshed == [True]
 
 
-def test_periodic_update_alert_is_not_repeated_for_same_version(monkeypatch):
+def test_periodic_update_alert_is_not_repeated_for_same_build(monkeypatch):
     _application()
     alerts = []
 
@@ -581,8 +581,10 @@ def test_periodic_update_alert_is_not_repeated_for_same_version(monkeypatch):
             return {
                 "status": "ok",
                 "update_available": True,
-                "current_version": "0.2.0",
-                "latest_version": "0.3.0",
+                "current_version": "0.2.1.dev0+gaaaaaaaa",
+                "current_build": "a" * 40,
+                "latest_version": "0.2.1.dev0+gbbbbbbbb",
+                "latest_build": "b" * 40,
                 "release_url": "https://github.com/joshua-guthrie/fedleave/releases/tag/v0.3.0",
                 "instructions": "Run the installer.",
             }
@@ -597,7 +599,8 @@ def test_periodic_update_alert_is_not_repeated_for_same_version(monkeypatch):
     window._perform_update_check(interactive=False)
 
     assert len(alerts) == 1
-    assert "0.3.0" in alerts[0]
+    assert "0.2.1.dev0+gbbbbbbbb" in alerts[0]
+    assert "bbbbbbbb" in alerts[0]
 
 
 def test_help_menu_hides_backend_about_action(monkeypatch):
