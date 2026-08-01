@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
 import urllib.error
 import urllib.request
+from datetime import datetime
+from pathlib import Path
 
 import holidays
+
 try:
     from icalendar import Calendar
 except Exception:

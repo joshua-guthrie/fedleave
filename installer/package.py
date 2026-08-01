@@ -11,12 +11,11 @@ import argparse
 import hashlib
 import io
 import os
-from pathlib import Path
 import re
 import subprocess
 import tarfile
 import tomllib
-
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PYPROJECT = ROOT / "pyproject.toml"
@@ -137,10 +136,7 @@ def validate_file_size(path: Path, max_mib: float) -> int:
     size = path.stat().st_size
     limit = int(max_mib * 1024 * 1024)
     if size > limit:
-        raise PackagingError(
-            f"{path.name} is {size / 1024 / 1024:.1f} MiB; "
-            f"the packaging limit is {max_mib:g} MiB"
-        )
+        raise PackagingError(f"{path.name} is {size / 1024 / 1024:.1f} MiB; the packaging limit is {max_mib:g} MiB")
     return size
 
 
@@ -155,9 +151,7 @@ def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tu
     # "FedLeave" is intentionally version independent. The bootstrap installer
     # supplies the versioned /opt destination after checksum verification.
     try:
-        with tarfile.open(
-            pending_archive, "w:gz", format=tarfile.PAX_FORMAT, dereference=False
-        ) as tar:
+        with tarfile.open(pending_archive, "w:gz", format=tarfile.PAX_FORMAT, dereference=False) as tar:
             tar.add(bundle_dir, arcname="FedLeave", recursive=True)
             version_bytes = f"{version}\n".encode()
             version_info = tarfile.TarInfo("FedLeave/VERSION")
@@ -174,9 +168,7 @@ def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tu
 def verify_tag(tag: str) -> None:
     expected = f"v{project_version()}"
     if tag != expected:
-        raise PackagingError(
-            f"Release tag {tag!r} does not match pyproject.toml version; expected {expected!r}"
-        )
+        raise PackagingError(f"Release tag {tag!r} does not match pyproject.toml version; expected {expected!r}")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -225,9 +217,7 @@ def main(argv: list[str] | None = None) -> int:
             executables = validate_bundle(args.bundle_dir.resolve(), args.platform)
             print(f"Validated {len(executables)} {args.platform} application executables.")
         elif args.command == "linux-archive":
-            archive, checksum = create_linux_archive(
-                args.bundle_dir.resolve(), args.output_dir.resolve(), args.version
-            )
+            archive, checksum = create_linux_archive(args.bundle_dir.resolve(), args.output_dir.resolve(), args.version)
             print(archive)
             print(checksum)
         elif args.command == "checksum":

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import date, timedelta
-
 
 DEFAULT_PAYDAY_OFFSET_DAYS = 6
 
@@ -11,7 +11,10 @@ def calculate_pay_date(end_date: date, payday_offset_days: int = DEFAULT_PAYDAY_
     return end_date + timedelta(days=payday_offset_days)
 
 
-def pay_period_pay_date(pay_period: dict, payday_offset_days: int = DEFAULT_PAYDAY_OFFSET_DAYS) -> str | None:
+def pay_period_pay_date(
+    pay_period: Mapping[str, object],
+    payday_offset_days: int = DEFAULT_PAYDAY_OFFSET_DAYS,
+) -> str | None:
     """Return explicit or backward-compatible inferred pay date for a pay period."""
     explicit = pay_period.get("pay_date")
     if explicit:
@@ -22,7 +25,10 @@ def pay_period_pay_date(pay_period: dict, payday_offset_days: int = DEFAULT_PAYD
     return calculate_pay_date(date.fromisoformat(str(end_date)), payday_offset_days).isoformat()
 
 
-def normalize_pay_period(pay_period: dict, payday_offset_days: int = DEFAULT_PAYDAY_OFFSET_DAYS) -> dict:
+def normalize_pay_period(
+    pay_period: Mapping[str, object],
+    payday_offset_days: int = DEFAULT_PAYDAY_OFFSET_DAYS,
+) -> dict[str, object]:
     normalized = dict(pay_period)
     pay_date = pay_period_pay_date(normalized, payday_offset_days)
     if pay_date:
@@ -30,8 +36,8 @@ def normalize_pay_period(pay_period: dict, payday_offset_days: int = DEFAULT_PAY
     return normalized
 
 
-def generate_pay_periods(start_date: date, count: int = 26) -> list[dict[str, str]]:
-    pay_periods: list[dict[str, str]] = []
+def generate_pay_periods(start_date: date, count: int = 26) -> list[dict[str, str | int]]:
+    pay_periods: list[dict[str, str | int]] = []
     current_start = start_date
     for number in range(1, count + 1):
         current_end = current_start + timedelta(days=13)

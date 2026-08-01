@@ -10,16 +10,18 @@ from pathlib import Path
 
 def _create_shortcut(shortcut_path: Path, target_path: Path, working_directory: Path) -> None:
     shortcut_path.parent.mkdir(parents=True, exist_ok=True)
-    script_text = "\n".join([
-        'Set shell = CreateObject("WScript.Shell")',
-        'Set shortcut = shell.CreateShortcut(WScript.Arguments(0))',
-        'shortcut.TargetPath = WScript.Arguments(1)',
-        'shortcut.WorkingDirectory = WScript.Arguments(2)',
-        'shortcut.IconLocation = WScript.Arguments(1) & ",0"',
-        'shortcut.Description = "FedLeave Calendar"',
-        "shortcut.Save",
-        "",
-    ])
+    script_text = "\n".join(
+        [
+            'Set shell = CreateObject("WScript.Shell")',
+            "Set shortcut = shell.CreateShortcut(WScript.Arguments(0))",
+            "shortcut.TargetPath = WScript.Arguments(1)",
+            "shortcut.WorkingDirectory = WScript.Arguments(2)",
+            'shortcut.IconLocation = WScript.Arguments(1) & ",0"',
+            'shortcut.Description = "FedLeave Calendar"',
+            "shortcut.Save",
+            "",
+        ]
+    )
     with tempfile.TemporaryDirectory(prefix="fedleave-shortcut-") as temp_dir:
         script_path = Path(temp_dir) / "create-shortcut.vbs"
         script_path.write_text(script_text, encoding="utf-8")

@@ -266,9 +266,7 @@ def test_infer_leave_year_falls_back_to_latest_year(tmp_path, monkeypatch, modul
         ("sick_leave_chart.chart", "sick_leave_balance_points"),
     ],
 )
-def test_main_uses_supplied_data_dir_for_inferred_year(
-    tmp_path, monkeypatch, capsys, module_name, balance_function
-):
+def test_main_uses_supplied_data_dir_for_inferred_year(tmp_path, monkeypatch, capsys, module_name, balance_function):
     _install_chart_import_stubs(monkeypatch)
     module = importlib.import_module(module_name)
 
@@ -299,9 +297,7 @@ def test_main_uses_supplied_data_dir_for_inferred_year(
 
 
 @pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])
-def test_get_leave_year_data_reads_leave_year_file_after_fedleave_balance(
-    tmp_path, monkeypatch, module_name
-):
+def test_get_leave_year_data_reads_leave_year_file_after_fedleave_balance(tmp_path, monkeypatch, module_name):
     _install_chart_import_stubs(monkeypatch)
     module = importlib.import_module(module_name)
 

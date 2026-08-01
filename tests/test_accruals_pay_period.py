@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from fedleave.cli import accrual_change, balance, pay_period_summary, pay_periods_summary, use_or_lose
 from fedleave.config import init_config
@@ -123,9 +123,7 @@ def test_accrual_change_backfills_missing_future_rows_with_changed_rate(tmp_path
         tx
         for tx in leave_year["transactions"]
         if not (
-            tx.get("source") == "auto_accrual"
-            and tx.get("category") == "annual"
-            and tx.get("date") >= "2026-07-12"
+            tx.get("source") == "auto_accrual" and tx.get("category") == "annual" and tx.get("date") >= "2026-07-12"
         )
     ]
 

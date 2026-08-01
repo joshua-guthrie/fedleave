@@ -15,7 +15,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 EXIT_INVALID_ARGS = 2
 EXIT_PREREQ = 3
 EXIT_PERMISSION = 5
@@ -339,9 +338,7 @@ class InstallerEngine:
         config_path = self._write_suite_config(
             targets, entry_paths, spec_dir / "fedleave-suite.json", platform_dist.name
         )
-        command = self._build_suite_command(
-            Path(sys.executable), config_path, work_dir, platform_dist
-        )
+        command = self._build_suite_command(Path(sys.executable), config_path, work_dir, platform_dist)
         if "PyInstaller" not in command or str(config_path) != command[-1]:
             raise InstallerError("Invalid shared PyInstaller suite command")
 
@@ -462,10 +459,7 @@ class InstallerEngine:
                 saved_bytes += size
 
         if linked_files:
-            self.log(
-                f"Deduplicated {linked_files} Linux runtime files "
-                f"({saved_bytes / 1024 / 1024:.1f} MiB saved)"
-            )
+            self.log(f"Deduplicated {linked_files} Linux runtime files ({saved_bytes / 1024 / 1024:.1f} MiB saved)")
 
     def _create_or_reuse_venv(self, venv_dir: Path) -> Path:
         py_exe = self._venv_python(venv_dir)
@@ -484,8 +478,6 @@ class InstallerEngine:
         pip_options = ["--no-index"] if self.options.offline else []
         editable_options = ["--no-build-isolation"] if self.options.offline else []
         self._run([str(py_exe), "-m", "pip", "install", *pip_options, "--upgrade", "pip"])
-        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "-r", str(self.repo_root / "requirements.txt")])
-        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "-r", str(self.repo_root / "requirements-gui.txt")])
         self._run(
             [
                 str(py_exe),
@@ -493,11 +485,11 @@ class InstallerEngine:
                 "pip",
                 "install",
                 *pip_options,
-                "-r",
-                str(self.repo_root / "scripts" / "lib" / "common" / "installer-requirements.txt"),
+                *editable_options,
+                "-e",
+                f"{self.repo_root}[gui,build]",
             ]
         )
-        self._run([str(py_exe), "-m", "pip", "install", *pip_options, *editable_options, "-e", str(self.repo_root)])
 
     def _load_targets(self) -> list[BuildTarget]:
         pyproject = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8"))
@@ -569,7 +561,9 @@ class InstallerEngine:
         version = self._project_version()
         if os.geteuid() != 0:
             if self.options.unattended:
-                raise InstallerError("System-wide install requires elevated privileges in unattended mode.", EXIT_PERMISSION)
+                raise InstallerError(
+                    "System-wide install requires elevated privileges in unattended mode.", EXIT_PERMISSION
+                )
             self.log("Requesting sudo to complete the system-wide installation.")
         helper_args = [
             "install-system",
@@ -720,7 +714,11 @@ class InstallerEngine:
 
         shutil.rmtree(Path("/opt/fedleave"), ignore_errors=True)
 
-        scripts = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("scripts", {})
+        scripts = (
+            tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+            .get("project", {})
+            .get("scripts", {})
+        )
         for app_name in scripts:
             (Path("/usr/local/bin") / app_name).unlink(missing_ok=True)
 
@@ -737,8 +735,7 @@ class InstallerEngine:
         self._log_handle.flush()
         if process.returncode != 0:
             raise InstallerError(
-                f"Command failed ({process.returncode}): {' '.join(cmd)}\n"
-                f"{process.stderr or process.stdout}",
+                f"Command failed ({process.returncode}): {' '.join(cmd)}\n{process.stderr or process.stdout}",
                 EXIT_BUILD_FAILED,
             )
 

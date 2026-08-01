@@ -29,10 +29,13 @@ test = [
   "pytest-qt",
 ]
 build = [
+  "build>=1,<2",
   "pyinstaller>=6,<7",
 ]
 dev = [
   "fedleave[gui,test,build]",
+  "mypy>=1.15,<2",
+  "ruff>=0.12,<1",
 ]
 
 [project.urls]
@@ -74,3 +77,20 @@ include = ["fedleave*", "annual_leave_chart*", "sick_leave_chart*", "credit_hour
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src", "tests", "installer", "scripts"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.mypy]
+python_version = "3.11"
+files = [
+  "src/fedleave/payperiods.py",
+  "src/fedleave/project_info.py",
+  "src/fedleave/transaction_effects.py",
+]
+strict = true

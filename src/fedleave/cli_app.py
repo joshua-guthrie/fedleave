@@ -8,7 +8,6 @@ from rich.console import Console
 from . import __version__
 from .project_info import OFFICIAL_PROJECT_URL, PROJECT_AUTHOR
 
-
 console = Console()
 
 
@@ -210,9 +209,8 @@ Exit codes:
     9  Holiday fetch/import/generation error
 
 For full project specification and advanced usage, see the README in the project root.
-""".replace("__OFFICIAL_PROJECT_URL__", OFFICIAL_PROJECT_URL).replace(
-    "__PROJECT_AUTHOR__", PROJECT_AUTHOR
-)
+""".replace("__OFFICIAL_PROJECT_URL__", OFFICIAL_PROJECT_URL).replace("__PROJECT_AUTHOR__", PROJECT_AUTHOR)
+
 
 def _version_callback(value: bool) -> None:
     if value:

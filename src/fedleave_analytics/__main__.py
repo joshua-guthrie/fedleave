@@ -3,8 +3,8 @@ if __package__:
 else:
     # PyInstaller can execute this file as the frozen application's
     # top-level __main__ module, where relative imports have no package.
-    from pathlib import Path
     import sys
+    from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from fedleave_analytics.app import main

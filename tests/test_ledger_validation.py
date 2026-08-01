@@ -1,5 +1,4 @@
-from fedleave.ledger import validate_leave_year, apply_fixes_to_leave_year
-import json
+from fedleave.ledger import apply_fixes_to_leave_year, validate_leave_year
 
 
 def make_bad_leave_year():

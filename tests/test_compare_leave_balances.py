@@ -41,7 +41,9 @@ def _compare_leave_balances(monkeypatch):
     return compare_leave_balances
 
 
-def _write_leave_year(path: Path, *, year: int, annual_start: float, annual_transactions: list[dict], overtime_transactions: list[dict]) -> None:
+def _write_leave_year(
+    path: Path, *, year: int, annual_start: float, annual_transactions: list[dict], overtime_transactions: list[dict]
+) -> None:
     data = {
         "schema_version": 1,
         "leave_year": year,

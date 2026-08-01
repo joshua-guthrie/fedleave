@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from fedleave.cli import add
 from fedleave.config import init_config
@@ -46,7 +46,8 @@ def test_authoritative_add_removes_matching_transaction(tmp_path: Path):
 
     leave_year = json.loads((data_dir / "leave_years" / "2026.json").read_text(encoding="utf-8"))
     annual_used = [
-        tx for tx in leave_year["transactions"]
+        tx
+        for tx in leave_year["transactions"]
         if tx["date"] == "2026-03-10" and tx["category"] == "annual" and tx["direction"] == "used"
     ]
 

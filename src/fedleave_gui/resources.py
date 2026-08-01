@@ -3,8 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PySide6.QtGui import QIcon
 from PySide6.QtCore import QUrl
+from PySide6.QtGui import QIcon
 
 
 def _candidate_roots() -> list[Path]:
@@ -17,9 +17,7 @@ def _candidate_roots() -> list[Path]:
         resolved = path.resolve()
         candidate_roots.append(resolved if resolved.is_dir() else resolved.parent)
     project_root = Path(__file__).resolve().parents[2]
-    candidate_roots.extend(
-        [project_root, project_root / "dist", project_root.parent / "dist"]
-    )
+    candidate_roots.extend([project_root, project_root / "dist", project_root.parent / "dist"])
 
     seen: set[Path] = set()
     ordered: list[Path] = []

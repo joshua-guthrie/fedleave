@@ -8,8 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fedleave.executable_search import is_executable, iter_executable_candidates
 from fedleave.config import get_default_data_dir
+from fedleave.executable_search import is_executable, iter_executable_candidates
 
 
 class BackendError(RuntimeError):
@@ -92,9 +92,7 @@ class FedleaveBackend:
         try:
             return subprocess.run(command, timeout=timeout, **kwargs)
         except subprocess.TimeoutExpired as exc:
-            raise BackendError(
-                f"fedleave backend did not respond within {timeout:g} seconds."
-            ) from exc
+            raise BackendError(f"fedleave backend did not respond within {timeout:g} seconds.") from exc
 
     def run_json(self, args: list[str], *, include_data_dir: bool = True) -> dict[str, Any]:
         fedleave = find_fedleave(self.options.fedleave_path)
@@ -205,9 +203,7 @@ class FedleaveBackend:
             for record in records
         ):
             raise BackendError("fedleave returned an unexpected leave-year payload.")
-        if not isinstance(categories, list) or not all(
-            isinstance(category, str) for category in categories
-        ):
+        if not isinstance(categories, list) or not all(isinstance(category, str) for category in categories):
             raise BackendError("fedleave returned unexpected visible-category metadata.")
         if not isinstance(warnings, list) or not all(isinstance(warning, str) for warning in warnings):
             raise BackendError("fedleave returned unexpected leave-year warnings.")
@@ -338,8 +334,7 @@ def run_month_report_graphic(
         result = subprocess.run(command, timeout=GRAPHIC_COMMAND_TIMEOUT_SECONDS, **kwargs)
     except subprocess.TimeoutExpired as exc:
         raise BackendError(
-            "fedleaveMonthReportGraphic did not respond within "
-            f"{GRAPHIC_COMMAND_TIMEOUT_SECONDS:g} seconds."
+            f"fedleaveMonthReportGraphic did not respond within {GRAPHIC_COMMAND_TIMEOUT_SECONDS:g} seconds."
         ) from exc
     if result.returncode != 0:
         message = (result.stderr or result.stdout or "fedleaveMonthReportGraphic command failed").strip()

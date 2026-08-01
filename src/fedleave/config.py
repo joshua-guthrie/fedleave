@@ -4,18 +4,17 @@ import json
 import os
 import sys
 from pathlib import Path
-from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
 from dateutil.parser import isoparse
-from .validation import sanitize_url
+from pydantic import BaseModel, Field
 from rich.console import Console
 
-from .storage import ensure_data_dir, atomic_write_json, migrate_leave_year_files
-from .payperiods import generate_pay_periods
 from .holidays import DEFAULT_OPM_ICS_URL, generate_federal_holidays
 from .ledger import ensure_automatic_accruals
+from .payperiods import generate_pay_periods
+from .storage import atomic_write_json, ensure_data_dir, migrate_leave_year_files
+from .validation import sanitize_url
 
 console = Console()
 
@@ -120,16 +119,18 @@ class Config(BaseModel):
     user: UserConfig = Field(default_factory=UserConfig)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
     holidays: HolidaysConfig = Field(default_factory=HolidaysConfig)
-    rules: dict[str, object] = Field(default_factory=lambda: {
-        "annual": AnnualRules().model_dump(),
-        "sick": SickRules().model_dump(),
-        "comp": CompRules().model_dump(),
-        "travel_comp": TravelCompRules().model_dump(),
-        "credit": CreditRules().model_dump(),
-        "time_off_award": TimeOffAwardRules().model_dump(),
-        "restored_annual": RestoredAnnualRules().model_dump(),
-        "religious_comp": ReligiousCompRules().model_dump(),
-    })
+    rules: dict[str, object] = Field(
+        default_factory=lambda: {
+            "annual": AnnualRules().model_dump(),
+            "sick": SickRules().model_dump(),
+            "comp": CompRules().model_dump(),
+            "travel_comp": TravelCompRules().model_dump(),
+            "credit": CreditRules().model_dump(),
+            "time_off_award": TimeOffAwardRules().model_dump(),
+            "restored_annual": RestoredAnnualRules().model_dump(),
+            "religious_comp": ReligiousCompRules().model_dump(),
+        }
+    )
 
 
 class LeaveYear(BaseModel):
@@ -145,11 +146,13 @@ class LeaveYear(BaseModel):
     transactions: list[dict] = Field(default_factory=list)
     pay_periods: list[dict] = Field(default_factory=list)
     holidays: list[dict] = Field(default_factory=list)
-    rollover_status: dict[str, object] = Field(default_factory=lambda: {
-        "rolled_from_previous_year": False,
-        "rolled_to_next_year": False,
-        "rollover_completed_at": None,
-    })
+    rollover_status: dict[str, object] = Field(
+        default_factory=lambda: {
+            "rolled_from_previous_year": False,
+            "rolled_to_next_year": False,
+            "rollover_completed_at": None,
+        }
+    )
 
 
 def get_default_data_dir(data_dir: Path | None = None) -> Path:

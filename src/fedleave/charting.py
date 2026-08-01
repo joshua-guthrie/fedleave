@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
-from calendar import monthrange
 import json
 import os
 import shutil
 import subprocess
 import sys
+from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -15,16 +15,9 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from .cli_helpers import load_leave_year, parse_iso_date
-from .config import get_default_data_dir as resolve_default_data_dir
-from .ledger import calculate_balances
-from .transaction_effects import signed_balance_effect, transaction_is_effective
-from .executable_search import is_executable, iter_executable_candidates
-from .project_info import HELP_EPILOG
 from .chart_style import (
     BACKGROUND,
     BASE_ASPECT_RATIO,
-    BASE_HEIGHT,
     BASE_WIDTH,
     BLUE,
     BORDER,
@@ -34,10 +27,15 @@ from .chart_style import (
     PLOT_LEFT,
     PLOT_RIGHT,
     PLOT_TOP,
-    RED,
     TEXT,
     draw_historical_and_future_line,
 )
+from .cli_helpers import load_leave_year, parse_iso_date
+from .config import get_default_data_dir as resolve_default_data_dir
+from .executable_search import is_executable, iter_executable_candidates
+from .ledger import calculate_balances
+from .project_info import HELP_EPILOG
+from .transaction_effects import signed_balance_effect, transaction_is_effective
 
 Y_MIN = Decimal("0")
 
@@ -171,8 +169,7 @@ def infer_leave_year(data_dir: Path) -> int:
     year_files = sorted(leave_year_dir.glob("*.json"))
     if not year_files:
         raise SystemExit(
-            f"No leave-year files found in {leave_year_dir}. "
-            "Run `fedleave init` first or specify --data-dir PATH."
+            f"No leave-year files found in {leave_year_dir}. Run `fedleave init` first or specify --data-dir PATH."
         )
 
     today = date.today()
@@ -197,8 +194,7 @@ def infer_leave_year(data_dir: Path) -> int:
         return max(valid_years)
 
     raise SystemExit(
-        f"No readable leave-year files found in {leave_year_dir}. "
-        "Run `fedleave init` first or specify --data-dir PATH."
+        f"No readable leave-year files found in {leave_year_dir}. Run `fedleave init` first or specify --data-dir PATH."
     )
 
 
@@ -302,7 +298,9 @@ def category_balance_points(
 
 def y_to_px(value: Decimal, dims: ChartDimensions) -> float:
     clamped = max(dims.y_min, min(dims.y_max, value))
-    return float(dims.plot_bottom - ((clamped - dims.y_min) / (dims.y_max - dims.y_min)) * (dims.plot_bottom - dims.plot_top))
+    return float(
+        dims.plot_bottom - ((clamped - dims.y_min) / (dims.y_max - dims.y_min)) * (dims.plot_bottom - dims.plot_top)
+    )
 
 
 def x_positions(count: int, dims: ChartDimensions) -> list[float]:
@@ -403,8 +401,7 @@ def render_balance_chart(
 
     raw_line = [(xs[index], y_to_px(value, dims)) for index, (_, value) in enumerate(points)]
     dated_line = [
-        (period_end, raw_line[index][0], raw_line[index][1])
-        for index, (period_end, _value) in enumerate(points)
+        (period_end, raw_line[index][0], raw_line[index][1]) for index, (period_end, _value) in enumerate(points)
     ]
     draw_historical_and_future_line(draw, dated_line, as_of=date.today(), fill=BLUE, width=5)
 
@@ -606,8 +603,7 @@ def run_chart_app(spec: LeaveChartSpec) -> None:
                 "max_balance_hours": format_hours(max_balance),
                 "output_png": str(output),
                 "points": [
-                    {"pay_period_end": day.isoformat(), spec.point_field: format_hours(value)}
-                    for day, value in points
+                    {"pay_period_end": day.isoformat(), spec.point_field: format_hours(value)} for day, value in points
                 ],
             },
             indent=2,

@@ -15,10 +15,10 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
-from fedleave.executable_search import is_executable, iter_executable_candidates
-from fedleave.chart_style import draw_historical_and_future_line
-from fedleave.project_info import HELP_EPILOG
 
+from fedleave.chart_style import draw_historical_and_future_line
+from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.project_info import HELP_EPILOG
 
 # Chart rendering constants (base dimensions)
 BASE_WIDTH = 1610
@@ -37,14 +37,15 @@ BORDER = "#808080"
 TEXT = "#000000"
 BACKGROUND = "#FFFFFF"
 
+
 class ChartDimensions:
     """Chart dimensions scaled to specific pixel width."""
-    
+
     def __init__(self, width_pixels: int = BASE_WIDTH):
         """
         Initialize chart dimensions based on target width in pixels.
         Height is calculated maintaining aspect ratio.
-        
+
         Args:
             width_pixels: Target image width in pixels (default: 1610)
         """
@@ -62,10 +63,10 @@ class ChartDimensions:
 def find_fedleave_app() -> Path:
     """
     Find the fedleave application in the same directory as the chart executable or in PATH.
-    
+
     Returns:
         Path to fedleave executable
-        
+
     Raises:
         SystemExit: If fedleave cannot be found with helpful error message
     """
@@ -102,13 +103,13 @@ fedleave bundle directory next to this application.
 def run_fedleave(args: list[str]) -> Any:
     """
     Run fedleave command and return parsed JSON output.
-    
+
     Args:
         args: Command line arguments to pass to fedleave
-        
+
     Returns:
         Parsed JSON output from fedleave --json
-        
+
     Raises:
         SystemExit: If fedleave command fails
     """
@@ -121,9 +122,7 @@ def run_fedleave(args: list[str]) -> Any:
     )
     if result.returncode != 0:
         detail = "\n".join(part for part in [result.stdout, result.stderr] if part).strip()
-        raise SystemExit(
-            f"fedleave command failed with exit code {result.returncode}:\n{detail}"
-        )
+        raise SystemExit(f"fedleave command failed with exit code {result.returncode}:\n{detail}")
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as e:
@@ -154,8 +153,7 @@ def infer_leave_year(data_dir: Path) -> int:
     year_files = sorted(leave_year_dir.glob("*.json"))
     if not year_files:
         raise SystemExit(
-            f"No leave-year files found in {leave_year_dir}. "
-            "Run `fedleave init` first or specify --data-dir PATH."
+            f"No leave-year files found in {leave_year_dir}. Run `fedleave init` first or specify --data-dir PATH."
         )
 
     today = date.today()
@@ -180,19 +178,18 @@ def infer_leave_year(data_dir: Path) -> int:
         return max(valid_years)
 
     raise SystemExit(
-        f"No readable leave-year files found in {leave_year_dir}. "
-        "Run `fedleave init` first or specify --data-dir PATH."
+        f"No readable leave-year files found in {leave_year_dir}. Run `fedleave init` first or specify --data-dir PATH."
     )
 
 
 def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, Any]:
     """
     Get leave year snapshot data using fedleave.
-    
+
     Args:
         year: Leave year number
         data_dir: Optional data directory path
-        
+
     Returns:
         Dictionary with leave_year_start, leave_year_end, transactions, starting_balances, etc.
     """
@@ -256,32 +253,30 @@ def load_font(size: int, bold: bool = False, scale: float = 1.0) -> ImageFont.Fr
     return ImageFont.load_default()
 
 
-def sick_leave_balance_points(year: int, data_dir: Path | None = None) -> tuple[list[tuple[date, Decimal]], dict[str, Any], Decimal]:
+def sick_leave_balance_points(
+    year: int, data_dir: Path | None = None
+) -> tuple[list[tuple[date, Decimal]], dict[str, Any], Decimal]:
     """
     Get sick leave balance points for each pay period.
-    
+
     Args:
         year: Leave year number
         data_dir: Optional data directory path
-        
+
     Returns:
         Tuple of (points list, snapshot dict, max_balance)
     """
     snapshot = get_leave_year_data(year, data_dir)
-    
+
     starts = snapshot.get("starting_balances", {})
     running = decimal_hours(starts.get("sick", 0))
-    
+
     # Get all sick leave transactions, sorted by date and ID
     txs = sorted(
-        [
-            tx
-            for tx in snapshot.get("transactions", [])
-            if not tx.get("void") and tx.get("category") == "sick"
-        ],
+        [tx for tx in snapshot.get("transactions", []) if not tx.get("void") and tx.get("category") == "sick"],
         key=lambda tx: (tx.get("date", ""), str(tx.get("id", ""))),
     )
-    
+
     # Get pay period end dates
     pay_periods = snapshot.get("pay_periods", [])
     if not pay_periods:
@@ -291,15 +286,15 @@ def sick_leave_balance_points(year: int, data_dir: Path | None = None) -> tuple[
         for index in range(26):
             period_end = min(start + timedelta(days=index * 14 + 13), end)
             pay_periods.append({"end_date": period_end.isoformat()})
-    
+
     # Calculate balance at each pay period end
     tx_index = 0
     points: list[tuple[date, Decimal]] = []
     max_balance = running
-    
+
     for period_data in pay_periods:
         period_end = pay_period_end_date(period_data)
-        
+
         while tx_index < len(txs) and date.fromisoformat(txs[tx_index]["date"]) <= period_end:
             tx = txs[tx_index]
             hours = decimal_hours(tx.get("hours"))
@@ -309,10 +304,10 @@ def sick_leave_balance_points(year: int, data_dir: Path | None = None) -> tuple[
             elif direction in {"used", "expired", "forfeited", "forced_decrease"}:
                 running -= hours
             tx_index += 1
-        
+
         points.append((period_end, running))
         max_balance = max(max_balance, running)
-    
+
     return points, snapshot, max_balance
 
 
@@ -324,16 +319,16 @@ def round_up_to_hundred(value: Decimal) -> Decimal:
 def y_to_px(value: Decimal, dims: ChartDimensions, y_max: Decimal) -> float:
     """Convert Y-axis value to pixel coordinate."""
     clamped = max(dims.y_min, min(y_max, value))
-    return float(dims.plot_bottom - ((clamped - dims.y_min) / (y_max - dims.y_min)) * (dims.plot_bottom - dims.plot_top))
+    return float(
+        dims.plot_bottom - ((clamped - dims.y_min) / (y_max - dims.y_min)) * (dims.plot_bottom - dims.plot_top)
+    )
 
 
 def x_positions(count: int, dims: ChartDimensions) -> list[float]:
     """Get X-axis pixel positions for data points."""
     if count <= 1:
         return [(dims.plot_left + dims.plot_right) / 2]
-    return [
-        dims.plot_left + (dims.plot_right - dims.plot_left) * index / (count - 1) for index in range(count)
-    ]
+    return [dims.plot_left + (dims.plot_right - dims.plot_left) * index / (count - 1) for index in range(count)]
 
 
 def rotated_label(text: str, font: ImageFont.ImageFont) -> Image.Image:
@@ -356,7 +351,7 @@ def draw_diamond(draw: ImageDraw.ImageDraw, x: float, y: float, radius: int = 9)
 def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensions, y_max: Decimal) -> None:
     """
     Render sick leave balance chart to PNG file.
-    
+
     Args:
         points: List of (pay_period_end_date, sick_balance_hours) tuples
         output: Output PNG file path
@@ -372,7 +367,7 @@ def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensio
 
     # Border
     draw.rectangle((4, 6, dims.width - 5, dims.height - 10), outline=BORDER, width=2)
-    
+
     # Title
     title = "Sick Leave"
     title_box = draw.textbbox((0, 0), title, font=title_font)
@@ -410,11 +405,10 @@ def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensio
     # Plot data line
     raw_line = [(xs[index], y_to_px(value, dims, y_max)) for index, (_, value) in enumerate(points)]
     dated_line = [
-        (period_end, raw_line[index][0], raw_line[index][1])
-        for index, (period_end, _value) in enumerate(points)
+        (period_end, raw_line[index][0], raw_line[index][1]) for index, (period_end, _value) in enumerate(points)
     ]
     draw_historical_and_future_line(draw, dated_line, as_of=date.today(), fill=BLUE, width=5)
-    
+
     # Plot data points
     for x, y in raw_line:
         draw_diamond(draw, x, y, 9)
@@ -439,9 +433,7 @@ def main() -> None:
         epilog=HELP_EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument(
-        "--year", type=int, help="Leave year. Defaults to current leave year."
-    )
+    parser.add_argument("--year", type=int, help="Leave year. Defaults to current leave year.")
     parser.add_argument("--outputFile", required=True, help="Output PNG file path")
     parser.add_argument(
         "--resolution",
@@ -449,23 +441,17 @@ def main() -> None:
         default=BASE_WIDTH,
         help=f"Image width in pixels (default: {BASE_WIDTH}). Height is scaled maintaining aspect ratio.",
     )
-    parser.add_argument(
-        "--data-dir", help="fedleave data directory (default: ~/.local/share/fedleave)"
-    )
+    parser.add_argument("--data-dir", help="fedleave data directory (default: ~/.local/share/fedleave)")
     args = parser.parse_args()
 
     # Validate output file is PNG
     output_path = Path(args.outputFile).expanduser()
     if not output_path.suffix.lower() == ".png":
-        raise SystemExit(
-            f"Error: Output file must have .png extension. Got: {output_path}"
-        )
+        raise SystemExit(f"Error: Output file must have .png extension. Got: {output_path}")
 
     # Validate resolution is positive
     if args.resolution <= 0:
-        raise SystemExit(
-            f"Error: Resolution must be a positive number of pixels. Got: {args.resolution}"
-        )
+        raise SystemExit(f"Error: Resolution must be a positive number of pixels. Got: {args.resolution}")
 
     data_dir = Path(args.data_dir).expanduser() if args.data_dir else get_default_data_dir()
 
@@ -476,11 +462,11 @@ def main() -> None:
     points, snapshot, max_balance = sick_leave_balance_points(args.year, data_dir)
     output = output_path.resolve()
     dims = ChartDimensions(width_pixels=args.resolution)
-    
+
     # Round up max to next hundred for Y-axis
     y_max = round_up_to_hundred(max_balance)
     render(points, output, dims, y_max)
-    
+
     print(
         json.dumps(
             {

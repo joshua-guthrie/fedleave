@@ -16,13 +16,12 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QScrollArea,
     QSizePolicy,
-    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
 )
 
 from fedleave.chart_style import BACKGROUND, BLUE, BORDER, GRID_MAJOR, RED, TEXT
-
 
 SERIES_COLORS = [BLUE, "#82A9D1", RED, "#D99694", "#8064A2", "#4BACC6"]
 WIDTH = 1610
@@ -30,11 +29,36 @@ HEIGHT = 1000
 HORIZONTAL_HEIGHT = 700
 AXIS_FONT_SIZE = 10
 NUMERIC_KEYS = {
-    "value", "hours", "through_today", "future_scheduled", "full_leave_year", "full_day_total",
-    "earned_or_added", "decreased", "used", "worked", "earned", "paid_out", "forfeited", "expired",
-    "net_change", "leave_hours", "percentage", "original", "remaining_today", "projected_remaining",
-    "age", "matured_lots", "earned_hours", "used_before_expiration", "percentage_consumed",
-    "overtime_worked", "comp_earned", "credit_earned", "combined_additional_work", "pay_period",
+    "value",
+    "hours",
+    "through_today",
+    "future_scheduled",
+    "full_leave_year",
+    "full_day_total",
+    "earned_or_added",
+    "decreased",
+    "used",
+    "worked",
+    "earned",
+    "paid_out",
+    "forfeited",
+    "expired",
+    "net_change",
+    "leave_hours",
+    "percentage",
+    "original",
+    "remaining_today",
+    "projected_remaining",
+    "age",
+    "matured_lots",
+    "earned_hours",
+    "used_before_expiration",
+    "percentage_consumed",
+    "overtime_worked",
+    "comp_earned",
+    "credit_earned",
+    "combined_additional_work",
+    "pay_period",
 }
 
 
@@ -74,9 +98,7 @@ class ResponsivePixmapLabel(QLabel):
         target = self.contentsRect().size()
         if target.width() < 2 or target.height() < 2:
             return
-        super().setPixmap(
-            self._source_pixmap.scaled(target, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        )
+        super().setPixmap(self._source_pixmap.scaled(target, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
 
 def _display(value: Any) -> str:
@@ -204,7 +226,13 @@ def render_bar_chart(
                 x = center + (series_index - (len(series) - 1) / 2) * bar_width - bar_width / 2
                 y = min(zero_y, value_y)
                 height = max(1.0, abs(zero_y - value_y))
-                painter.fillRect(int(x), int(y), max(1, int(bar_width - 2)), int(height), QColor(SERIES_COLORS[series_index % len(SERIES_COLORS)]))
+                painter.fillRect(
+                    int(x),
+                    int(y),
+                    max(1, int(bar_width - 2)),
+                    int(height),
+                    QColor(SERIES_COLORS[series_index % len(SERIES_COLORS)]),
+                )
             label = str(row.get(label_key, ""))
             painter.save()
             painter.translate(int(center), bottom + 12)
@@ -274,19 +302,34 @@ def render_horizontal_bar_chart(
         for row_index, row in enumerate(rows):
             center_y = top + row_height * (row_index + 0.5)
             painter.setPen(QColor(TEXT))
-            painter.drawText(10, int(center_y - row_height / 2), left - 25, int(row_height), Qt.AlignRight | Qt.AlignVCenter, str(row.get(label_key, "")))
+            painter.drawText(
+                10,
+                int(center_y - row_height / 2),
+                left - 25,
+                int(row_height),
+                Qt.AlignRight | Qt.AlignVCenter,
+                str(row.get(label_key, "")),
+            )
             for series_index, (key, _label) in enumerate(series):
                 value = float(row.get(key) or 0)
                 y = center_y + (series_index - (len(series) - 1) / 2) * bar_height - bar_height / 2
                 value_x = left + (value - minimum) / (maximum - minimum) * (right - left)
                 bar_left = min(zero_x, value_x)
                 width = max(1, int(abs(value_x - zero_x)))
-                painter.fillRect(int(bar_left), int(y), width, max(1, int(bar_height - 2)), QColor(SERIES_COLORS[series_index % len(SERIES_COLORS)]))
+                painter.fillRect(
+                    int(bar_left),
+                    int(y),
+                    width,
+                    max(1, int(bar_height - 2)),
+                    QColor(SERIES_COLORS[series_index % len(SERIES_COLORS)]),
+                )
                 if abs(value) > 1e-9:
                     painter.setPen(QColor(TEXT))
                     label_x = int(value_x) + 5 if value >= 0 else int(value_x) - 80
                     alignment = Qt.AlignLeft if value >= 0 else Qt.AlignRight
-                    painter.drawText(label_x, int(y) - 2, 75, int(bar_height + 4), alignment | Qt.AlignVCenter, _display(value))
+                    painter.drawText(
+                        label_x, int(y) - 2, 75, int(bar_height + 4), alignment | Qt.AlignVCenter, _display(value)
+                    )
 
         legend_x = left
         for series_index, (_key, label) in enumerate(series):
@@ -416,12 +459,16 @@ class AnalyticsChartWindow(QMainWindow):
         return str(self._default_folder / filename) if str(self._default_folder) not in {"", "."} else filename
 
     def save_png(self) -> None:
-        path, _filter = QFileDialog.getSaveFileName(self, "Save Graphic as PNG", self._default_path("png"), "PNG files (*.png)")
+        path, _filter = QFileDialog.getSaveFileName(
+            self, "Save Graphic as PNG", self._default_path("png"), "PNG files (*.png)"
+        )
         if path and not self._pixmap.save(path, "PNG"):
             QMessageBox.warning(self, "Save Graphic", f"Could not save PNG to {path}.")
 
     def save_pdf(self) -> None:
-        path, _filter = QFileDialog.getSaveFileName(self, "Save Graphic as PDF", self._default_path("pdf"), "PDF files (*.pdf)")
+        path, _filter = QFileDialog.getSaveFileName(
+            self, "Save Graphic as PDF", self._default_path("pdf"), "PDF files (*.pdf)"
+        )
         if not path:
             return
         printer = QPrinter(QPrinter.HighResolution)

@@ -1,6 +1,5 @@
-from pathlib import Path
-import os
 import sys
+from pathlib import Path
 
 from fedleave.config import get_default_data_dir
 

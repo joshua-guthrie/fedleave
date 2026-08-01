@@ -17,7 +17,6 @@ import yearly_leave_comparison_chart
 from fedleave.cli_app import HELP_TEXT
 from fedleave.project_info import OFFICIAL_PROJECT_URL, PROJECT_AUTHOR
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

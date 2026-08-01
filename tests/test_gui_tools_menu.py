@@ -1,12 +1,11 @@
-import os
 import json
+import os
+
 from PySide6.QtWidgets import QDialog
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
-from PySide6.QtWidgets import QFileDialog
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from fedleave_gui.backend import BackendError
 from fedleave_gui.main_window import MainWindow, _visible_categories
@@ -108,14 +107,21 @@ def test_analytics_view_action_launches_companion_with_current_context(monkeypat
 
     window.open_analytics()
 
-    assert calls == [[
-        str(analytics_path),
-        "--backend", str(backend_path),
-        "--year", "2027",
-        "--font-size", "12",
-        "--data-dir", str(tmp_path / "data"),
-        "--pdf-folder", str(tmp_path / "pdf"),
-    ]]
+    assert calls == [
+        [
+            str(analytics_path),
+            "--backend",
+            str(backend_path),
+            "--year",
+            "2027",
+            "--font-size",
+            "12",
+            "--data-dir",
+            str(tmp_path / "data"),
+            "--pdf-folder",
+            str(tmp_path / "pdf"),
+        ]
+    ]
 
 
 def test_analytics_view_action_passes_resolved_default_data_directory(monkeypatch, tmp_path):
@@ -281,7 +287,9 @@ def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monk
 
     view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
-        action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
+        action
+        for action in view_action.menu().actions()
+        if action.menu() and action.text() == "Yearly Leave Comparison"
     )
 
     assert yearly_comparison_action.menu().isEnabled() is False
@@ -295,17 +303,27 @@ def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monk
 def test_category_visibility_considers_balances_and_transactions_across_years(tmp_path):
     leave_years = tmp_path / "leave_years"
     leave_years.mkdir()
-    (leave_years / "2025.json").write_text(json.dumps({
-        "starting_balances": {"annual": 20, "religious_comp": 0},
-        "transactions": [],
-    }), encoding="utf-8")
-    (leave_years / "2026.json").write_text(json.dumps({
-        "starting_balances": {},
-        "transactions": [
-            {"category": "overtime", "hours": 2, "status": "reconciled"},
-            {"category": "religious_comp", "hours": 4, "status": "denied"},
-        ],
-    }), encoding="utf-8")
+    (leave_years / "2025.json").write_text(
+        json.dumps(
+            {
+                "starting_balances": {"annual": 20, "religious_comp": 0},
+                "transactions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (leave_years / "2026.json").write_text(
+        json.dumps(
+            {
+                "starting_balances": {},
+                "transactions": [
+                    {"category": "overtime", "hours": 2, "status": "reconciled"},
+                    {"category": "religious_comp", "hours": 4, "status": "denied"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
 
     assert _visible_categories(_MetadataBackend([2025, 2026], ["annual", "overtime"])) == {
         "annual",
@@ -455,7 +473,9 @@ def test_import_wms_http_report_uses_html_picker_and_refreshes(monkeypatch, tmp_
 
     report = tmp_path / "clocking.html"
     report.write_text("<html><body><table class='jrPage'></table></body></html>", encoding="utf-8")
-    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(report), "HTML files (*.html *.htm)"))
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(report), "HTML files (*.html *.htm)")
+    )
     monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.Ok)
     monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
 
@@ -507,7 +527,9 @@ def test_wms_import_failure_uses_copyable_diagnostic_dialog(monkeypatch, tmp_pat
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
     monkeypatch.setattr(MainWindow, "_backend", lambda self: FakeBackend())
     monkeypatch.setattr("fedleave_gui.main_window.DiagnosticDialog", FakeDiagnosticDialog)
-    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(tmp_path / "clocking.html"), "HTML"))
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName", lambda *args, **kwargs: (str(tmp_path / "clocking.html"), "HTML")
+    )
     monkeypatch.setattr(QMessageBox, "warning", lambda *args, **kwargs: QMessageBox.Ok)
     monkeypatch.setattr(QMessageBox, "question", lambda *args, **kwargs: QMessageBox.Yes)
     window = MainWindow()
@@ -587,8 +609,11 @@ def test_help_menu_hides_backend_about_action(monkeypatch):
     labels = [action.text() for action in help_action.menu().actions() if action.text()]
 
     assert labels == [
-        "Help Contents", "Leave Abbreviations", "Official Project Website",
-        "Check for Updates...", "About FedLeave Calendar",
+        "Help Contents",
+        "Leave Abbreviations",
+        "Official Project Website",
+        "Check for Updates...",
+        "About FedLeave Calendar",
     ]
 
 

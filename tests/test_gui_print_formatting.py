@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -76,7 +75,9 @@ def test_save_pdf_delegates_to_print_document(monkeypatch, tmp_path):
         captured["printer"] = printer
 
     monkeypatch.setattr(window, "_print_document", fake_print_document)
-    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(tmp_path / "month.pdf"), "PDF files (*.pdf)"))
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(tmp_path / "month.pdf"), "PDF files (*.pdf)")
+    )
 
     window.save_pdf()
 

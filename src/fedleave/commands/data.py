@@ -97,9 +97,7 @@ def years(
                 values = leave_year.get(field, {})
                 if isinstance(values, dict):
                     visible_categories.update(
-                        str(category)
-                        for category, value in values.items()
-                        if _nonzero_number(value)
+                        str(category) for category, value in values.items() if _nonzero_number(value)
                     )
             for transaction in leave_year.get("transactions", []):
                 if not isinstance(transaction, dict):
@@ -153,6 +151,7 @@ def init(
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     from ..config import init_config
+
     # validate leave_year_start early to avoid creating bad state
     try:
         leave_year_start = parse_iso_date(leave_year_start).isoformat()
@@ -178,6 +177,7 @@ def init(
         holiday_ics_url=holiday_ics_url,
         data_dir=data_dir,
     )
+
 
 def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
     if not directory.exists():
@@ -473,6 +473,7 @@ def validate(
     With `--apply` the command will write back normalized dates for transactions when safe.
     """
     from ..storage import write_json
+
     if not isinstance(apply, bool):
         apply = False
     if not isinstance(json_output, bool):

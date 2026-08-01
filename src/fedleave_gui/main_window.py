@@ -2,29 +2,27 @@ from __future__ import annotations
 
 import calendar
 import html
-import os
 import subprocess
-import sys
 import tempfile
-from datetime import datetime, timedelta, timezone
 import webbrowser
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QByteArray, QDate, QTimer, Qt, QUrl
+from PySide6.QtCore import QByteArray, QDate, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QColor, QFont, QPageLayout, QPainter, QPixmap, QResizeEvent, QTextDocument
+from PySide6.QtPrintSupport import QPrintDialog, QPrinter, QPrintPreviewDialog
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtPrintSupport import QPrintDialog, QPrintPreviewDialog, QPrinter
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QDateEdit,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
-    QDateEdit,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -33,32 +31,30 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMainWindow,
     QMessageBox,
+    QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSizePolicy,
     QSpinBox,
-    QDoubleSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTextBrowser,
-    QPlainTextEdit,
     QToolBar,
     QVBoxLayout,
     QWidget,
 )
 
-from . import __version__
-from .chart_windows import LeaveChartDialog
-from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend, find_analytics
-from .resources import asset_file, help_base_url, help_file, window_icon
 from fedleave.config import get_default_data_dir
 from fedleave.payperiods import calculate_pay_date
 from fedleave.project_info import OFFICIAL_PROJECT_URL
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
 from fedleave_month_report_graphic.report import ReportData as MonthReportData
 from fedleave_month_report_graphic.report import render_svg as render_month_report_svg
-from .settings import GuiSettings, load_settings, save_settings, settings_path
 
+from .backend import BackendError, BackendMissingError, BackendOptions, FedleaveBackend, find_analytics
+from .chart_windows import LeaveChartDialog
+from .resources import asset_file, help_base_url, help_file, window_icon
+from .settings import GuiSettings, load_settings, save_settings, settings_path
 
 CATEGORY_LABELS = {
     "annual": ("A", "Annual Leave"),
@@ -400,7 +396,13 @@ class DayEditDialog(QDialog):
 class SaveDayPreviewDialog(QDialog):
     _COLUMN_WEIGHT_SUM = 5
 
-    def __init__(self, day: dict[str, Any], existing_values: dict[str, float], new_values: dict[str, float], parent: QWidget | None = None) -> None:
+    def __init__(
+        self,
+        day: dict[str, Any],
+        existing_values: dict[str, float],
+        new_values: dict[str, float],
+        parent: QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Review Save for {day['date']}")
         self.resize(640, 420)
@@ -817,7 +819,13 @@ class ExpirationStatusDialog(QDialog):
             ["Leave Type", "Earned", "Original Hours", "Remaining", "Expires", "PP Left", "Use / PP", "Lot ID"]
         )
         self.table.verticalHeader().setVisible(False)
-        alignments = [TABLE_TEXT_ALIGNMENT, TABLE_TEXT_ALIGNMENT] + [TABLE_NUMBER_ALIGNMENT] * 2 + [TABLE_TEXT_ALIGNMENT] + [TABLE_NUMBER_ALIGNMENT] * 2 + [TABLE_TEXT_ALIGNMENT]
+        alignments = (
+            [TABLE_TEXT_ALIGNMENT, TABLE_TEXT_ALIGNMENT]
+            + [TABLE_NUMBER_ALIGNMENT] * 2
+            + [TABLE_TEXT_ALIGNMENT]
+            + [TABLE_NUMBER_ALIGNMENT] * 2
+            + [TABLE_TEXT_ALIGNMENT]
+        )
         _set_table_header_alignments(self.table, alignments)
         for row_number, row in enumerate(lots):
             values = [
@@ -906,7 +914,9 @@ class TransactionDateRangeDialog(QDialog):
 
 
 class LeaveTransactionsDialog(QDialog):
-    def __init__(self, start: date, end: date, transactions: list[dict[str, Any]], parent: QWidget | None = None) -> None:
+    def __init__(
+        self, start: date, end: date, transactions: list[dict[str, Any]], parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Leave Transactions")
         self.resize(1100, 560)
@@ -915,7 +925,9 @@ class LeaveTransactionsDialog(QDialog):
         layout.addWidget(QLabel(f"Transactions from {start.isoformat()} to {end.isoformat()}"))
 
         self.table = QTableWidget(len(transactions), 8)
-        self.table.setHorizontalHeaderLabels(["Date", "Type", "Direction", "Hours", "Status", "Source", "Description", "ID"])
+        self.table.setHorizontalHeaderLabels(
+            ["Date", "Type", "Direction", "Hours", "Status", "Source", "Description", "ID"]
+        )
         self.table.verticalHeader().setVisible(False)
         _set_table_header_alignments(
             self.table,
@@ -989,9 +1001,7 @@ def _leave_year_metadata(source: FedleaveBackend | dict[str, Any]) -> dict[str, 
 
 def _available_leave_years(source: FedleaveBackend | dict[str, Any]) -> list[int]:
     return sorted(
-        int(record["leave_year"])
-        for record in _leave_year_metadata(source)["years"]
-        if record.get("valid") is True
+        int(record["leave_year"]) for record in _leave_year_metadata(source)["years"] if record.get("valid") is True
     )
 
 
@@ -1154,7 +1164,9 @@ class MainWindow(QMainWindow):
         root_layout.addWidget(self.balance_button)
         self.balance_table = QTableWidget(0, 3)
         self.balance_table.setHorizontalHeaderLabels(["Category", "Balance", "Use or Lose"])
-        _set_table_header_alignments(self.balance_table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT])
+        _set_table_header_alignments(
+            self.balance_table, [TABLE_TEXT_ALIGNMENT, TABLE_NUMBER_ALIGNMENT, TABLE_NUMBER_ALIGNMENT]
+        )
         self.balance_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         root_layout.addWidget(self.balance_table, 1)
 
@@ -1188,13 +1200,19 @@ class MainWindow(QMainWindow):
             self.yearly_comparison_actions[category] = self._action(
                 self.yearly_comparison_menu,
                 f"{label} Comparison",
-                lambda _checked=False, app_name=app_name, label=label, category=category: self.open_yearly_leave_comparison(app_name, label, category),
+                lambda _checked=False, app_name=app_name, label=label, category=category: (
+                    self.open_yearly_leave_comparison(app_name, label, category)
+                ),
             )
         self.yearly_comparison_menu.setEnabled(False)
-        self._toggle(view_menu, "Show Automatic Accruals in Day Cells", self.settings.show_auto_accruals, "show_auto_accruals")
+        self._toggle(
+            view_menu, "Show Automatic Accruals in Day Cells", self.settings.show_auto_accruals, "show_auto_accruals"
+        )
         self._toggle(view_menu, "Show Holidays", self.settings.show_holidays, "show_holidays")
         self._toggle(view_menu, "Show Pay-Day Highlight", self.settings.show_paydays, "show_paydays")
-        self._toggle(view_menu, "Show Pay-Period End Highlight", self.settings.show_pay_period_end, "show_pay_period_end")
+        self._toggle(
+            view_menu, "Show Pay-Period End Highlight", self.settings.show_pay_period_end, "show_pay_period_end"
+        )
         tools_menu = self.menuBar().addMenu("Tools")
         self._action(tools_menu, "Change Accrual...", self.change_accrual)
         self._action(tools_menu, "Force Leave Balance...", self.force_leave_balance)
@@ -1279,14 +1297,10 @@ class MainWindow(QMainWindow):
             self.render_month()
             self.refresh()
 
-    def _refresh_yearly_comparison_menu(
-        self, metadata: dict[str, Any] | None = None
-    ) -> None:
+    def _refresh_yearly_comparison_menu(self, metadata: dict[str, Any] | None = None) -> None:
         if self.yearly_comparison_menu is None:
             return
-        self.yearly_comparison_menu.setEnabled(
-            len(_available_leave_years(metadata or self.backend)) > 1
-        )
+        self.yearly_comparison_menu.setEnabled(len(_available_leave_years(metadata or self.backend)) > 1)
 
     def _refresh_chart_visibility(self, metadata: dict[str, Any] | None = None) -> None:
         visible = _visible_categories(metadata or self.backend)
@@ -1305,7 +1319,11 @@ class MainWindow(QMainWindow):
             self._refresh_yearly_comparison_menu(metadata)
             self._refresh_chart_visibility(metadata)
         except BackendMissingError:
-            QMessageBox.critical(self, "Backend Missing", "The fedleave backend executable could not be found. Open Preferences to set the path.")
+            QMessageBox.critical(
+                self,
+                "Backend Missing",
+                "The fedleave backend executable could not be found. Open Preferences to set the path.",
+            )
             self.preferences()
             return
         except BackendError as exc:
@@ -1396,13 +1414,17 @@ class MainWindow(QMainWindow):
         self.pay_period_layout.addStretch(1)
 
     def _render_balances(self) -> None:
-        snapshot = self.balance_snapshot or (self.month_json.get("balance_as_of_today") if self.month_json else {}) or {}
-        balance = (snapshot.get("balances") or {})
-        use_or_lose = (self.use_or_lose_json or {}).get("use_or_lose") if isinstance(self.use_or_lose_json, dict) else {}
+        snapshot = (
+            self.balance_snapshot or (self.month_json.get("balance_as_of_today") if self.month_json else {}) or {}
+        )
+        balance = snapshot.get("balances") or {}
+        use_or_lose = (
+            (self.use_or_lose_json or {}).get("use_or_lose") if isinstance(self.use_or_lose_json, dict) else {}
+        )
         if not isinstance(use_or_lose, dict):
             use_or_lose = {}
         if not use_or_lose:
-            use_or_lose = ((self.month_json.get("projected_balance") or {}).get("use_or_lose") or {})
+            use_or_lose = (self.month_json.get("projected_balance") or {}).get("use_or_lose") or {}
         self.balance_table.setRowCount(0)
         for category, value in sorted(balance.items()):
             if not _nonzero(value):
@@ -1471,7 +1493,10 @@ class MainWindow(QMainWindow):
         dialog = StartYearDialog(self)
         if dialog.exec() != QDialog.Accepted:
             return
-        if QMessageBox.question(self, "Create Leave Year", f"Create Leave Year {dialog.year.value()}?") != QMessageBox.Yes:
+        if (
+            QMessageBox.question(self, "Create Leave Year", f"Create Leave Year {dialog.year.value()}?")
+            != QMessageBox.Yes
+        ):
             return
         try:
             self.backend.init_year(
@@ -1499,10 +1524,14 @@ class MainWindow(QMainWindow):
         except BackendError as exc:
             QMessageBox.warning(self, "Validation Failed", str(exc))
             return
-        QMessageBox.information(self, "Validate Data", "Data is valid." if payload.get("ok") else "Validation found issues.")
+        QMessageBox.information(
+            self, "Validate Data", "Data is valid." if payload.get("ok") else "Validation found issues."
+        )
 
     def export_data(self) -> None:
-        path, _ = QFileDialog.getSaveFileName(self, "Export FedLeave Data", "fedleave_backup.json", "JSON files (*.json)")
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export FedLeave Data", "fedleave_backup.json", "JSON files (*.json)"
+        )
         if not path:
             return
         try:
@@ -1647,7 +1676,9 @@ class MainWindow(QMainWindow):
             return
         if result.get("status") != "ok":
             if interactive:
-                QMessageBox.information(self, "Check for Updates", str(result.get("message", "Update check unavailable.")))
+                QMessageBox.information(
+                    self, "Check for Updates", str(result.get("message", "Update check unavailable."))
+                )
             return
         latest = str(result.get("latest_version") or "")
         if result.get("update_available"):
@@ -1690,9 +1721,9 @@ class MainWindow(QMainWindow):
         if not limits:
             return
         urgent = [
-            row for row in payload.get("lots", [])
-            if float(row.get("remaining_hours", 0.0)) > 0
-            and int(row.get("pay_periods_remaining", 0)) <= max(limits)
+            row
+            for row in payload.get("lots", [])
+            if float(row.get("remaining_hours", 0.0)) > 0 and int(row.get("pay_periods_remaining", 0)) <= max(limits)
         ]
         if not urgent:
             return
@@ -1742,7 +1773,15 @@ class MainWindow(QMainWindow):
         except BackendError as exc:
             QMessageBox.warning(self, "FedLeave Analytics", str(exc))
             return
-        command = [str(analytics), "--backend", str(backend), "--year", str(self.year), "--font-size", str(self.settings.font_size)]
+        command = [
+            str(analytics),
+            "--backend",
+            str(backend),
+            "--year",
+            str(self.year),
+            "--font-size",
+            str(self.settings.font_size),
+        ]
         command.extend(["--data-dir", str(self.backend.data_directory())])
         if self.settings.pdf_export_folder:
             command.extend(["--pdf-folder", self.settings.pdf_export_folder])
@@ -1909,7 +1948,9 @@ class MainWindow(QMainWindow):
             return
 
         if not transactions:
-            QMessageBox.information(self, "View Leave Transactions", "No leave transactions were found for that date range.")
+            QMessageBox.information(
+                self, "View Leave Transactions", "No leave transactions were found for that date range."
+            )
             return
 
         LeaveTransactionsDialog(start_date, end_date, transactions, self).exec()

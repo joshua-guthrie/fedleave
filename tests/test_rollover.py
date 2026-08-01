@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from fedleave.config import init_config
-from fedleave.ledger import add_transaction_to_leave_year, create_transaction, calculate_balances
-from fedleave.storage import write_json
 from fedleave.cli import rollover
+from fedleave.config import init_config
+from fedleave.ledger import add_transaction_to_leave_year, create_transaction
+from fedleave.storage import write_json
 
 
 def test_rollover_preview_and_apply(tmp_path: Path):
@@ -27,7 +27,7 @@ def test_rollover_preview_and_apply(tmp_path: Path):
     )
 
     year_file = data_dir / "leave_years" / "2026.json"
-    leave_year = __import__('json').loads(year_file.read_text())
+    leave_year = __import__("json").loads(year_file.read_text())
     # add a transaction to change annual balance
     t = create_transaction(date="2026-06-01", category="annual", direction="used", hours=20.0, existing_ids=[])
     add_transaction_to_leave_year(leave_year, t)
@@ -41,10 +41,10 @@ def test_rollover_preview_and_apply(tmp_path: Path):
 
     new_file = data_dir / "leave_years" / "2027.json"
     assert new_file.exists()
-    new_ly = __import__('json').loads(new_file.read_text())
+    new_ly = __import__("json").loads(new_file.read_text())
     # carried annual includes init-seeded accruals and remains capped by the carryover limit
-    assert abs(new_ly['starting_balances']['annual'] - 236.0) < 1e-6
-    assert abs(new_ly['starting_balances']['sick'] - 154.0) < 1e-6
+    assert abs(new_ly["starting_balances"]["annual"] - 236.0) < 1e-6
+    assert abs(new_ly["starting_balances"]["sick"] - 154.0) < 1e-6
 
 
 def test_rollover_preserves_expiring_leave_as_individual_lots(tmp_path: Path):
@@ -55,8 +55,14 @@ def test_rollover_preserves_expiring_leave_as_individual_lots(tmp_path: Path):
         leave_year_start="2026-01-11",
         annual_accrual=0,
         starting_balances={
-            "annual": 0, "sick": 0, "comp": 0, "credit": 0, "travel_comp": 0,
-            "time_off_award": 0, "religious_comp": 0, "restored_annual": 0,
+            "annual": 0,
+            "sick": 0,
+            "comp": 0,
+            "credit": 0,
+            "travel_comp": 0,
+            "time_off_award": 0,
+            "religious_comp": 0,
+            "restored_annual": 0,
         },
         data_dir=data_dir,
     )

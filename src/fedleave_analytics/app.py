@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, QThread, QTimer, Qt, Signal, Slot
+from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
@@ -25,9 +25,8 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSplitter,
-    QTabWidget,
     QTableWidget,
-    QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -44,89 +43,166 @@ from .charts import (
     table_widget,
 )
 
-
 SUMMARY_COLUMNS = [
-    ("metric", "Metric"), ("value", "Value"), ("units", "Units"),
-    ("period_or_date", "Period or Date"), ("basis", "Basis"),
+    ("metric", "Metric"),
+    ("value", "Value"),
+    ("units", "Units"),
+    ("period_or_date", "Period or Date"),
+    ("basis", "Basis"),
 ]
 TIME_COLUMNS = [
-    ("through_today", "Through Today"), ("future_scheduled", "Future Scheduled"),
+    ("through_today", "Through Today"),
+    ("future_scheduled", "Future Scheduled"),
     ("full_leave_year", "Full Leave Year"),
 ]
 MONTH_COLUMNS = [("month", "Month"), *TIME_COLUMNS]
 WEEKDAY_COLUMNS = [("weekday", "Weekday"), *TIME_COLUMNS]
 PAY_PERIOD_COLUMNS = [
-    ("pay_period", "Pay Period"), ("start_date", "Start Date"), ("end_date", "End Date"), *TIME_COLUMNS,
+    ("pay_period", "Pay Period"),
+    ("start_date", "Start Date"),
+    ("end_date", "End Date"),
+    *TIME_COLUMNS,
 ]
 HEATMAP_COLUMNS = [
-    ("date", "Date"), ("weekday", "Weekday"), ("through_today", "Through Today"),
-    ("future_scheduled", "Future Scheduled"), ("full_day_total", "Full-Day Total"),
+    ("date", "Date"),
+    ("weekday", "Weekday"),
+    ("through_today", "Through Today"),
+    ("future_scheduled", "Future Scheduled"),
+    ("full_day_total", "Full-Day Total"),
     ("categories", "Categories"),
 ]
 NET_COLUMNS = [
-    ("month", "Month"), ("earned_or_added", "Earned or Added"), ("used", "Used"),
-    ("paid_out", "Paid Out"), ("forfeited", "Forfeited"), ("expired", "Expired"),
+    ("month", "Month"),
+    ("earned_or_added", "Earned or Added"),
+    ("used", "Used"),
+    ("paid_out", "Paid Out"),
+    ("forfeited", "Forfeited"),
+    ("expired", "Expired"),
     ("net_change", "Net Change"),
 ]
 LIFECYCLE_COLUMNS = [("metric", "Metric"), *TIME_COLUMNS, ("units", "Units")]
 LOT_COLUMNS = [
-    ("earned_date", "Earned Date"), ("original", "Original"), ("used", "Used"),
-    ("paid_out", "Paid Out"), ("forfeited", "Forfeited"), ("expired", "Expired"),
-    ("remaining_today", "Remaining Today"), ("projected_remaining", "Projected Remaining"),
-    ("expiration", "Expiration"), ("age", "Age"), ("status", "Status"),
-    ("description", "Description"), ("source", "Source"),
+    ("earned_date", "Earned Date"),
+    ("original", "Original"),
+    ("used", "Used"),
+    ("paid_out", "Paid Out"),
+    ("forfeited", "Forfeited"),
+    ("expired", "Expired"),
+    ("remaining_today", "Remaining Today"),
+    ("projected_remaining", "Projected Remaining"),
+    ("expiration", "Expiration"),
+    ("age", "Age"),
+    ("status", "Status"),
+    ("description", "Description"),
+    ("source", "Source"),
 ]
 ALLOCATION_COLUMNS = [
-    ("event_date", "Event Date"), ("event_type", "Event Type"), ("hours", "Hours"),
-    ("earned_lot_date", "Earned Lot Date"), ("expiration_date", "Expiration Date"),
-    ("allocation_method", "Allocation Method"), ("transaction_id", "Transaction ID"),
+    ("event_date", "Event Date"),
+    ("event_type", "Event Type"),
+    ("hours", "Hours"),
+    ("earned_lot_date", "Earned Lot Date"),
+    ("expiration_date", "Expiration Date"),
+    ("allocation_method", "Allocation Method"),
+    ("transaction_id", "Transaction ID"),
 ]
 MATURED_COLUMNS = [
-    ("matured_lots", "Matured Lots"), ("earned_hours", "Earned Hours"),
-    ("used_before_expiration", "Used Before Expiration"), ("paid_out", "Paid Out"),
-    ("forfeited", "Forfeited"), ("expired", "Expired"),
+    ("matured_lots", "Matured Lots"),
+    ("earned_hours", "Earned Hours"),
+    ("used_before_expiration", "Used Before Expiration"),
+    ("paid_out", "Paid Out"),
+    ("forfeited", "Forfeited"),
+    ("expired", "Expired"),
     ("percentage_consumed", "Percentage Consumed"),
 ]
 OVERTIME_COMP_COLUMNS = [
-    ("month", "Month"), ("overtime_worked", "Overtime Worked"),
-    ("comp_earned", "Comp Earned"), ("credit_earned", "Credit Earned or Worked"),
+    ("month", "Month"),
+    ("overtime_worked", "Overtime Worked"),
+    ("comp_earned", "Comp Earned"),
+    ("credit_earned", "Credit Earned or Worked"),
     ("combined_additional_work", "Combined Additional Work"),
 ]
 COMP_MONTH_COLUMNS = [
-    ("month", "Month"), ("earned", "Comp Earned"), ("used", "Comp Used"),
-    ("paid_out", "Comp Paid Out"), ("forfeited", "Comp Forfeited"), ("expired", "Comp Expired"),
+    ("month", "Month"),
+    ("earned", "Comp Earned"),
+    ("used", "Comp Used"),
+    ("paid_out", "Comp Paid Out"),
+    ("forfeited", "Comp Forfeited"),
+    ("expired", "Comp Expired"),
 ]
 CREDIT_MONTH_COLUMNS = [
-    ("month", "Month"), ("earned", "Credit Earned"), ("used", "Credit Used"),
-    ("forfeited", "Credit Forfeited"), ("expired", "Credit Expired"),
+    ("month", "Month"),
+    ("earned", "Credit Earned"),
+    ("used", "Credit Used"),
+    ("forfeited", "Credit Forfeited"),
+    ("expired", "Credit Expired"),
 ]
 WARNING_COLUMNS = [
-    ("severity", "Severity"), ("area", "Area"), ("date_or_lot", "Date or Lot"), ("message", "Message"),
+    ("severity", "Severity"),
+    ("area", "Area"),
+    ("date_or_lot", "Date or Lot"),
+    ("message", "Message"),
 ]
 TRANSACTION_COLUMNS = [
-    ("date", "Date"), ("category", "Category"), ("direction", "Direction"),
-    ("hours", "Hours"), ("status", "Status"), ("timing", "Timing"),
-    ("description", "Description"), ("source", "Source"),
-    ("transaction_id", "Transaction ID"), ("earned_transaction_id", "Earned Transaction ID"),
+    ("date", "Date"),
+    ("category", "Category"),
+    ("direction", "Direction"),
+    ("hours", "Hours"),
+    ("status", "Status"),
+    ("timing", "Timing"),
+    ("description", "Description"),
+    ("source", "Source"),
+    ("transaction_id", "Transaction ID"),
+    ("earned_transaction_id", "Earned Transaction ID"),
 ]
 
 
 SEASONALITY_VIEWS: dict[str, tuple[str, list[tuple[str, str]], str, list[tuple[str, str]]]] = {
-    "Leave Used by Month": ("months", MONTH_COLUMNS, "month", [
-        ("through_today", "Through Today"), ("future_scheduled", "Future Scheduled"),
-    ]),
-    "Leave Used by Day of Week": ("weekdays", WEEKDAY_COLUMNS, "weekday", [
-        ("through_today", "Through Today"), ("future_scheduled", "Future Scheduled"),
-    ]),
-    "Leave Used by Pay Period": ("pay_periods", PAY_PERIOD_COLUMNS, "pay_period", [
-        ("through_today", "Through Today"), ("future_scheduled", "Future Scheduled"),
-    ]),
-    "Overtime Worked by Month": ("overtime_months", MONTH_COLUMNS, "month", [
-        ("through_today", "Through Today"), ("future_scheduled", "Future Scheduled"),
-    ]),
-    "Net Leave Accumulation by Month": ("net_accumulation", NET_COLUMNS, "month", [
-        ("earned_or_added", "Earned or Added"), ("used", "Used"), ("net_change", "Net Change"),
-    ]),
+    "Leave Used by Month": (
+        "months",
+        MONTH_COLUMNS,
+        "month",
+        [
+            ("through_today", "Through Today"),
+            ("future_scheduled", "Future Scheduled"),
+        ],
+    ),
+    "Leave Used by Day of Week": (
+        "weekdays",
+        WEEKDAY_COLUMNS,
+        "weekday",
+        [
+            ("through_today", "Through Today"),
+            ("future_scheduled", "Future Scheduled"),
+        ],
+    ),
+    "Leave Used by Pay Period": (
+        "pay_periods",
+        PAY_PERIOD_COLUMNS,
+        "pay_period",
+        [
+            ("through_today", "Through Today"),
+            ("future_scheduled", "Future Scheduled"),
+        ],
+    ),
+    "Overtime Worked by Month": (
+        "overtime_months",
+        MONTH_COLUMNS,
+        "month",
+        [
+            ("through_today", "Through Today"),
+            ("future_scheduled", "Future Scheduled"),
+        ],
+    ),
+    "Net Leave Accumulation by Month": (
+        "net_accumulation",
+        NET_COLUMNS,
+        "month",
+        [
+            ("earned_or_added", "Earned or Added"),
+            ("used", "Used"),
+            ("net_change", "Net Change"),
+        ],
+    ),
 }
 
 
@@ -177,7 +253,9 @@ class TransactionDialog(QDialog):
         self.setWindowTitle("Supporting Transactions")
         self.resize(1100, 560)
         layout = QVBoxLayout(self)
-        heading = QLabel(f"{len(rows)} transaction(s); total {_format_number(sum(float(row.get('hours') or 0) for row in rows))} hours")
+        heading = QLabel(
+            f"{len(rows)} transaction(s); total {_format_number(sum(float(row.get('hours') or 0) for row in rows))} hours"
+        )
         layout.addWidget(heading)
         layout.addWidget(table_widget(rows, TRANSACTION_COLUMNS), 1)
         close_button = QPushButton("Close")
@@ -376,9 +454,15 @@ class AnalyticsWindow(QMainWindow):
             (self.matured_table, "Expiration Performance"),
         ):
             self.lifecycle_tabs.addTab(table, title)
-        self.overtime_comp_page, self.overtime_comp_image, self.overtime_comp_table = self._monthly_lifecycle_page(OVERTIME_COMP_COLUMNS)
-        self.comp_month_page, self.comp_month_image, self.comp_month_table = self._monthly_lifecycle_page(COMP_MONTH_COLUMNS)
-        self.credit_month_page, self.credit_month_image, self.credit_month_table = self._monthly_lifecycle_page(CREDIT_MONTH_COLUMNS)
+        self.overtime_comp_page, self.overtime_comp_image, self.overtime_comp_table = self._monthly_lifecycle_page(
+            OVERTIME_COMP_COLUMNS
+        )
+        self.comp_month_page, self.comp_month_image, self.comp_month_table = self._monthly_lifecycle_page(
+            COMP_MONTH_COLUMNS
+        )
+        self.credit_month_page, self.credit_month_image, self.credit_month_table = self._monthly_lifecycle_page(
+            CREDIT_MONTH_COLUMNS
+        )
         self.lifecycle_tabs.addTab(self.overtime_comp_page, "Overtime, Comp, and Credit by Month")
         self.lifecycle_tabs.addTab(self.comp_month_page, "Monthly Comp Lifecycle")
         self.lifecycle_tabs.addTab(self.credit_month_page, "Monthly Credit Lifecycle")
@@ -501,7 +585,9 @@ class AnalyticsWindow(QMainWindow):
                 "No transactions were returned for this leave year. Verify the selected leave year and the calendar's data settings."
             )
         elif source["absence_transactions"] == 0:
-            self.notice_label.setText("Transactions were loaded, but none qualify as used or scheduled absence. Seasonality and heatmap totals are therefore zero.")
+            self.notice_label.setText(
+                "Transactions were loaded, but none qualify as used or scheduled absence. Seasonality and heatmap totals are therefore zero."
+            )
         else:
             self.notice_label.setText(
                 "Values are hours. Through Today includes dates on or before today; Future Scheduled includes later active transactions."
@@ -616,22 +702,29 @@ class AnalyticsWindow(QMainWindow):
                 self.overtime_comp_image,
                 "Overtime, Comp, and Credit by Month",
                 lifecycle["monthly_overtime_vs_comp"],
-                [("overtime_worked", "Overtime Worked"), ("comp_earned", "Comp Earned"),
-                 ("credit_earned", "Credit Earned or Worked")],
+                [
+                    ("overtime_worked", "Overtime Worked"),
+                    ("comp_earned", "Comp Earned"),
+                    ("credit_earned", "Credit Earned or Worked"),
+                ],
             ),
             (
                 self.comp_month_image,
                 "Monthly Comp Lifecycle",
                 lifecycle["monthly_comp"],
-                [("earned", "Earned"), ("used", "Used"), ("paid_out", "Paid Out"),
-                 ("forfeited", "Forfeited"), ("expired", "Expired")],
+                [
+                    ("earned", "Earned"),
+                    ("used", "Used"),
+                    ("paid_out", "Paid Out"),
+                    ("forfeited", "Forfeited"),
+                    ("expired", "Expired"),
+                ],
             ),
             (
                 self.credit_month_image,
                 "Monthly Credit Lifecycle",
                 lifecycle["monthly_credit"],
-                [("earned", "Earned"), ("used", "Used"),
-                 ("forfeited", "Forfeited"), ("expired", "Expired")],
+                [("earned", "Earned"), ("used", "Used"), ("forfeited", "Forfeited"), ("expired", "Expired")],
             ),
         )
         for image, title, rows, series in chart_specs:
@@ -649,11 +742,15 @@ class AnalyticsWindow(QMainWindow):
         page = self.pages.currentIndex()
         self.open_chart_button.setEnabled(page != 0)
         if page == 0:
-            self._set_current_table(self.summary_table, self.data.get("summary", []) if self.data else [], SUMMARY_COLUMNS)
+            self._set_current_table(
+                self.summary_table, self.data.get("summary", []) if self.data else [], SUMMARY_COLUMNS
+            )
         elif page == 1:
             name = self.seasonality_selector.currentText()
             path, columns, _label, _series = SEASONALITY_VIEWS[name]
-            self._set_current_table(self.seasonality_table, list(_payload_value(self.data, path)) if self.data else [], columns)
+            self._set_current_table(
+                self.seasonality_table, list(_payload_value(self.data, path)) if self.data else [], columns
+            )
         elif page == 2:
             self._schedule_default_chart_ratio(self.heatmap_splitter)
             selected_key = str(self.heatmap_selector.currentData() or "all-used")
@@ -675,7 +772,9 @@ class AnalyticsWindow(QMainWindow):
                 self._schedule_default_chart_ratio(self._monthly_splitters[index - 4])
             self._set_current_table(*mappings[index])
 
-    def _set_current_table(self, table: QTableWidget, rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> None:
+    def _set_current_table(
+        self, table: QTableWidget, rows: list[dict[str, Any]], columns: list[tuple[str, str]]
+    ) -> None:
         self._current_table = table
         self._current_rows = rows
         self._current_columns = columns
@@ -686,7 +785,7 @@ class AnalyticsWindow(QMainWindow):
         page = self.pages.currentIndex()
         if page == 1:
             name = self.seasonality_selector.currentText()
-            path, columns, label_key, series = SEASONALITY_VIEWS[name]
+            path, columns, _label_key, _series = SEASONALITY_VIEWS[name]
             rows = list(_payload_value(self.data, path))
             title = f"{name} — {self.data['year']}"
         elif page == 2:
@@ -702,25 +801,22 @@ class AnalyticsWindow(QMainWindow):
             index = self.lifecycle_tabs.currentIndex()
             if index == 4:
                 rows = self.data["lifecycle"]["monthly_overtime_vs_comp"]
-                columns, label_key = OVERTIME_COMP_COLUMNS, "month"
-                series = [
-                    ("overtime_worked", "Overtime Worked"),
-                    ("comp_earned", "Comp Earned"),
-                    ("credit_earned", "Credit Earned or Worked"),
-                ]
+                columns = OVERTIME_COMP_COLUMNS
                 title = f"Overtime, Comp, and Credit by Month — {self.data['year']}"
             elif index == 5:
                 rows = self.data["lifecycle"]["monthly_comp"]
-                columns, label_key = COMP_MONTH_COLUMNS, "month"
-                series = [("earned", "Earned"), ("used", "Used"), ("paid_out", "Paid Out"), ("forfeited", "Forfeited"), ("expired", "Expired")]
+                columns = COMP_MONTH_COLUMNS
                 title = f"Monthly Comp Lifecycle — {self.data['year']}"
             elif index == 6:
                 rows = self.data["lifecycle"]["monthly_credit"]
-                columns, label_key = CREDIT_MONTH_COLUMNS, "month"
-                series = [("earned", "Earned"), ("used", "Used"), ("forfeited", "Forfeited"), ("expired", "Expired")]
+                columns = CREDIT_MONTH_COLUMNS
                 title = f"Monthly Credit Lifecycle — {self.data['year']}"
             else:
-                QMessageBox.information(self, "Open Chart", "Select one of the monthly lifecycle tabs to open a chart. The other tabs are structured tables.")
+                QMessageBox.information(
+                    self,
+                    "Open Chart",
+                    "Select one of the monthly lifecycle tabs to open a chart. The other tabs are structured tables.",
+                )
                 return
         else:
             return
@@ -783,9 +879,13 @@ class AnalyticsWindow(QMainWindow):
             key = selected.get("month_key", "")
             transactions = [row for row in transactions if str(row["date"]).startswith(str(key))]
         elif name == "Leave Used by Day of Week":
-            transactions = [row for row in transactions if datetime.fromisoformat(row["date"]).strftime("%A") == selected["weekday"]]
+            transactions = [
+                row for row in transactions if datetime.fromisoformat(row["date"]).strftime("%A") == selected["weekday"]
+            ]
         elif name == "Leave Used by Pay Period":
-            transactions = [row for row in transactions if selected["start_date"] <= row["date"] <= selected["end_date"]]
+            transactions = [
+                row for row in transactions if selected["start_date"] <= row["date"] <= selected["end_date"]
+            ]
         TransactionDialog(transactions, self).exec()
 
     def _heatmap_drilldown(self, row_index: int, _column: int) -> None:
@@ -802,7 +902,8 @@ class AnalyticsWindow(QMainWindow):
             {"category": "all", "direction": "used"},
         )
         rows = [
-            row for row in self.data["transactions"]
+            row
+            for row in self.data["transactions"]
             if row["date"] == selected_date
             and row["direction"] == option["direction"]
             and (option["category"] == "all" or row["category"] == option["category"])
@@ -844,7 +945,9 @@ class AnalyticsWindow(QMainWindow):
         transactions = self.data["transactions"]
         if category_direction:
             category, direction = category_direction
-            transactions = [row for row in transactions if row["category"] == category and row["direction"] == direction]
+            transactions = [
+                row for row in transactions if row["category"] == category and row["direction"] == direction
+            ]
         else:
             transactions = [row for row in transactions if row["category"] == "comp"]
         TransactionDialog(transactions, self).exec()
@@ -858,7 +961,8 @@ class AnalyticsWindow(QMainWindow):
             return
         lot_id = lots[row_index]["lot_id"]
         rows = [
-            row for row in self.data["transactions"]
+            row
+            for row in self.data["transactions"]
             if row["transaction_id"] == lot_id or row["earned_transaction_id"] == lot_id
         ]
         TransactionDialog(rows, self).exec()
@@ -893,7 +997,8 @@ class AnalyticsWindow(QMainWindow):
         month_label = rows[row_index]["month"]
         month_key = datetime.strptime(month_label, "%b %Y").strftime("%Y-%m")
         transactions = [
-            row for row in self.data["transactions"]
+            row
+            for row in self.data["transactions"]
             if row["date"].startswith(month_key) and row["category"] in categories
         ]
         TransactionDialog(transactions, self).exec()

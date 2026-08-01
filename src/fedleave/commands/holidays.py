@@ -52,6 +52,7 @@ def holidays(
         # Full ICS import using icalendar
         try:
             from ..holidays import import_ics
+
             # sanitize file path
             try:
                 file_text = sanitize_text(file, field_name="file")

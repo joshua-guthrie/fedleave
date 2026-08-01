@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import platform
+import re
 from dataclasses import dataclass
 from datetime import date
 from datetime import datetime as _datetime
 from html.parser import HTMLParser
 from pathlib import Path
-import platform
-import re
 from typing import Any
 
 from . import __version__
 from .config import LeaveYear
 from .ledger import create_transaction
 from .payperiods import generate_pay_periods
-
 
 WMS_SUPPORT_URL = "https://github.com/joshua-guthrie/fedleave/issues/new"
 
@@ -172,7 +171,7 @@ def _cell(row: list[str], index: int) -> str:
 def _parse_date(value: str) -> date:
     try:
         return date.fromisoformat(value)
-    except ValueError as exc:
+    except ValueError:
         try:
             return _datetime.strptime(value, "%d-%b-%Y").date()
         except Exception as inner_exc:
@@ -337,7 +336,9 @@ def build_leave_year_skeleton(report: WmsImportReport, annual_accrual: float) ->
     return leave_year
 
 
-def build_transactions_from_report(report: WmsImportReport, existing_ids: list[str]) -> tuple[list[dict[str, Any]], list[str]]:
+def build_transactions_from_report(
+    report: WmsImportReport, existing_ids: list[str]
+) -> tuple[list[dict[str, Any]], list[str]]:
     transactions: list[dict[str, Any]] = []
     used_ids = list(existing_ids)
     for spec in report.specs:

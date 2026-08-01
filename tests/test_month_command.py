@@ -112,7 +112,10 @@ def test_month_command_emits_calendar_json(tmp_path: Path, capsys):
     assert "balances" in result["projected_balance"]
     assert "use_or_lose" in result["projected_balance"]
     assert any(period["touches_display_month"] for period in result["pay_periods"])
-    assert all({"number", "start", "end", "pay_date", "totals", "ending_balances"} <= set(period) for period in result["pay_periods"])
+    assert all(
+        {"number", "start", "end", "pay_date", "totals", "ending_balances"} <= set(period)
+        for period in result["pay_periods"]
+    )
     assert any(period["end"] == "2026-07-11" and period["pay_date"] == "2026-07-17" for period in result["pay_periods"])
     first_july_period = next(period for period in result["pay_periods"] if period["end"] == "2026-07-11")
     assert first_july_period["ending_balances"]["annual"] >= 0.0

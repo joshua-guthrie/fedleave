@@ -3,14 +3,14 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 import tarfile
+import tomllib
+from pathlib import Path
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGE_PATH = ROOT / "installer" / "package.py"
@@ -34,8 +34,7 @@ def _fake_bundle(module, root: Path, platform: str = "linux") -> Path:
         executable = bundle / f"{command}{suffix}"
         if platform == "linux":
             executable.write_text(
-                "#!/usr/bin/env bash\n"
-                "if [[ ${1:-} == --version ]]; then echo 'fedleave 0.2.0'; else echo help; fi\n",
+                "#!/usr/bin/env bash\nif [[ ${1:-} == --version ]]; then echo 'fedleave 0.2.0'; else echo help; fi\n",
                 encoding="utf-8",
             )
             executable.chmod(0o755)
@@ -111,9 +110,7 @@ def test_artifact_size_gate_reports_regressions(tmp_path: Path) -> None:
 
 
 def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> None:
-    workflow = (ROOT / ".github" / "workflows" / "distribution.yml").read_text(
-        encoding="utf-8"
-    )
+    workflow = (ROOT / ".github" / "workflows" / "distribution.yml").read_text(encoding="utf-8")
 
     assert "github.ref == 'refs/heads/master'" in workflow
     assert "github.ref_type == 'tag'" not in workflow
@@ -130,20 +127,34 @@ def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> Non
 
 
 def test_runtime_dependencies_and_bundle_manifest_remain_lean() -> None:
-    runtime_requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
-    development_requirements = (ROOT / "requirements-dev.txt").read_text(encoding="utf-8").lower()
-    manifest = (
-        ROOT / "scripts" / "lib" / "common" / "application_manifest.toml"
-    ).read_text(encoding="utf-8")
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    runtime_requirements = "\n".join(project["dependencies"]).lower()
+    development_requirements = "\n".join(project["optional-dependencies"]["dev"]).lower()
+    manifest = (ROOT / "scripts" / "lib" / "common" / "application_manifest.toml").read_text(encoding="utf-8")
     charting = (ROOT / "src" / "fedleave" / "charting.py").read_text(encoding="utf-8")
 
     for dependency in ("numpy", "pytest", "hypothesis", "pyinstaller"):
         assert dependency not in runtime_requirements
-    for dependency in ("pytest", "hypothesis", "pyinstaller"):
-        assert dependency in development_requirements
+    assert "fedleave[gui,test,build]" in development_requirements
+    assert "ruff" in development_requirements
+    assert "mypy" in development_requirements
     assert 'collect_all = ["shiboken6"]' not in manifest
     assert '"numpy"' not in manifest
     assert "import numpy" not in charting
+
+
+def test_pyproject_is_the_only_dependency_definition() -> None:
+    for obsolete_file in (
+        ROOT / "requirements.txt",
+        ROOT / "requirements-gui.txt",
+        ROOT / "requirements-dev.txt",
+        ROOT / "scripts" / "lib" / "common" / "installer-requirements.txt",
+    ):
+        assert not obsolete_file.exists()
+
+    installer_engine = (ROOT / "scripts" / "lib" / "common" / "installer_engine.py").read_text(encoding="utf-8")
+    assert 'f"{self.repo_root}[gui,build]"' in installer_engine
+    assert "requirements.txt" not in installer_engine
 
 
 def test_linux_bootstrap_checks_tmp_capacity_before_extracting() -> None:
@@ -152,9 +163,7 @@ def test_linux_bootstrap_checks_tmp_capacity_before_extracting() -> None:
     assert 'df -Pk "$TEMP_DIR"' in bootstrap
     assert "unpacked_bytes" in bootstrap
     assert "Temporary-space check passed" in bootstrap
-    assert bootstrap.index("Temporary-space check passed") < bootstrap.index(
-        'tar -xzf "$TEMP_DIR/$ARCHIVE_NAME"'
-    )
+    assert bootstrap.index("Temporary-space check passed") < bootstrap.index('tar -xzf "$TEMP_DIR/$ARCHIVE_NAME"')
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
@@ -200,8 +209,7 @@ def test_bootstrap_migrates_legacy_fedleave_command_wrappers(tmp_path: Path) -> 
     bin_dir.mkdir()
     legacy_wrapper = bin_dir / "fedleave"
     legacy_wrapper.write_text(
-        "#!/usr/bin/env bash\n"
-        f'exec {install_root}/current/fedleave/fedleave "$@"\n',
+        f'#!/usr/bin/env bash\nexec {install_root}/current/fedleave/fedleave "$@"\n',
         encoding="utf-8",
     )
     legacy_wrapper.chmod(0o755)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from html import escape
 import json
+from html import escape
 from pathlib import Path
 
 import pytest
@@ -50,7 +50,9 @@ def test_parse_wms_http_leave_report_extracts_transactions() -> None:
             [
                 _data_row(date="12-Jan-2026", code="RG", start_time="7.00", hours="4.50"),
                 _data_row(date="13-Jan-2026", code="LA", start_time="7.00", hours="3.00"),
-                _data_row(date="13-Jan-2026", code="LS/DD", start_time="10.00", hours="1.50", status="Incomplete Clocking"),
+                _data_row(
+                    date="13-Jan-2026", code="LS/DD", start_time="10.00", hours="1.50", status="Incomplete Clocking"
+                ),
                 _data_row(date="13-Jan-2026", code="CD", start_time="15.50", hours="1.00", total="9.0"),
             ]
         )
@@ -75,9 +77,11 @@ def test_parse_wms_http_leave_report_extracts_transactions() -> None:
 def test_parse_wms_http_leave_report_rejects_unknown_codes() -> None:
     with pytest.raises(WmsImportError, match="Unsupported WMS leave code ZZ"):
         parse_wms_http_leave_report(
-            _wms_html([
-                _data_row(date="13-Jan-2026", code="ZZ", start_time="7.00", hours="1.00"),
-            ])
+            _wms_html(
+                [
+                    _data_row(date="13-Jan-2026", code="ZZ", start_time="7.00", hours="1.00"),
+                ]
+            )
         )
 
 
@@ -119,11 +123,17 @@ def test_import_wms_http_creates_missing_leave_year(tmp_path: Path) -> None:
     assert imported["leave_year_start"] == "2026-01-11"
     assert imported["starting_balances"]["annual"] == 0.0
     assert any(
-        tx["date"] == "2026-01-13" and tx["category"] == "annual" and tx["direction"] == "used" and tx["source"] == "wms-http"
+        tx["date"] == "2026-01-13"
+        and tx["category"] == "annual"
+        and tx["direction"] == "used"
+        and tx["source"] == "wms-http"
         for tx in imported["transactions"]
     )
     assert any(
-        tx["date"] == "2026-01-13" and tx["category"] == "credit" and tx["direction"] == "earned" and tx["source"] == "wms-http"
+        tx["date"] == "2026-01-13"
+        and tx["category"] == "credit"
+        and tx["direction"] == "earned"
+        and tx["source"] == "wms-http"
         for tx in imported["transactions"]
     )
 

@@ -8,17 +8,23 @@ import typer
 from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
-from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, resolve_leave_year_for_date, sanitize_text
+from ..cli_helpers import (
+    get_leave_year_path,
+    load_leave_year,
+    parse_iso_date,
+    resolve_leave_year_for_date,
+    sanitize_text,
+)
+from ..config import load_config
 from ..ledger import (
-    Transaction,
     TRANSACTION_CATEGORIES,
     TRANSACTION_DIRECTIONS,
     TRANSACTION_STATUSES,
+    Transaction,
     add_transaction_to_leave_year,
     create_transaction,
     normalize_direction,
 )
-from ..config import load_config
 from ..storage import load_json, write_json
 
 _SET_DAY_CATEGORIES = [
@@ -82,7 +88,11 @@ def _set_day_values(
             if transaction.get("date") == date and transaction.get("category") == category
         ]
         existing_comment = next(
-            (str(transaction.get("description", "")).strip() for transaction in replaced if str(transaction.get("description", "")).strip()),
+            (
+                str(transaction.get("description", "")).strip()
+                for transaction in replaced
+                if str(transaction.get("description", "")).strip()
+            ),
             "",
         )
         raw_comment = comments.get(category)
@@ -146,7 +156,9 @@ def add(
     description: str = typer.Option("", help="Transaction description."),
     status: str = typer.Option("planned", help="Transaction status."),
     source: str = typer.Option("manual", help="Transaction source."),
-    authoritative: bool = typer.Option(False, help="Remove existing same-date/category/direction transactions before adding this one."),
+    authoritative: bool = typer.Option(
+        False, help="Remove existing same-date/category/direction transactions before adding this one."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     show_transaction_ids: bool = typer.Option(
         False,
@@ -242,7 +254,11 @@ def add(
         return
     detail = f"transaction [bold]{transaction.id}[/bold]" if show_transaction_ids else "transaction"
     if replaced_ids:
-        replaced_detail = f"; replaced {', '.join(replaced_ids)}" if show_transaction_ids else f"; replaced {len(replaced_ids)} existing transaction(s)"
+        replaced_detail = (
+            f"; replaced {', '.join(replaced_ids)}"
+            if show_transaction_ids
+            else f"; replaced {len(replaced_ids)} existing transaction(s)"
+        )
         console.print(f"Added {detail} to {year}{replaced_detail}")
     else:
         console.print(f"Added {detail} to {year}")
@@ -286,7 +302,9 @@ def set_day(
     other: float | None = typer.Option(None, help="Signed other leave hours."),
     other_comment: str | None = typer.Option(None, help="Other leave comment."),
     restored_annual: float | None = typer.Option(None, "--restored-annual", help="Signed restored annual leave hours."),
-    restored_annual_comment: str | None = typer.Option(None, "--restored-annual-comment", help="Restored annual leave comment."),
+    restored_annual_comment: str | None = typer.Option(
+        None, "--restored-annual-comment", help="Restored annual leave comment."
+    ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     if not isinstance(authoritative, bool):
@@ -540,6 +558,7 @@ def reconcile(
     else:
         console.print(f"Reconciled {category} {direction} on {date}: {action} transaction {transaction_id} in {year}")
 
+
 @app.command()
 def correct(
     id: str | None = typer.Option(None, help="Transaction ID to correct (YYYYMMDD-NNN)."),
@@ -598,14 +617,20 @@ def correct(
                 console.print(f"[red]ERROR:[/red] {exc}")
                 raise typer.Exit(code=1)
 
-            matches = [t for t in ly.get("transactions", []) if t.get("date") == search_date and t.get("category") == search_type]
+            matches = [
+                t
+                for t in ly.get("transactions", [])
+                if t.get("date") == search_date and t.get("category") == search_type
+            ]
             if not matches:
                 console.print(f"[red]ERROR:[/red] No matching transaction on {search_date} for category {search_type}")
                 raise typer.Exit(code=1)
             if len(matches) > 1:
-                console.print(f"[red]ERROR:[/red] Multiple matching transactions found; specify the transaction id:")
+                console.print("[red]ERROR:[/red] Multiple matching transactions found; specify the transaction id:")
                 for t in matches:
-                    console.print(f"  {t.get('id')} {t.get('date')} {t.get('category')} {t.get('direction')} {t.get('hours')}")
+                    console.print(
+                        f"  {t.get('id')} {t.get('date')} {t.get('category')} {t.get('direction')} {t.get('hours')}"
+                    )
                 raise typer.Exit(code=2)
 
             # single match — use its id and set leave_year to the loaded year
@@ -683,7 +708,9 @@ def correct(
             )
             return
         console.print("Preview: would update transaction with:")
-        console.print(f"  date={date or orig['date']} category={category or orig['category']} direction={direction or orig['direction']} hours={hours}")
+        console.print(
+            f"  date={date or orig['date']} category={category or orig['category']} direction={direction or orig['direction']} hours={hours}"
+        )
         return
 
     # Sanitize the reason before updating the final record.
@@ -730,6 +757,7 @@ def correct(
         console.print(f"Corrected transaction {id} in place")
     else:
         console.print("Corrected transaction in place")
+
 
 @app.command(name="list")
 def list_transactions(
@@ -826,6 +854,7 @@ def list_transactions(
             f"{transaction_id}{transaction['date']} {transaction['category']} {transaction['direction']} {transaction['hours']} {transaction['status']} {transaction['description']}"
         )
 
+
 @app.command()
 def void(
     id: str = typer.Option(..., help="Transaction ID to delete (YYYYMMDD-NNN)."),
@@ -878,6 +907,7 @@ def void(
     if not found:
         console.print(f"[red]ERROR:[/red] Transaction {id} not found")
         raise typer.Exit(code=1)
+
 
 @app.command()
 def types(

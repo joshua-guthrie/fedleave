@@ -3,7 +3,4 @@
 OFFICIAL_PROJECT_URL = "https://www.westmouthbay.com/fedleave-application/"
 PROJECT_AUTHOR = "Joshua Guthrie"
 
-HELP_EPILOG = (
-    f"Official project website: {OFFICIAL_PROJECT_URL}\n"
-    f"Author: {PROJECT_AUTHOR}"
-)
+HELP_EPILOG = f"Official project website: {OFFICIAL_PROJECT_URL}\nAuthor: {PROJECT_AUTHOR}"

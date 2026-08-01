@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import json
-from datetime import date as _date, datetime as _datetime
+from datetime import date as _date
+from datetime import datetime as _datetime
 from pathlib import Path
 
 import typer
@@ -58,7 +59,9 @@ def rollover(
     if cfg_path.exists():
         try:
             cfg = json.loads(cfg_path.read_text())
-            carryover_limit = float(cfg.get("rules", {}).get("annual", {}).get("carryover_limit_hours", carryover_limit))
+            carryover_limit = float(
+                cfg.get("rules", {}).get("annual", {}).get("carryover_limit_hours", carryover_limit)
+            )
         except Exception:
             pass
 
@@ -144,24 +147,35 @@ def rollover(
         "transactions": [],
         "pay_periods": pay_periods,
         "holidays": [],
-        "rollover_status": {"rolled_from_previous_year": True, "rolled_to_next_year": False, "rollover_completed_at": None},
+        "rollover_status": {
+            "rolled_from_previous_year": True,
+            "rolled_to_next_year": False,
+            "rollover_completed_at": None,
+        },
     }
     for lot in expiring_lots:
         category = str(lot["category"])
-        new_ly["carryover_from_previous_year"][category] = (
-            float(new_ly["carryover_from_previous_year"].get(category, 0.0))
-            + float(lot["remaining_hours"])
-        )
+        new_ly["carryover_from_previous_year"][category] = float(
+            new_ly["carryover_from_previous_year"].get(category, 0.0)
+        ) + float(lot["remaining_hours"])
 
     # create starting-balance transactions
     existing_ids = []
     if carry_forward and carry_forward > 0:
-        tx = create_transaction(date=new_start, category="annual", direction="starting_balance", hours=carry_forward, existing_ids=existing_ids)
+        tx = create_transaction(
+            date=new_start,
+            category="annual",
+            direction="starting_balance",
+            hours=carry_forward,
+            existing_ids=existing_ids,
+        )
         new_ly["transactions"].append(tx.model_dump())
         existing_ids.append(tx.id)
         result["created_transaction_ids"].append(tx.id)
     if sick_balance and sick_balance > 0:
-        tx2 = create_transaction(date=new_start, category="sick", direction="starting_balance", hours=sick_balance, existing_ids=existing_ids)
+        tx2 = create_transaction(
+            date=new_start, category="sick", direction="starting_balance", hours=sick_balance, existing_ids=existing_ids
+        )
         new_ly["transactions"].append(tx2.model_dump())
         existing_ids.append(tx2.id)
         result["created_transaction_ids"].append(tx2.id)

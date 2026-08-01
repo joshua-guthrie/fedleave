@@ -8,7 +8,6 @@ from typing import Any
 from .config import Config
 from .ledger import generate_transaction_id
 
-
 EXPIRING_CATEGORIES = ("comp", "travel_comp", "restored_annual", "time_off_award")
 LOT_DIRECTIONS = {"earned", "restored"}
 DISPOSAL_DIRECTIONS = {"used", "expired", "forfeited"}
@@ -57,7 +56,10 @@ def _expiration_for(
 
 def _active(transaction: dict[str, Any]) -> bool:
     return not transaction.get("void") and str(transaction.get("status", "")).lower() not in {
-        "denied", "cancelled", "voided", "deleted"
+        "denied",
+        "cancelled",
+        "voided",
+        "deleted",
     }
 
 
@@ -100,7 +102,11 @@ def synchronize_expirations(
     existing_ids = [str(tx.get("id", "")) for tx in transactions]
     additions: list[dict[str, Any]] = []
     uses = sorted(
-        [tx for tx in transactions if _active(tx) and tx.get("direction") == "used" and not tx.get("earned_transaction_id")],
+        [
+            tx
+            for tx in transactions
+            if _active(tx) and tx.get("direction") == "used" and not tx.get("earned_transaction_id")
+        ],
         key=lambda tx: (str(tx.get("date", "")), str(tx.get("id", ""))),
     )
     for use in uses:
@@ -109,7 +115,8 @@ def synchronize_expirations(
             continue
         needed = float(use.get("hours", 0.0))
         eligible = [
-            lot for lot in lots
+            lot
+            for lot in lots
             if lot.get("category") == category
             and str(lot.get("date", "")) <= str(use.get("date", ""))
             and remaining.get(str(lot.get("id", "")), 0.0) > EPSILON
@@ -152,9 +159,7 @@ def synchronize_expirations(
         if hours <= EPSILON or expiration_date > as_of or action not in {"expire", "expired", "forfeit", "forfeited"}:
             continue
         if any(
-            _active(tx)
-            and tx.get("earned_transaction_id") == lot_id
-            and tx.get("source") == "expiration-engine"
+            _active(tx) and tx.get("earned_transaction_id") == lot_id and tx.get("source") == "expiration-engine"
             for tx in transactions
         ):
             continue
@@ -198,7 +203,8 @@ def expiration_report(
         remaining_hours = state["remaining"].get(str(lot["id"]), 0.0)
         periods = max(0, ceil((expiration - as_of).days / 14))
         linked_disposals = [
-            tx for tx in leave_year.get("transactions", [])
+            tx
+            for tx in leave_year.get("transactions", [])
             if _active(tx)
             and tx.get("earned_transaction_id") == lot.get("id")
             and tx.get("direction") in DISPOSAL_DIRECTIONS
@@ -231,8 +237,15 @@ def expiration_report(
             }
         )
     active = [row for row in rows if row["remaining_hours"] > EPSILON]
-    thresholds = {str(n): sum(row["remaining_hours"] for row in active if row["pay_periods_remaining"] <= n) for n in (1, 3, 6, 12)}
-    disposals = [tx for tx in leave_year.get("transactions", []) if _active(tx) and tx.get("direction") in {"expired", "forfeited"}]
+    thresholds = {
+        str(n): sum(row["remaining_hours"] for row in active if row["pay_periods_remaining"] <= n)
+        for n in (1, 3, 6, 12)
+    }
+    disposals = [
+        tx
+        for tx in leave_year.get("transactions", [])
+        if _active(tx) and tx.get("direction") in {"expired", "forfeited"}
+    ]
     return {
         "as_of": as_of.isoformat(),
         "leave_year": leave_year.get("leave_year"),
@@ -240,7 +253,8 @@ def expiration_report(
         "earliest_expiration_date": min((row["expiration_date"] for row in active), default=None),
         "hours_expiring_within_pay_periods": thresholds,
         "expired_or_forfeited_this_leave_year": sum(
-            float(tx.get("hours", 0.0)) for tx in disposals
+            float(tx.get("hours", 0.0))
+            for tx in disposals
             if date.fromisoformat(str(tx.get("date"))).year == as_of.year
         ),
         "enabled_categories": [category for category, rule in state["rules"].items() if rule.get("expires")],

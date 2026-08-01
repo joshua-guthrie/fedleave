@@ -8,7 +8,7 @@ from typing import Any
 from .config import get_default_data_dir, load_config
 from .expirations import synchronize_expirations
 from .storage import load_json, remove_legacy_transaction_history, write_json
-from .validation import sanitize_text
+from .validation import sanitize_text as sanitize_text
 
 
 def resolve_data_dir(data_dir: Path | None) -> Path:
@@ -84,17 +84,4 @@ def parse_iso_date(date_str: str) -> date:
     try:
         return date.fromisoformat(normalized)
     except Exception as exc:
-        raise ValueError(
-            f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11, or today."
-        ) from exc
-
-
-def sanitize_text(value: str, *, field_name: str = "value", max_length: int = 1024) -> str:
-    if not isinstance(value, str):
-        raise ValueError(f"{field_name} must be a string")
-    if "\x00" in value:
-        raise ValueError(f"{field_name} contains null byte which is not allowed")
-    if len(value) > max_length:
-        raise ValueError(f"{field_name} too long (max {max_length} characters)")
-    # strip trailing and leading whitespace
-    return value.strip()
+        raise ValueError(f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11, or today.") from exc

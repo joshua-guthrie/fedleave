@@ -7,7 +7,6 @@ from types import SimpleNamespace
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE_PATH = ROOT / "scripts" / "lib" / "common" / "installer_engine.py"
 HELPER_PATH = ROOT / "scripts" / "lib" / "common" / "windows_installer_helper.py"

@@ -1,7 +1,7 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
-from fedleave.config import init_config, get_default_data_dir
+from fedleave.config import init_config
 from fedleave.storage import write_json
 
 

@@ -8,7 +8,6 @@ from urllib.request import Request, urlopen
 from . import __version__
 from .project_info import OFFICIAL_PROJECT_URL
 
-
 MASTER_VERSION_URL = "https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/pyproject.toml"
 
 

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
 import shlex
-import sys
+import shutil
 import tomllib
 from pathlib import Path
 
@@ -22,16 +21,23 @@ def repair_build_workspace(build_root: Path, uid: int, gid: int) -> None:
 
 
 def write_linux_wrappers(repo_root: Path, current_link: Path) -> None:
-    scripts = tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("scripts", {})
+    scripts = (
+        tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("scripts", {})
+    )
     bin_dir = Path("/usr/local/bin")
     bin_dir.mkdir(parents=True, exist_ok=True)
 
     for app_name in scripts:
         wrapper = bin_dir / app_name
-        wrapper_text = "\n".join([
-            "#!/usr/bin/env bash",
-            "exec " + shlex.quote(str(current_link / app_name / app_name)) + ' "$@"',
-        ]) + "\n"
+        wrapper_text = (
+            "\n".join(
+                [
+                    "#!/usr/bin/env bash",
+                    "exec " + shlex.quote(str(current_link / app_name / app_name)) + ' "$@"',
+                ]
+            )
+            + "\n"
+        )
         wrapper.write_text(wrapper_text, encoding="utf-8")
         wrapper.chmod(0o755)
 
@@ -39,14 +45,17 @@ def write_linux_wrappers(repo_root: Path, current_link: Path) -> None:
     desktop_dir.mkdir(parents=True, exist_ok=True)
     desktop_file = desktop_dir / "fedleave-calendar.desktop"
     desktop_file.write_text(
-        "\n".join([
-            "[Desktop Entry]",
-            "Type=Application",
-            "Name=FedLeave Calendar",
-            "Exec=/usr/local/bin/FedLeaveCalendar",
-            "Terminal=false",
-            "Categories=Office;Utility;",
-        ]) + "\n",
+        "\n".join(
+            [
+                "[Desktop Entry]",
+                "Type=Application",
+                "Name=FedLeave Calendar",
+                "Exec=/usr/local/bin/FedLeaveCalendar",
+                "Terminal=false",
+                "Categories=Office;Utility;",
+            ]
+        )
+        + "\n",
         encoding="utf-8",
     )
 

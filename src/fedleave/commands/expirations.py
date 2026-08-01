@@ -23,7 +23,9 @@ def _config(data_dir: Path | None) -> dict | None:
 @app.command("expirations")
 def expirations(
     year: int | None = typer.Option(None, help="Leave year; defaults to the year containing today."),
-    within_pay_periods: int | None = typer.Option(None, help="Only include lots expiring within this many pay periods."),
+    within_pay_periods: int | None = typer.Option(
+        None, help="Only include lots expiring within this many pay periods."
+    ),
     category: str | None = typer.Option(None, help="Only include one expiring leave category."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
@@ -52,7 +54,11 @@ def expirations(
             selected = None
             for path in candidates:
                 payload = load_json(path)
-                if parse_iso_date(str(payload.get("leave_year_start", ""))) <= today <= parse_iso_date(str(payload.get("leave_year_end", ""))):
+                if (
+                    parse_iso_date(str(payload.get("leave_year_start", "")))
+                    <= today
+                    <= parse_iso_date(str(payload.get("leave_year_end", "")))
+                ):
                     selected = int(payload.get("leave_year", path.stem))
                     break
             if selected is None:

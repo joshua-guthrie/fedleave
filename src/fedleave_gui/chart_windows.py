@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from PySide6.QtCore import QEvent, QTimer, Qt
-from PySide6.QtGui import QColor, QPixmap, QPainter
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QDialog,
@@ -64,9 +62,7 @@ class LeaveChartDialog(QDialog):
         viewport_size = self.scroll_area.viewport().size()
         if viewport_size.width() <= 0 or viewport_size.height() <= 0:
             return
-        self.image_label.setPixmap(
-            self._pixmap.scaled(viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-        )
+        self.image_label.setPixmap(self._pixmap.scaled(viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def save_png(self) -> None:
         path, _ = QFileDialog.getSaveFileName(

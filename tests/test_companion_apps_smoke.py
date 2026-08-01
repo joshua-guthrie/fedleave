@@ -6,7 +6,6 @@ from pathlib import Path
 
 from fedleave.config import init_config
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 

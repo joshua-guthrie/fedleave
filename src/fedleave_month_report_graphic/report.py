@@ -17,12 +17,11 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave.project_info import HELP_EPILOG
 
 from . import __version__
-
 
 BASE_WIDTH = 1920
 BASE_HEIGHT = 1080
@@ -325,7 +324,17 @@ def _escape(value: Any) -> str:
     return html.escape(str(value), quote=True)
 
 
-def _svg_text(x: float, y: float, text: Any, size: int, *, weight: int = 400, fill: str = TEXT, anchor: str = "start", family: str = "Arial, Helvetica, sans-serif") -> str:
+def _svg_text(
+    x: float,
+    y: float,
+    text: Any,
+    size: int,
+    *,
+    weight: int = 400,
+    fill: str = TEXT,
+    anchor: str = "start",
+    family: str = "Arial, Helvetica, sans-serif",
+) -> str:
     return (
         f'<text x="{x:.1f}" y="{y:.1f}" font-family="{family}" font-size="{size}" '
         f'font-weight="{weight}" fill="{fill}" text-anchor="{anchor}">{_escape(text)}</text>'
@@ -387,7 +396,9 @@ def _pay_period_end_dates(month_json: dict[str, Any]) -> set[str]:
 
 def _pay_dates(month_json: dict[str, Any]) -> set[str]:
     from_days = {str(day.get("date")) for day in month_json.get("days", []) if day.get("is_payday")}
-    from_periods = {str(period.get("pay_date")) for period in month_json.get("pay_periods", []) if period.get("pay_date")}
+    from_periods = {
+        str(period.get("pay_date")) for period in month_json.get("pay_periods", []) if period.get("pay_date")
+    }
     from_top_level = {str(pay_date) for pay_date in month_json.get("pay_dates", []) if pay_date}
     return from_days | from_periods | from_top_level
 
@@ -395,8 +406,10 @@ def _pay_dates(month_json: dict[str, Any]) -> set[str]:
 def render_svg(data: ReportData, width: int) -> str:
     height = round(width * 9 / 16)
     scale = width / BASE_WIDTH
+
     def sx(value: float) -> float:
         return value * scale
+
     def sy(value: float) -> float:
         return value * scale
 
@@ -404,7 +417,11 @@ def render_svg(data: ReportData, width: int) -> str:
     month_name = calendar.month_name[int(month_json.get("month", data.today.month))]
     year = int(month_json.get("year", data.today.year))
     title = f"FedLeave Month Report - {month_name} {year}"
-    generated = data.generated_at.strftime("%B %-d, %Y %H:%M") if not sys.platform.startswith("win") else data.generated_at.strftime("%B %#d, %Y %H:%M")
+    generated = (
+        data.generated_at.strftime("%B %-d, %Y %H:%M")
+        if not sys.platform.startswith("win")
+        else data.generated_at.strftime("%B %#d, %Y %H:%M")
+    )
 
     parts = [
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {BASE_WIDTH} {BASE_HEIGHT}">',
@@ -419,7 +436,9 @@ def render_svg(data: ReportData, width: int) -> str:
     parts.append("</svg>")
     # Keep the external dimensions scaled while using a stable 1920x1080 layout coordinate system.
     if width != BASE_WIDTH:
-        parts[0] = f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {BASE_WIDTH} {BASE_HEIGHT}">'
+        parts[0] = (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {BASE_WIDTH} {BASE_HEIGHT}">'
+        )
     _ = sx, sy
     return "\n".join(parts)
 
@@ -438,7 +457,9 @@ def _render_calendar_svg(month_json: dict[str, Any], today: date) -> list[str]:
     ]
     for col, name in enumerate(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]):
         x = x0 + col * cell_w
-        parts.append(f'<rect x="{x:.1f}" y="{y0}" width="{cell_w:.1f}" height="{header_h}" fill="{HEADER}" stroke="{GRID}" stroke-width="1"/>')
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y0}" width="{cell_w:.1f}" height="{header_h}" fill="{HEADER}" stroke="{GRID}" stroke-width="1"/>'
+        )
         parts.append(_svg_text(x + cell_w / 2, y0 + 23, name, 15, weight=700, anchor="middle"))
 
     for index, day in enumerate(days):
@@ -466,11 +487,15 @@ def _render_calendar_svg(month_json: dict[str, Any], today: date) -> list[str]:
         if is_pp_end and not is_holiday and not is_today:
             stroke, stroke_w = PAY_PERIOD_STROKE, 3
 
-        parts.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_w:.1f}" height="{cell_h:.1f}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>')
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:.1f}" width="{cell_w:.1f}" height="{cell_h:.1f}" fill="{fill}" stroke="{stroke}" stroke-width="{stroke_w}"/>'
+        )
         day_fill = TEXT if in_month else BORDER
         parts.append(_svg_text(x + cell_w - 10, y + 22, day_date.day, 17, weight=700, fill=day_fill, anchor="end"))
         if is_pp_end:
-            parts.append(f'<path d="M {x + cell_w - 26:.1f} {y + cell_h - 6:.1f} L {x + cell_w - 6:.1f} {y + cell_h - 6:.1f} L {x + cell_w - 6:.1f} {y + cell_h - 26:.1f} Z" fill="{PAY_PERIOD_STROKE}"/>')
+            parts.append(
+                f'<path d="M {x + cell_w - 26:.1f} {y + cell_h - 6:.1f} L {x + cell_w - 6:.1f} {y + cell_h - 6:.1f} L {x + cell_w - 6:.1f} {y + cell_h - 26:.1f} Z" fill="{PAY_PERIOD_STROKE}"/>'
+            )
 
         y_text = y + 42
         if is_holiday:
@@ -483,27 +508,53 @@ def _render_calendar_svg(month_json: dict[str, Any], today: date) -> list[str]:
             if not amount:
                 continue
             parts.append(_svg_text(x + 14, y_text, label, 15, weight=700))
-            parts.append(_svg_text(x + cell_w - 14, y_text, amount, 15, weight=700, anchor="end", family="Consolas, 'Courier New', monospace"))
+            parts.append(
+                _svg_text(
+                    x + cell_w - 14,
+                    y_text,
+                    amount,
+                    15,
+                    weight=700,
+                    anchor="end",
+                    family="Consolas, 'Courier New', monospace",
+                )
+            )
             y_text += 19
     return parts
 
 
-def _render_table_svg(x: float, y: float, headers: list[str], rows: list[list[str]], widths: list[float], row_h: float = 22.0, font_size: int = 12) -> list[str]:
+def _render_table_svg(
+    x: float,
+    y: float,
+    headers: list[str],
+    rows: list[list[str]],
+    widths: list[float],
+    row_h: float = 22.0,
+    font_size: int = 12,
+) -> list[str]:
     parts: list[str] = []
     total_w = sum(widths)
-    parts.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{total_w:.1f}" height="24" fill="{HEADER}" stroke="{GRID}" stroke-width="1"/>')
+    parts.append(
+        f'<rect x="{x:.1f}" y="{y:.1f}" width="{total_w:.1f}" height="24" fill="{HEADER}" stroke="{GRID}" stroke-width="1"/>'
+    )
     cursor = x
     for i, header in enumerate(headers):
         anchor = "start" if i == 0 else "middle"
         tx = cursor + 6 if i == 0 else cursor + widths[i] / 2
         parts.append(_svg_text(tx, y + 17, header, font_size, weight=700, anchor=anchor))
-        parts.append(f'<line x1="{cursor:.1f}" y1="{y:.1f}" x2="{cursor:.1f}" y2="{y + 24 + len(rows) * row_h:.1f}" stroke="{GRID}" stroke-width="1"/>')
+        parts.append(
+            f'<line x1="{cursor:.1f}" y1="{y:.1f}" x2="{cursor:.1f}" y2="{y + 24 + len(rows) * row_h:.1f}" stroke="{GRID}" stroke-width="1"/>'
+        )
         cursor += widths[i]
-    parts.append(f'<line x1="{cursor:.1f}" y1="{y:.1f}" x2="{cursor:.1f}" y2="{y + 24 + len(rows) * row_h:.1f}" stroke="{GRID}" stroke-width="1"/>')
+    parts.append(
+        f'<line x1="{cursor:.1f}" y1="{y:.1f}" x2="{cursor:.1f}" y2="{y + 24 + len(rows) * row_h:.1f}" stroke="{GRID}" stroke-width="1"/>'
+    )
 
     for row_index, row in enumerate(rows):
         ry = y + 24 + row_index * row_h
-        parts.append(f'<rect x="{x:.1f}" y="{ry:.1f}" width="{total_w:.1f}" height="{row_h:.1f}" fill="{WHITE}" stroke="{GRID}" stroke-width="1"/>')
+        parts.append(
+            f'<rect x="{x:.1f}" y="{ry:.1f}" width="{total_w:.1f}" height="{row_h:.1f}" fill="{WHITE}" stroke="{GRID}" stroke-width="1"/>'
+        )
         cursor = x
         for i, value in enumerate(row):
             anchor = "start" if i == 0 else "end"
@@ -577,7 +628,7 @@ def _abbreviation_columns() -> list[list[list[str]]]:
         ]
         for category in TRANSACTION_CATEGORIES
     ]
-    return [rows[index:index + 6] for index in range(0, len(rows), 6)]
+    return [rows[index : index + 6] for index in range(0, len(rows), 6)]
 
 
 def _marker_legend_items() -> list[tuple[str, str, str]]:
@@ -618,12 +669,16 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
         )
     )
 
-    parts.extend([
-        _svg_text(1224, 780, "Abbreviations", 22, weight=700),
-        f'<rect x="1224" y="790" width="668" height="250" fill="{WHITE}" stroke="{BORDER}" stroke-width="2" rx="6"/>',
-    ])
+    parts.extend(
+        [
+            _svg_text(1224, 780, "Abbreviations", 22, weight=700),
+            f'<rect x="1224" y="790" width="668" height="250" fill="{WHITE}" stroke="{BORDER}" stroke-width="2" rx="6"/>',
+        ]
+    )
     for index, rows in enumerate(_abbreviation_columns()):
-        parts.extend(_render_table_svg(1238 + index * 216, 808, ["Abbr", "Category"], rows, [48, 154], row_h=20, font_size=11))
+        parts.extend(
+            _render_table_svg(1238 + index * 216, 808, ["Abbr", "Category"], rows, [48, 154], row_h=20, font_size=11)
+        )
     parts.extend(_render_marker_legend_svg(1240, 1018))
     return parts
 
@@ -631,8 +686,12 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
 def load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     windows_fonts = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
     candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf"
+        if bold
+        else "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
         windows_fonts / ("arialbd.ttf" if bold else "arial.ttf"),
         windows_fonts / ("segoeuib.ttf" if bold else "segoeui.ttf"),
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -645,7 +704,7 @@ def load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
 
 def _hex_to_rgb(value: str) -> tuple[int, int, int]:
     value = value.lstrip("#")
-    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+    return tuple(int(value[i : i + 2], 16) for i in (0, 2, 4))
 
 
 def render_png(data: ReportData, output: Path, width: int) -> None:
@@ -659,14 +718,30 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
     title_font = load_font(max(16, int(32 * scale)), bold=True)
 
     def rect(box, fill=WHITE, outline=GRID, width_px=1):
-        draw.rectangle(tuple(int(v * scale) for v in box), fill=_hex_to_rgb(fill), outline=_hex_to_rgb(outline), width=max(1, int(width_px * scale)))
+        draw.rectangle(
+            tuple(int(v * scale) for v in box),
+            fill=_hex_to_rgb(fill),
+            outline=_hex_to_rgb(outline),
+            width=max(1, int(width_px * scale)),
+        )
 
     def text(x, y, value, fill=TEXT, font_obj=None, anchor="la"):
-        draw.text((int(x * scale), int(y * scale)), str(value), fill=_hex_to_rgb(fill), font=font_obj or font, anchor=anchor)
+        draw.text(
+            (int(x * scale), int(y * scale)), str(value), fill=_hex_to_rgb(fill), font=font_obj or font, anchor=anchor
+        )
 
-    text(28, 18, f"FedLeave Month Report - {calendar.month_name[int(data.month_json.get('month', 1))]} {data.month_json.get('year')}", font_obj=title_font)
+    text(
+        28,
+        18,
+        f"FedLeave Month Report - {calendar.month_name[int(data.month_json.get('month', 1))]} {data.month_json.get('year')}",
+        font_obj=title_font,
+    )
     text(1892, 24, f"Generated: {data.generated_at:%B %d, %Y %H:%M}", fill=MUTED, anchor="ra")
-    draw.line((int(28 * scale), int(58 * scale), int(1892 * scale), int(58 * scale)), fill=_hex_to_rgb("#e5e7eb"), width=max(1, int(2 * scale)))
+    draw.line(
+        (int(28 * scale), int(58 * scale), int(1892 * scale), int(58 * scale)),
+        fill=_hex_to_rgb("#e5e7eb"),
+        width=max(1, int(2 * scale)),
+    )
 
     # Draw a simplified but complete raster representation. The SVG contains the exact table/grid structure.
     month_json = data.month_json
@@ -768,7 +843,9 @@ def write_output(data: ReportData, options: Options) -> None:
     try:
         if suffix == ".svg":
             content = render_svg(data, options.resolution)
-            with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=str(output.parent), suffix=".tmp") as handle:
+            with tempfile.NamedTemporaryFile(
+                "w", encoding="utf-8", delete=False, dir=str(output.parent), suffix=".tmp"
+            ) as handle:
                 handle.write(content)
                 temp_name = handle.name
             Path(temp_name).replace(output)
@@ -795,15 +872,20 @@ def main(argv: list[str] | None = None) -> None:
             print(f"Created output: {options.output_file.resolve()}")
         if options.verbose:
             elapsed = time.perf_counter() - start
-            print(json.dumps({
-                "fedleave": str(fedleave),
-                "year": options.year,
-                "month": options.month,
-                "output": str(options.output_file.resolve()),
-                "resolution": options.resolution,
-                "image_dimensions": {"width": options.resolution, "height": round(options.resolution * 9 / 16)},
-                "render_seconds": round(elapsed, 3),
-            }, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "fedleave": str(fedleave),
+                        "year": options.year,
+                        "month": options.month,
+                        "output": str(options.output_file.resolve()),
+                        "resolution": options.resolution,
+                        "image_dimensions": {"width": options.resolution, "height": round(options.resolution * 9 / 16)},
+                        "render_seconds": round(elapsed, 3),
+                    },
+                    indent=2,
+                )
+            )
     except MonthReportError as exc:
         _eprint(f"ERROR: {exc}")
         raise SystemExit(exc.exit_code)

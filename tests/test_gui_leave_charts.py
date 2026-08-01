@@ -45,7 +45,9 @@ def test_analysis_menu_includes_yearly_leave_comparison_submenu(monkeypatch):
 
     view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
-        action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
+        action
+        for action in view_action.menu().actions()
+        if action.menu() and action.text() == "Yearly Leave Comparison"
     )
     labels = [action.text() for action in yearly_comparison_action.menu().actions()]
 
@@ -72,7 +74,9 @@ def test_yearly_leave_comparison_submenu_is_disabled_with_one_leave_year(monkeyp
 
     view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
-        action for action in view_action.menu().actions() if action.menu() and action.text() == "Yearly Leave Comparison"
+        action
+        for action in view_action.menu().actions()
+        if action.menu() and action.text() == "Yearly Leave Comparison"
     )
 
     assert yearly_comparison_action.menu().isEnabled() is False

@@ -6,7 +6,13 @@ import typer
 from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
-from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, resolve_leave_year_for_date, sanitize_text
+from ..cli_helpers import (
+    get_leave_year_path,
+    load_leave_year,
+    parse_iso_date,
+    resolve_leave_year_for_date,
+    sanitize_text,
+)
 from ..ledger import ensure_automatic_accruals, upsert_accrual_rate_change
 from ..storage import write_json
 
@@ -95,8 +101,6 @@ def accrual_change(
         f"Changed {category} accrual for {year} as of {effective_date}: "
         f"{result['previous_hours_per_pay_period']:.2f} -> {result['new_hours_per_pay_period']:.2f}"
     )
-    console.print(
-        f"Updated {result['updated_auto_accrual_transactions']} automatic {category} accrual transactions."
-    )
+    console.print(f"Updated {result['updated_auto_accrual_transactions']} automatic {category} accrual transactions.")
     if added_accruals:
         console.print(f"Posted {added_accruals} missing automatic accrual transactions through {leave_year_end}.")

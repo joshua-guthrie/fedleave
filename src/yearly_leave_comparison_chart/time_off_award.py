@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from fedleave.charting import ComparisonChartSpec, run_comparison_chart_app
 
-
 SPEC = ComparisonChartSpec(
     app_name="TimeOffAwardYearlyComparison",
     title="Time Off Award Yearly Comparison",

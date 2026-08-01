@@ -54,11 +54,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: |
-            pyproject.toml
-            requirements.txt
-            requirements-gui.txt
-            scripts/lib/common/installer-requirements.txt
+          cache-dependency-path: pyproject.toml
 
       - name: Build PyInstaller applications
         shell: cmd
@@ -145,11 +141,7 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: |
-            pyproject.toml
-            requirements.txt
-            requirements-gui.txt
-            scripts/lib/common/installer-requirements.txt
+          cache-dependency-path: pyproject.toml
 
       - name: Install Linux packaging tools
         run: |

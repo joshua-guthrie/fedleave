@@ -1,5 +1,4 @@
 from pathlib import Path
-import tempfile
 
 from fedleave.holidays import generate_federal_holidays
 

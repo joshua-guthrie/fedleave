@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 import pytest
 import typer
@@ -219,7 +219,9 @@ def test_import_preserves_existing_current_year_file(tmp_path: Path):
     target_years = target / "leave_years"
     target_years.mkdir(parents=True)
     (target_years / "2026.json").write_text(json.dumps(current_year), encoding="utf-8")
-    archive.write_text(json.dumps({"schema_version": 1, "leave_years": {"2025": previous_year}, "holiday_cache": {}}), encoding="utf-8")
+    archive.write_text(
+        json.dumps({"schema_version": 1, "leave_years": {"2025": previous_year}, "holiday_cache": {}}), encoding="utf-8"
+    )
 
     import_data(input=archive, data_dir=target)
 
@@ -251,9 +253,7 @@ def test_import_validates_the_entire_archive_before_writing(tmp_path: Path):
                         "holidays": [],
                     }
                 },
-                "holiday_cache": {
-                    "bad/name": {"year": 2026}
-                },
+                "holiday_cache": {"bad/name": {"year": 2026}},
             }
         ),
         encoding="utf-8",

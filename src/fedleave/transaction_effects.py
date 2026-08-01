@@ -50,9 +50,7 @@ INCREASE_DIRECTIONS = frozenset(
         "forced_increase",
     }
 )
-DECREASE_DIRECTIONS = frozenset(
-    {"used", "expired", "forfeited", "forced_decrease"}
-)
+DECREASE_DIRECTIONS = frozenset({"used", "expired", "forfeited", "forced_decrease"})
 INEFFECTIVE_STATUSES = frozenset({"denied", "cancelled"})
 
 

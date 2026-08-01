@@ -1,10 +1,9 @@
 import os
-from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 
 from fedleave_gui.main_window import DayEditDialog, MainWindow, SaveDayPreviewDialog
 
@@ -85,11 +84,23 @@ def test_save_day_preview_dialog_lists_existing_and_new_values_without_signs():
     assert dialog.table.rowCount() == 3
     assert dialog.table.horizontalHeaderItem(0).textAlignment() & Qt.AlignLeft
     assert all(dialog.table.horizontalHeaderItem(column).textAlignment() & Qt.AlignRight for column in range(1, 3))
-    assert [dialog.table.item(0, 0).text(), dialog.table.item(0, 1).text().strip(), dialog.table.item(0, 2).text().strip()] == ["Annual Leave", "4 used", "5 earned"]
+    assert [
+        dialog.table.item(0, 0).text(),
+        dialog.table.item(0, 1).text().strip(),
+        dialog.table.item(0, 2).text().strip(),
+    ] == ["Annual Leave", "4 used", "5 earned"]
     assert dialog.table.item(0, 0).textAlignment() & Qt.AlignLeft
     assert all(dialog.table.item(0, column).textAlignment() & Qt.AlignRight for column in range(1, 3))
-    assert [dialog.table.item(1, 0).text(), dialog.table.item(1, 1).text().strip(), dialog.table.item(1, 2).text().strip()] == ["Credit Hours", "2 earned", "0"]
-    assert [dialog.table.item(2, 0).text(), dialog.table.item(2, 1).text().strip(), dialog.table.item(2, 2).text().strip()] == ["Sick Leave", "0", "1.5 used"]
+    assert [
+        dialog.table.item(1, 0).text(),
+        dialog.table.item(1, 1).text().strip(),
+        dialog.table.item(1, 2).text().strip(),
+    ] == ["Credit Hours", "2 earned", "0"]
+    assert [
+        dialog.table.item(2, 0).text(),
+        dialog.table.item(2, 1).text().strip(),
+        dialog.table.item(2, 2).text().strip(),
+    ] == ["Sick Leave", "0", "1.5 used"]
 
 
 def test_edit_day_requires_preview_confirmation(monkeypatch):

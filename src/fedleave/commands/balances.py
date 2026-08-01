@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import calendar as _calendar
-from datetime import date as _date, timedelta as _timedelta
+from datetime import date as _date
+from datetime import timedelta as _timedelta
 from pathlib import Path
 
 import typer
@@ -18,10 +19,8 @@ from ..ledger import (
     ensure_automatic_accruals,
 )
 from ..payperiods import normalize_pay_period, pay_period_pay_date
-from ..storage import load_json
-from ..storage import write_json
+from ..storage import load_json, write_json
 from ..transaction_effects import signed_balance_effect, transaction_is_effective
-
 
 _DISPLAY_CATEGORY_LABELS = {
     "annual": "A",
@@ -42,6 +41,7 @@ _DISPLAY_CATEGORY_LABELS = {
     "other": "Other",
     "restored_annual": "RA",
 }
+
 
 def _display_line(transaction: dict) -> str:
     label = _DISPLAY_CATEGORY_LABELS.get(transaction.get("category"), str(transaction.get("category", "")))
@@ -184,10 +184,19 @@ def _resolve_balance_date(value: str | None, leave_year: dict, *, default_today:
 @app.command()
 def balance(
     year: int | None = typer.Option(None, help="Leave year. Defaults to the leave year containing --as-of or today."),
-    as_of: str | None = typer.Option(None, help="Compute balances through this date YYYY-MM-DD, today, or leave-year-end."),
-    project: bool = typer.Option(False, help="Deprecated compatibility flag; projection is enabled by --project-to or --use-or-lose."),
-    project_to: str | None = typer.Option(None, help="Projection end date YYYY-MM-DD, today, or leave-year-end. Defaults to leave year end when projection is enabled."),
-    use_or_lose: bool = typer.Option(False, help="Show projected annual carryover and use-or-lose amounts at year end."),
+    as_of: str | None = typer.Option(
+        None, help="Compute balances through this date YYYY-MM-DD, today, or leave-year-end."
+    ),
+    project: bool = typer.Option(
+        False, help="Deprecated compatibility flag; projection is enabled by --project-to or --use-or-lose."
+    ),
+    project_to: str | None = typer.Option(
+        None,
+        help="Projection end date YYYY-MM-DD, today, or leave-year-end. Defaults to leave year end when projection is enabled.",
+    ),
+    use_or_lose: bool = typer.Option(
+        False, help="Show projected annual carryover and use-or-lose amounts at year end."
+    ),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
@@ -436,7 +445,9 @@ def pay_periods_summary(
     if not json_output:
         console.print(f"Pay period summary for {year}:")
         if added_accruals:
-            console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {final_accrual_date}.")
+            console.print(
+                f"Posted {added_accruals} automatic annual/sick accrual transactions through {final_accrual_date}."
+            )
 
     for pay_period in pay_periods:
         activity = calculate_pay_period_activity(leave_year, pay_period["start_date"])
@@ -660,10 +671,10 @@ def daily_activity(
         return
 
     console.print(f"Leave activity for {date} ({year}):")
-    for category in sorted({*activity['earned'], *activity['used'], *activity['net']}):
-        earned = activity['earned'].get(category, 0.0)
-        used = activity['used'].get(category, 0.0)
-        net = activity['net'].get(category, 0.0)
+    for category in sorted({*activity["earned"], *activity["used"], *activity["net"]}):
+        earned = activity["earned"].get(category, 0.0)
+        used = activity["used"].get(category, 0.0)
+        net = activity["net"].get(category, 0.0)
         console.print(f"  {category}: earned={earned:.2f} used={used:.2f} net={net:.2f}")
 
 

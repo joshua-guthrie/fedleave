@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from fedleave.config import init_config
-from fedleave.ledger import create_transaction, add_transaction_to_leave_year
-from fedleave.storage import write_json
 from fedleave.cli import rollover
+from fedleave.config import init_config
+from fedleave.ledger import add_transaction_to_leave_year, create_transaction
+from fedleave.storage import write_json
 
 
 def test_rollover_respects_carryover_limit(tmp_path: Path):
@@ -46,4 +46,9 @@ def test_rollover_respects_carryover_limit(tmp_path: Path):
     assert abs(new_ly["starting_balances"]["annual"] - 10.0) < 1e-6
     # verify starting-balance transaction created
     txs = new_ly.get("transactions", [])
-    assert any(tx.get("category") == "annual" and tx.get("direction") == "starting_balance" and abs(tx.get("hours", 0) - 10.0) < 1e-6 for tx in txs)
+    assert any(
+        tx.get("category") == "annual"
+        and tx.get("direction") == "starting_balance"
+        and abs(tx.get("hours", 0) - 10.0) < 1e-6
+        for tx in txs
+    )

@@ -85,7 +85,4 @@ def force_balance(
     if json_output:
         _print_json(result)
         return
-    console.print(
-        f"Forced {category} balance to {hours:.2f} as of {effective_date} "
-        f"(adjustment {adjustment:+.2f})."
-    )
+    console.print(f"Forced {category} balance to {hours:.2f} as of {effective_date} (adjustment {adjustment:+.2f}).")

@@ -6,7 +6,6 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
-
 LEGACY_TRANSACTION_AUDIT_FIELDS = {
     "void",
     "void_reason",

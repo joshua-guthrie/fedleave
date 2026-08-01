@@ -3,20 +3,22 @@ from __future__ import annotations
 import re
 from datetime import date, datetime
 from math import isfinite
-from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from .transaction_effects import (
-    BalanceEffect,
     TRANSACTION_DIRECTIONS as EFFECT_DIRECTIONS,
+)
+from .transaction_effects import (
     TRANSACTION_STATUSES as EFFECT_STATUSES,
+)
+from .transaction_effects import (
+    BalanceEffect,
     direction_effect,
     signed_balance_effect,
     transaction_is_effective,
 )
-
 
 TRANSACTION_CATEGORIES = [
     "annual",
@@ -62,25 +64,19 @@ class Transaction(BaseModel):
     @field_validator("category")
     def validate_category(cls, value: str) -> str:
         if value not in TRANSACTION_CATEGORIES:
-            raise ValueError(
-                f"Invalid category: {value}. Valid categories: {', '.join(TRANSACTION_CATEGORIES)}."
-            )
+            raise ValueError(f"Invalid category: {value}. Valid categories: {', '.join(TRANSACTION_CATEGORIES)}.")
         return value
 
     @field_validator("direction")
     def validate_direction(cls, value: str) -> str:
         if value not in TRANSACTION_DIRECTIONS:
-            raise ValueError(
-                f"Invalid direction: {value}. Valid directions: {', '.join(TRANSACTION_DIRECTIONS)}."
-            )
+            raise ValueError(f"Invalid direction: {value}. Valid directions: {', '.join(TRANSACTION_DIRECTIONS)}.")
         return value
 
     @field_validator("status")
     def validate_status(cls, value: str) -> str:
         if value not in TRANSACTION_STATUSES:
-            raise ValueError(
-                f"Invalid status: {value}. Valid statuses: {', '.join(TRANSACTION_STATUSES)}."
-            )
+            raise ValueError(f"Invalid status: {value}. Valid statuses: {', '.join(TRANSACTION_STATUSES)}.")
         return value
 
     @field_validator("hours")
@@ -96,9 +92,7 @@ class Transaction(BaseModel):
         try:
             normalized = _parse_iso_date(value).isoformat()
         except ValueError:
-            raise ValueError(
-                f"Invalid date: {value}. Use YYYY-MM-DD, for example 2026-01-11."
-            )
+            raise ValueError(f"Invalid date: {value}. Use YYYY-MM-DD, for example 2026-01-11.")
         return normalized
 
 
@@ -167,9 +161,7 @@ def _parse_iso_date(date_str: str) -> date:
     try:
         return date.fromisoformat(normalized)
     except Exception as exc:
-        raise ValueError(
-            f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11."
-        ) from exc
+        raise ValueError(f"Invalid date: {date_str}. Use YYYY-MM-DD, for example 2026-01-11.") from exc
 
 
 def _normalize_iso_date(date_str: str) -> str:
@@ -246,12 +238,12 @@ def calculate_balances(
     return totals
 
 
-def calculate_use_or_lose(leave_year: dict[str, Any], balances: dict[str, float], config: dict[str, Any] | None = None) -> dict[str, float]:
+def calculate_use_or_lose(
+    leave_year: dict[str, Any], balances: dict[str, float], config: dict[str, Any] | None = None
+) -> dict[str, float]:
     carryover_limit = 240.0
     if config is not None:
-        carryover_limit = float(
-            config.get("rules", {}).get("annual", {}).get("carryover_limit_hours", carryover_limit)
-        )
+        carryover_limit = float(config.get("rules", {}).get("annual", {}).get("carryover_limit_hours", carryover_limit))
     annual_balance = balances.get("annual", 0.0)
     carryover_amount = min(annual_balance, carryover_limit)
     use_or_lose_amount = max(0.0, annual_balance - carryover_limit)
@@ -498,7 +490,9 @@ def validate_leave_year(leave_year: dict[str, Any]) -> list[dict[str, Any]]:
     # check starting balances
     sb = leave_year.get("starting_balances", {})
     if not isinstance(sb, dict):
-        issues.append({"type": "starting_balances", "path": "starting_balances", "message": "starting_balances must be a mapping"})
+        issues.append(
+            {"type": "starting_balances", "path": "starting_balances", "message": "starting_balances must be a mapping"}
+        )
 
     # check transactions
     for idx, tx in enumerate(leave_year.get("transactions", [])):
@@ -509,13 +503,27 @@ def validate_leave_year(leave_year: dict[str, Any]) -> list[dict[str, Any]]:
             d = _parse_iso_date(date_str)
             normalized = d.isoformat()
             if normalized != date_str:
-                issues.append({"type": "date", "path": path + ".date", "message": f"Non-canonical date: {date_str}", "fix": {"date": normalized}})
+                issues.append(
+                    {
+                        "type": "date",
+                        "path": path + ".date",
+                        "message": f"Non-canonical date: {date_str}",
+                        "fix": {"date": normalized},
+                    }
+                )
         except ValueError:
             # try to normalize; if normalization succeeds, suggest fix
             normalized = _normalize_iso_date(date_str)
             try:
                 _ = date.fromisoformat(normalized)
-                issues.append({"type": "date", "path": path + ".date", "message": f"Non-canonical date: {date_str}", "fix": {"date": normalized}})
+                issues.append(
+                    {
+                        "type": "date",
+                        "path": path + ".date",
+                        "message": f"Non-canonical date: {date_str}",
+                        "fix": {"date": normalized},
+                    }
+                )
             except Exception:
                 issues.append({"type": "date", "path": path + ".date", "message": f"Invalid date: {date_str}"})
 
@@ -540,7 +548,9 @@ def validate_leave_year(leave_year: dict[str, Any]) -> list[dict[str, Any]]:
             if h < 0:
                 issues.append({"type": "hours", "path": path + ".hours", "message": f"Negative hours: {h}"})
         except Exception:
-            issues.append({"type": "hours", "path": path + ".hours", "message": f"Invalid hours value: {tx.get('hours')}"})
+            issues.append(
+                {"type": "hours", "path": path + ".hours", "message": f"Invalid hours value: {tx.get('hours')}"}
+            )
 
     return issues
 

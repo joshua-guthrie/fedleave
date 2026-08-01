@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from fedleave.cli_helpers import normalize_iso_date
 from fedleave.ledger import generate_transaction_id

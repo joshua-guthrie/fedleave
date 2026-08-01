@@ -4,8 +4,8 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from .resources import window_icon
 from .main_window import MainWindow
+from .resources import window_icon
 
 
 def main(argv: list[str] | None = None) -> int:

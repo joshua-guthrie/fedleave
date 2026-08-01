@@ -5,16 +5,16 @@ from datetime import date, datetime
 
 import pytest
 
-from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave.executable_search import is_executable
+from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave_month_report_graphic.report import (
-    ArgumentError,
     CATEGORY_LABELS,
-    find_fedleave,
+    PAYDAY_STROKE,
+    ArgumentError,
     Options,
     OutputError,
-    PAYDAY_STROKE,
     ReportData,
+    find_fedleave,
     load_report_data,
     parse_args,
     parse_month,
@@ -263,7 +263,9 @@ def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
         },
     }
 
-    monkeypatch.setattr("fedleave_month_report_graphic.report.find_fedleave", lambda explicit=None: tmp_path / "fedleave")
+    monkeypatch.setattr(
+        "fedleave_month_report_graphic.report.find_fedleave", lambda explicit=None: tmp_path / "fedleave"
+    )
 
     def fake_run_fedleave(_fedleave, args):
         calls.append(args)
@@ -275,9 +277,7 @@ def test_load_report_data_prefers_enriched_month_payload(monkeypatch, tmp_path):
 
     monkeypatch.setattr("fedleave_month_report_graphic.report.run_fedleave", fake_run_fedleave)
 
-    _fedleave, data = load_report_data(
-        Options(tmp_path / "month.png", 2026, 7, 1920, None, None, False, False, False)
-    )
+    _fedleave, data = load_report_data(Options(tmp_path / "month.png", 2026, 7, 1920, None, None, False, False, False))
 
     assert [call[0] for call in calls] == ["month", "use-or-lose"]
     assert data.balance_json["balances"]["annual"] == 124.0

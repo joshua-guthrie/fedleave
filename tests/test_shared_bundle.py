@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import importlib.util
 import os
-from pathlib import Path
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE_PATH = ROOT / "scripts" / "lib" / "common" / "installer_engine.py"

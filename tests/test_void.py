@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from fedleave.config import init_config
-from fedleave.ledger import create_transaction, add_transaction_to_leave_year
-from fedleave.storage import write_json
 from fedleave.cli import void
+from fedleave.config import init_config
+from fedleave.ledger import add_transaction_to_leave_year, create_transaction
+from fedleave.storage import write_json
 
 
 def test_void_deletes_transaction(tmp_path: Path):
@@ -27,12 +27,12 @@ def test_void_deletes_transaction(tmp_path: Path):
     )
 
     year_file = data_dir / "leave_years" / "2026.json"
-    leave_year = __import__('json').loads(year_file.read_text())
+    leave_year = __import__("json").loads(year_file.read_text())
     t = create_transaction(date="2026-04-01", category="annual", direction="used", hours=2.0, existing_ids=[])
     add_transaction_to_leave_year(leave_year, t)
     write_json(year_file, leave_year)
 
     void(id=t.id, reason="test void", data_dir=data_dir)
 
-    ly2 = __import__('json').loads(year_file.read_text())
-    assert all(x['id'] != t.id for x in ly2['transactions'])
+    ly2 = __import__("json").loads(year_file.read_text())
+    assert all(x["id"] != t.id for x in ly2["transactions"])

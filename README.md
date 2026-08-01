@@ -102,6 +102,10 @@ python -m venv .venv
 pip install -e ".[dev]"
 ```
 
+See [Development](docs/DEVELOPMENT.md) for the standard quality, test, and
+package commands, and [Architecture](docs/ARCHITECTURE.md) for a map of the
+source tree and dependency boundaries.
+
 ## Developer packaging
 
 The commands below build from source for development and packaging.

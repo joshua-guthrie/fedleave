@@ -18,21 +18,40 @@ def _application() -> QApplication:
 
 
 def _data():
-    return analyze_leave_year({
-        "year": 2026,
-        "leave_year_start": "2026-01-01",
-        "leave_year_end": "2026-12-31",
-        "starting_balances": {"annual": 100},
-        "carryover_from_previous_year": {},
-        "available_leave_years": [2025, 2026],
-        "pay_periods": [{"pay_period_number": 1, "start_date": "2026-01-01", "end_date": "2026-01-14"}],
-        "transactions": [
-            {"id": "1", "date": "2026-02-03", "category": "annual", "direction": "used", "hours": 8,
-             "status": "approved", "description": "Leave", "source": "manual"},
-            {"id": "2", "date": "2026-10-03", "category": "sick", "direction": "used", "hours": 4,
-             "status": "planned", "description": "Appointment", "source": "manual"},
-        ],
-    }, date(2026, 6, 1))
+    return analyze_leave_year(
+        {
+            "year": 2026,
+            "leave_year_start": "2026-01-01",
+            "leave_year_end": "2026-12-31",
+            "starting_balances": {"annual": 100},
+            "carryover_from_previous_year": {},
+            "available_leave_years": [2025, 2026],
+            "pay_periods": [{"pay_period_number": 1, "start_date": "2026-01-01", "end_date": "2026-01-14"}],
+            "transactions": [
+                {
+                    "id": "1",
+                    "date": "2026-02-03",
+                    "category": "annual",
+                    "direction": "used",
+                    "hours": 8,
+                    "status": "approved",
+                    "description": "Leave",
+                    "source": "manual",
+                },
+                {
+                    "id": "2",
+                    "date": "2026-10-03",
+                    "category": "sick",
+                    "direction": "used",
+                    "hours": 4,
+                    "status": "planned",
+                    "description": "Appointment",
+                    "source": "manual",
+                },
+            ],
+        },
+        date(2026, 6, 1),
+    )
 
 
 def test_main_window_has_required_pages_controls_without_backend_diagnostics():
@@ -46,7 +65,10 @@ def test_main_window_has_required_pages_controls_without_backend_diagnostics():
     window.set_data(_data())
 
     assert [window.pages.tabText(index) for index in range(window.pages.count())] == [
-        "Summary", "Seasonality", "Calendar Heatmap", "Overtime, Comp, and Credit",
+        "Summary",
+        "Seasonality",
+        "Calendar Heatmap",
+        "Overtime, Comp, and Credit",
     ]
     assert window.summary_table.rowCount() == 15
     assert window.refresh_button.text() == "Refresh"
@@ -75,8 +97,7 @@ def test_seasonality_views_are_explained_and_populated():
     assert not window.seasonality_chart_image.source_pixmap().isNull()
     assert window.open_chart_button.isEnabled()
     assert "Final-Quarter Leave Concentration" not in [
-        window.seasonality_selector.itemText(index)
-        for index in range(window.seasonality_selector.count())
+        window.seasonality_selector.itemText(index) for index in range(window.seasonality_selector.count())
     ]
 
 
@@ -141,7 +162,9 @@ def test_dynamic_heatmaps_and_monthly_lifecycle_charts_are_populated():
     window.set_data(_data())
 
     assert [window.heatmap_selector.itemText(index) for index in range(window.heatmap_selector.count())] == [
-        "All Leave Used", "Annual — Used", "Sick — Used",
+        "All Leave Used",
+        "Annual — Used",
+        "Sick — Used",
     ]
     window.pages.setCurrentIndex(2)
     assert window.heatmap_table.rowCount() == 2

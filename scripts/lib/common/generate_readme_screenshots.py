@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import json
 import os
-from datetime import date
-from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from datetime import date
+from pathlib import Path
 from typing import Any
-
 
 ROOT = Path(__file__).resolve().parents[3]
 EXAMPLES = ROOT / "examples"
@@ -21,8 +19,7 @@ def _run(command: list[str]) -> None:
     result = subprocess.run(command, cwd=ROOT, env=env, text=True, capture_output=True, check=False)
     if result.returncode:
         raise RuntimeError(
-            f"Screenshot command failed ({result.returncode}): {' '.join(command)}\n"
-            f"{result.stderr or result.stdout}"
+            f"Screenshot command failed ({result.returncode}): {' '.join(command)}\n{result.stderr or result.stdout}"
         )
 
 
@@ -201,10 +198,10 @@ def _gui_screenshots(data_dir: Path) -> None:
     from PySide6.QtCore import QDate
     from PySide6.QtWidgets import QAbstractItemView, QApplication, QSplitter
 
-    from fedleave_analytics.analytics import analyze_leave_year
-    from fedleave.storage import load_json
-    from fedleave_analytics.app import AnalyticsWindow, TransactionDialog
     import fedleave_gui.main_window as calendar_ui
+    from fedleave.storage import load_json
+    from fedleave_analytics.analytics import analyze_leave_year
+    from fedleave_analytics.app import AnalyticsWindow, TransactionDialog
     from fedleave_gui.settings import GuiSettings
 
     app = QApplication.instance() or QApplication([])
@@ -245,15 +242,23 @@ def _gui_screenshots(data_dir: Path) -> None:
         "expired_or_forfeited_this_leave_year": 2,
         "lots": [
             {
-                "category": "travel_comp", "earned_date": "2025-09-13", "earned_hours": 8,
-                "remaining_hours": 5.5, "expiration_date": "2026-09-12",
-                "pay_periods_remaining": 4, "hours_per_pay_period_to_use": 1.38,
+                "category": "travel_comp",
+                "earned_date": "2025-09-13",
+                "earned_hours": 8,
+                "remaining_hours": 5.5,
+                "expiration_date": "2026-09-12",
+                "pay_periods_remaining": 4,
+                "hours_per_pay_period_to_use": 1.38,
                 "transaction_id": "20250913-001",
             },
             {
-                "category": "comp", "earned_date": "2026-05-09", "earned_hours": 7,
-                "remaining_hours": 4, "expiration_date": "2027-05-08",
-                "pay_periods_remaining": 21, "hours_per_pay_period_to_use": 0.19,
+                "category": "comp",
+                "earned_date": "2026-05-09",
+                "earned_hours": 7,
+                "remaining_hours": 4,
+                "expiration_date": "2027-05-08",
+                "pay_periods_remaining": 21,
+                "hours_per_pay_period_to_use": 0.19,
                 "transaction_id": "20260509-001",
             },
         ],
@@ -268,20 +273,28 @@ def _gui_screenshots(data_dir: Path) -> None:
 
     transactions = [
         {
-            "id": "20260703-001", "date": "2026-07-03", "category": "annual",
-            "direction": "used", "hours": 20, "status": "reconciled",
-            "source": "screenshot-sample", "description": "Summer leave",
+            "id": "20260703-001",
+            "date": "2026-07-03",
+            "category": "annual",
+            "direction": "used",
+            "hours": 20,
+            "status": "reconciled",
+            "source": "screenshot-sample",
+            "description": "Summer leave",
         },
         {
-            "id": "20260717-001", "date": "2026-07-17", "category": "comp",
-            "direction": "used", "hours": 3, "status": "reconciled",
-            "source": "screenshot-sample", "description": "Comp time used",
+            "id": "20260717-001",
+            "date": "2026-07-17",
+            "category": "comp",
+            "direction": "used",
+            "hours": 3,
+            "status": "reconciled",
+            "source": "screenshot-sample",
+            "description": "Comp time used",
         },
     ]
     _capture(
-        calendar_ui.LeaveTransactionsDialog(
-            calendar_ui.date(2026, 7, 1), calendar_ui.date(2026, 7, 31), transactions
-        ),
+        calendar_ui.LeaveTransactionsDialog(calendar_ui.date(2026, 7, 1), calendar_ui.date(2026, 7, 31), transactions),
         EXAMPLES / "fedleave-calendar-transactions.png",
         1600,
         900,

@@ -24,7 +24,9 @@ def test_balance_table_headers_follow_left_aligned_text(monkeypatch):
     window._render_balances()
 
     assert window.balance_table.horizontalHeaderItem(0).textAlignment() & Qt.AlignLeft
-    assert all(window.balance_table.horizontalHeaderItem(column).textAlignment() & Qt.AlignRight for column in range(1, 3))
+    assert all(
+        window.balance_table.horizontalHeaderItem(column).textAlignment() & Qt.AlignRight for column in range(1, 3)
+    )
     assert [window.balance_table.horizontalHeaderItem(column).text() for column in range(3)] == [
         "Category",
         "Balance",
