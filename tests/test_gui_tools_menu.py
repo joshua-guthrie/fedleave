@@ -17,6 +17,42 @@ def _application() -> QApplication:
     return QApplication.instance() or QApplication([])
 
 
+def _write_valid_year(path, year: int) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "leave_year": year,
+                "leave_year_start": f"{year}-01-01",
+                "leave_year_end": f"{year}-12-31",
+                "starting_balances": {},
+                "transactions": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+class _MetadataBackend:
+    def __init__(self, years: list[int], visible_categories: list[str] | None = None):
+        self._years = years
+        self._visible_categories = visible_categories or []
+
+    def leave_years(self):
+        return {
+            "years": [
+                {
+                    "leave_year": year,
+                    "start_date": None,
+                    "end_date": None,
+                    "valid": True,
+                }
+                for year in self._years
+            ],
+            "visible_categories": self._visible_categories,
+            "warnings": [],
+        }
+
+
 def test_tools_menu_hides_internal_data_folder(monkeypatch):
     _application()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
@@ -109,6 +145,7 @@ def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):
     (tmp_path / "leave_years" / "2024.json").write_text("{}", encoding="utf-8")
     (tmp_path / "leave_years" / "2026.json").write_text("{}", encoding="utf-8")
     window.settings.data_dir = str(tmp_path)
+    window.backend = _MetadataBackend([2024, 2026])
 
     file_action = next(action for action in window.menuBar().actions() if action.text() == "File")
     labels = [action.text() for action in file_action.menu().actions() if action.text()]
@@ -129,6 +166,7 @@ def test_change_leave_year_action_updates_displayed_year(monkeypatch, tmp_path):
     (tmp_path / "leave_years" / "2024.json").write_text("{}", encoding="utf-8")
     (tmp_path / "leave_years" / "2026.json").write_text("{}", encoding="utf-8")
     window.settings.data_dir = str(tmp_path)
+    window.backend = _MetadataBackend([2024, 2026])
 
     class FakeChangeLeaveYearDialog:
         def __init__(self, years, current_year, parent=None):
@@ -159,7 +197,7 @@ def test_startup_loads_current_leave_year_when_available(monkeypatch, tmp_path):
     window = MainWindow()
     leave_years = tmp_path / "leave_years"
     leave_years.mkdir()
-    (leave_years / f"{window.today.year}.json").write_text("{}", encoding="utf-8")
+    _write_valid_year(leave_years / f"{window.today.year}.json", window.today.year)
     refreshed = []
     window.refresh = lambda: refreshed.append(window.year)
 
@@ -179,8 +217,8 @@ def test_startup_uses_latest_available_leave_year_when_current_is_missing(monkey
     window = MainWindow()
     leave_years = tmp_path / "leave_years"
     leave_years.mkdir()
-    (leave_years / "2024.json").write_text("{}", encoding="utf-8")
-    (leave_years / "2025.json").write_text("{}", encoding="utf-8")
+    _write_valid_year(leave_years / "2024.json", 2024)
+    _write_valid_year(leave_years / "2025.json", 2025)
     refreshed = []
     window.refresh = lambda: refreshed.append(window.year)
 
@@ -239,7 +277,7 @@ def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monk
 
     leave_years = tmp_path / "leave_years"
     leave_years.mkdir()
-    (leave_years / "2026.json").write_text("{}", encoding="utf-8")
+    _write_valid_year(leave_years / "2026.json", 2026)
 
     view_action = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
     yearly_comparison_action = next(
@@ -248,7 +286,7 @@ def test_yearly_comparison_menu_refreshes_when_a_second_leave_year_is_added(monk
 
     assert yearly_comparison_action.menu().isEnabled() is False
 
-    (leave_years / "2027.json").write_text("{}", encoding="utf-8")
+    _write_valid_year(leave_years / "2027.json", 2027)
     window._refresh_yearly_comparison_menu()
 
     assert yearly_comparison_action.menu().isEnabled() is True
@@ -269,7 +307,10 @@ def test_category_visibility_considers_balances_and_transactions_across_years(tm
         ],
     }), encoding="utf-8")
 
-    assert _visible_categories(str(tmp_path)) == {"annual", "overtime"}
+    assert _visible_categories(_MetadataBackend([2025, 2026], ["annual", "overtime"])) == {
+        "annual",
+        "overtime",
+    }
 
 
 def test_change_accrual_action_updates_backend_and_refreshes(monkeypatch):

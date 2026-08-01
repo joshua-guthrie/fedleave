@@ -42,6 +42,7 @@ Primary commands:
                 Extend one eligible earned lot with a recorded reason
     reconcile   Add or update one reconciled transaction by date/category/direction
     list        List transactions for a leave year
+    years       List backend-recognized leave years and visible categories
     starting-balance
                 Set starting balances
     balance     Show balances calculated from the ledger
@@ -126,6 +127,9 @@ Command details and examples:
 
     fedleave list --year YEAR [--json] [--show-transaction-ids] [--data-dir PATH]
         List active transactions for a leave year. Transaction IDs are hidden unless --show-transaction-ids is passed.
+
+    fedleave years [--json] [--data-dir PATH]
+        List valid and invalid leave-year files through the backend data boundary.
 
     fedleave starting-balance set --year YEAR --category CATEGORY --hours HOURS --reason TEXT [--data-dir PATH]
         Set a leave year's starting balance for one category, retaining only the final value.

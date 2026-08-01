@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import calendar
 import html
-import json
 import os
 import subprocess
 import sys
@@ -984,45 +983,20 @@ class LeaveTransactionsDialog(QDialog):
             self.table.setItem(row, column, _table_item(value, alignments[column]))
 
 
-def _available_leave_years(data_dir: str | None) -> list[int]:
-    base_dir = get_default_data_dir(Path(data_dir) if data_dir else None)
-    year_dir = base_dir / "leave_years"
-    if not year_dir.exists():
-        return []
-    years: list[int] = []
-    for path in sorted(year_dir.glob("*.json")):
-        if path.stem.isdigit():
-            years.append(int(path.stem))
-    return years
+def _leave_year_metadata(source: FedleaveBackend | dict[str, Any]) -> dict[str, Any]:
+    return source if isinstance(source, dict) else source.leave_years()
 
 
-def _visible_categories(data_dir: str | None) -> set[str]:
-    base_dir = get_default_data_dir(Path(data_dir) if data_dir else None)
-    year_dir = base_dir / "leave_years"
-    visible: set[str] = set()
-    if not year_dir.exists():
-        return visible
-    for path in sorted(year_dir.glob("*.json")):
-        try:
-            leave_year = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        for field in ("starting_balances", "carryover_from_previous_year"):
-            values = leave_year.get(field, {})
-            if not isinstance(values, dict):
-                continue
-            for category, value in values.items():
-                if _nonzero(value):
-                    visible.add(str(category))
-        for transaction in leave_year.get("transactions", []):
-            if (
-                isinstance(transaction, dict)
-                and not transaction.get("void")
-                and str(transaction.get("status", "")).lower() not in {"denied", "cancelled", "voided", "deleted"}
-                and _nonzero(transaction.get("hours"))
-            ):
-                visible.add(str(transaction.get("category", "")))
-    return visible
+def _available_leave_years(source: FedleaveBackend | dict[str, Any]) -> list[int]:
+    return sorted(
+        int(record["leave_year"])
+        for record in _leave_year_metadata(source)["years"]
+        if record.get("valid") is True
+    )
+
+
+def _visible_categories(source: FedleaveBackend | dict[str, Any]) -> set[str]:
+    return set(_leave_year_metadata(source)["visible_categories"])
 
 
 class MainWindow(QMainWindow):
@@ -1049,7 +1023,19 @@ class MainWindow(QMainWindow):
 
     def start_initial_load(self) -> None:
         """Load an existing leave year or guide a first-time user through setup."""
-        years = _available_leave_years(self.settings.data_dir or None)
+        try:
+            years = _available_leave_years(self.backend)
+        except BackendMissingError:
+            QMessageBox.critical(
+                self,
+                "Backend Missing",
+                "The fedleave backend executable could not be found. Open Preferences to set the path.",
+            )
+            self.preferences()
+            return
+        except BackendError as exc:
+            QMessageBox.warning(self, "Backend Error", str(exc))
+            return
         if years:
             if self.year not in years:
                 self.year = max(years)
@@ -1204,7 +1190,7 @@ class MainWindow(QMainWindow):
                 f"{label} Comparison",
                 lambda _checked=False, app_name=app_name, label=label, category=category: self.open_yearly_leave_comparison(app_name, label, category),
             )
-        self._refresh_yearly_comparison_menu()
+        self.yearly_comparison_menu.setEnabled(False)
         self._toggle(view_menu, "Show Automatic Accruals in Day Cells", self.settings.show_auto_accruals, "show_auto_accruals")
         self._toggle(view_menu, "Show Holidays", self.settings.show_holidays, "show_holidays")
         self._toggle(view_menu, "Show Pay-Day Highlight", self.settings.show_paydays, "show_paydays")
@@ -1293,13 +1279,17 @@ class MainWindow(QMainWindow):
             self.render_month()
             self.refresh()
 
-    def _refresh_yearly_comparison_menu(self) -> None:
+    def _refresh_yearly_comparison_menu(
+        self, metadata: dict[str, Any] | None = None
+    ) -> None:
         if self.yearly_comparison_menu is None:
             return
-        self.yearly_comparison_menu.setEnabled(len(_available_leave_years(self.settings.data_dir or None)) > 1)
+        self.yearly_comparison_menu.setEnabled(
+            len(_available_leave_years(metadata or self.backend)) > 1
+        )
 
-    def _refresh_chart_visibility(self) -> None:
-        visible = _visible_categories(self.backend.options.data_dir)
+    def _refresh_chart_visibility(self, metadata: dict[str, Any] | None = None) -> None:
+        visible = _visible_categories(metadata or self.backend)
         for category, action in self.leave_chart_actions.items():
             action.setVisible(category in visible)
         for category, action in self.yearly_comparison_actions.items():
@@ -1311,8 +1301,9 @@ class MainWindow(QMainWindow):
             self.month_json = self.backend.load_month(self.year, self.month)
             self.use_or_lose_json = self.backend.use_or_lose(self.year)
             self._refresh_balance_snapshot()
-            self._refresh_yearly_comparison_menu()
-            self._refresh_chart_visibility()
+            metadata = self.backend.leave_years()
+            self._refresh_yearly_comparison_menu(metadata)
+            self._refresh_chart_visibility(metadata)
         except BackendMissingError:
             QMessageBox.critical(self, "Backend Missing", "The fedleave backend executable could not be found. Open Preferences to set the path.")
             self.preferences()
@@ -1880,7 +1871,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def change_leave_year(self) -> None:
-        years = _available_leave_years(self.settings.data_dir or None)
+        years = _available_leave_years(self.backend)
         if not years:
             QMessageBox.warning(self, "Change Leave Year", "No leave year files were found.")
             return
@@ -1924,7 +1915,7 @@ class MainWindow(QMainWindow):
         LeaveTransactionsDialog(start_date, end_date, transactions, self).exec()
 
     def _transactions_in_range(self, start_date: date, end_date: date) -> list[dict[str, Any]]:
-        years = _available_leave_years(self.settings.data_dir or None)
+        years = _available_leave_years(self.backend)
         if not years:
             years = [self.year]
 

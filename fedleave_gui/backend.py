@@ -20,6 +20,10 @@ class BackendMissingError(BackendError):
     pass
 
 
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 30.0
+GRAPHIC_COMMAND_TIMEOUT_SECONDS = 120.0
+
+
 @dataclass(frozen=True)
 class BackendOptions:
     fedleave_path: str | None = None
@@ -76,11 +80,21 @@ class FedleaveBackend:
     def __init__(self, options: BackendOptions | None = None) -> None:
         self.options = options or BackendOptions()
 
-    def _run_command(self, command: list[str]) -> subprocess.CompletedProcess[str]:
+    def _run_command(
+        self,
+        command: list[str],
+        *,
+        timeout: float = DEFAULT_COMMAND_TIMEOUT_SECONDS,
+    ) -> subprocess.CompletedProcess[str]:
         kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
         if sys.platform.startswith("win"):
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        return subprocess.run(command, **kwargs)
+        try:
+            return subprocess.run(command, timeout=timeout, **kwargs)
+        except subprocess.TimeoutExpired as exc:
+            raise BackendError(
+                f"fedleave backend did not respond within {timeout:g} seconds."
+            ) from exc
 
     def run_json(self, args: list[str], *, include_data_dir: bool = True) -> dict[str, Any]:
         fedleave = find_fedleave(self.options.fedleave_path)
@@ -179,6 +193,26 @@ class FedleaveBackend:
     def load_month(self, year: int, month: int) -> dict[str, Any]:
         return self.run_json(["month", "--year", str(year), "--month", str(month), "--json"])
 
+    def leave_years(self) -> dict[str, Any]:
+        payload = self.run_json(["years", "--json"])
+        records = payload.get("years")
+        categories = payload.get("visible_categories")
+        warnings = payload.get("warnings")
+        if not isinstance(records, list) or not all(
+            isinstance(record, dict)
+            and isinstance(record.get("leave_year"), int)
+            and isinstance(record.get("valid"), bool)
+            for record in records
+        ):
+            raise BackendError("fedleave returned an unexpected leave-year payload.")
+        if not isinstance(categories, list) or not all(
+            isinstance(category, str) for category in categories
+        ):
+            raise BackendError("fedleave returned unexpected visible-category metadata.")
+        if not isinstance(warnings, list) or not all(isinstance(warning, str) for warning in warnings):
+            raise BackendError("fedleave returned unexpected leave-year warnings.")
+        return payload
+
     def list_transactions(self, year: int) -> list[dict[str, Any]]:
         payload = self.run_json(["list", "--year", str(year), "--json"])
         transactions = payload.get("transactions")
@@ -262,7 +296,12 @@ class FedleaveBackend:
         kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
         if sys.platform.startswith("win"):
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        result = subprocess.run(command, **kwargs)
+        try:
+            result = subprocess.run(command, timeout=GRAPHIC_COMMAND_TIMEOUT_SECONDS, **kwargs)
+        except subprocess.TimeoutExpired as exc:
+            raise BackendError(
+                f"{app_name} did not respond within {GRAPHIC_COMMAND_TIMEOUT_SECONDS:g} seconds."
+            ) from exc
         if result.returncode != 0:
             message = (result.stderr or result.stdout or f"{app_name} command failed").strip()
             raise BackendError(message)
@@ -295,7 +334,13 @@ def run_month_report_graphic(
     kwargs: dict[str, Any] = {"text": True, "capture_output": True, "check": False}
     if sys.platform.startswith("win"):
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-    result = subprocess.run(command, **kwargs)
+    try:
+        result = subprocess.run(command, timeout=GRAPHIC_COMMAND_TIMEOUT_SECONDS, **kwargs)
+    except subprocess.TimeoutExpired as exc:
+        raise BackendError(
+            "fedleaveMonthReportGraphic did not respond within "
+            f"{GRAPHIC_COMMAND_TIMEOUT_SECONDS:g} seconds."
+        ) from exc
     if result.returncode != 0:
         message = (result.stderr or result.stdout or "fedleaveMonthReportGraphic command failed").strip()
         raise BackendError(message)

@@ -68,3 +68,16 @@ def test_backup_file_uses_unique_names_within_same_second(
     assert first.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
     assert second.read_text(encoding="utf-8") == source.read_text(encoding="utf-8")
     assert len(list(source.parent.parent.joinpath("backups").iterdir())) == 2
+
+
+def test_config_backup_stays_inside_data_directory(tmp_path: Path) -> None:
+    data_dir = tmp_path / "fedleave-data"
+    data_dir.mkdir()
+    config = data_dir / "config.json"
+    config.write_text('{"schema_version": 1}\n', encoding="utf-8")
+
+    backup = backup_file(config)
+
+    assert backup.parent == data_dir / "backups"
+    assert backup.read_text(encoding="utf-8") == config.read_text(encoding="utf-8")
+    assert not (tmp_path / "backups").exists()

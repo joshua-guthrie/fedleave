@@ -50,7 +50,11 @@ def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
 def backup_file(path: Path) -> Path:
     if not path.exists():
         raise FileNotFoundError(path)
-    backup_dir = path.parent.parent / "backups"
+    if path.parent.name in {"leave_years", "holiday_cache"}:
+        data_dir = path.parent.parent
+    else:
+        data_dir = path.parent
+    backup_dir = data_dir / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")
     counter = 0

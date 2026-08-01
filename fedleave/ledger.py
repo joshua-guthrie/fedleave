@@ -2,10 +2,20 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError, field_validator
+
+from .transaction_effects import (
+    BalanceEffect,
+    TRANSACTION_DIRECTIONS as EFFECT_DIRECTIONS,
+    TRANSACTION_STATUSES as EFFECT_STATUSES,
+    direction_effect,
+    signed_balance_effect,
+    transaction_is_effective,
+)
 
 
 TRANSACTION_CATEGORIES = [
@@ -28,37 +38,8 @@ TRANSACTION_CATEGORIES = [
     "restored_annual",
 ]
 
-TRANSACTION_DIRECTIONS = [
-    "earned",
-    "used",
-    "worked",
-    "adjusted",
-    "expired",
-    "forfeited",
-    "starting_balance",
-    "restored",
-    "corrected",
-    "reconciled",
-    "forced_increase",
-    "forced_decrease",
-]
-
-TRANSACTION_STATUSES = [
-    "planned",
-    "requested",
-    "approved",
-    "denied",
-    "worked",
-    "submitted",
-    "certified",
-    "reconciled",
-    "cancelled",
-]
-
-
-EARNED_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled", "forced_increase"}
-USED_DIRECTIONS = {"used", "expired", "forfeited", "forced_decrease"}
-WORKED_DIRECTIONS = {"worked"}
+TRANSACTION_DIRECTIONS = list(EFFECT_DIRECTIONS)
+TRANSACTION_STATUSES = list(EFFECT_STATUSES)
 
 
 class Transaction(BaseModel):
@@ -104,6 +85,8 @@ class Transaction(BaseModel):
 
     @field_validator("hours")
     def validate_hours(cls, value: float) -> float:
+        if not isfinite(value):
+            raise ValueError("Invalid hours: must be a finite number")
         if value < 0:
             raise ValueError("Invalid hours: must be zero or positive. Example: --used 4.0")
         return value
@@ -221,7 +204,7 @@ def calculate_balances(
         transaction_cutoff = projection_end
 
     for transaction in leave_year.get("transactions", []):
-        if transaction.get("void"):
+        if not transaction_is_effective(transaction):
             continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if transaction_cutoff is not None and tx_date > transaction_cutoff:
@@ -236,17 +219,9 @@ def calculate_balances(
                 continue
 
         category = transaction["category"]
-        direction = transaction["direction"]
-        hours = float(transaction.get("hours", 0.0))
         if category not in totals:
             totals[category] = 0.0
-
-        if direction in EARNED_DIRECTIONS or direction in WORKED_DIRECTIONS or direction == "starting_balance":
-            totals[category] += hours
-        elif direction in USED_DIRECTIONS:
-            totals[category] -= hours
-        else:
-            totals[category] += hours
+        totals[category] += signed_balance_effect(transaction)
 
     if include_projected:
         pay_periods = leave_year.get("pay_periods", [])
@@ -294,7 +269,7 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
     net: dict[str, float] = {}
 
     for transaction in leave_year.get("transactions", []):
-        if transaction.get("void"):
+        if not transaction_is_effective(transaction):
             continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if tx_date != target:
@@ -302,22 +277,20 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
 
         category = transaction["category"]
         direction = transaction["direction"]
-        hours = float(transaction.get("hours", 0.0))
+        hours = abs(signed_balance_effect(transaction))
 
         if category not in earned:
             earned[category] = 0.0
             used[category] = 0.0
             net[category] = 0.0
 
-        if direction in EARNED_DIRECTIONS or direction in WORKED_DIRECTIONS or direction == "starting_balance":
+        effect = direction_effect(direction)
+        if effect is BalanceEffect.INCREASE:
             earned[category] += hours
             net[category] += hours
-        elif direction in USED_DIRECTIONS:
+        elif effect is BalanceEffect.DECREASE:
             used[category] += hours
             net[category] -= hours
-        else:
-            earned[category] += hours
-            net[category] += hours
 
     return {"earned": earned, "used": used, "net": net}
 
@@ -338,7 +311,7 @@ def _has_auto_accrual(leave_year: dict[str, Any], category: str, accrual_date: s
         and transaction.get("category") == category
         and transaction.get("direction") == "earned"
         and transaction.get("date") == accrual_date
-        and not transaction.get("void")
+        and transaction_is_effective(transaction)
         for transaction in leave_year.get("transactions", [])
     )
 
@@ -409,7 +382,7 @@ def upsert_accrual_rate_change(
             transaction.get("source") != "auto_accrual"
             or transaction.get("category") != category
             or transaction.get("direction") != "earned"
-            or transaction.get("void")
+            or not transaction_is_effective(transaction)
         ):
             continue
         tx_date = _parse_iso_date(str(transaction.get("date", "")))
@@ -473,7 +446,7 @@ def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[
     net: dict[str, float] = {}
 
     for transaction in leave_year.get("transactions", []):
-        if transaction.get("void"):
+        if not transaction_is_effective(transaction):
             continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if not (start <= tx_date <= end):
@@ -481,27 +454,25 @@ def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[
 
         category = transaction["category"]
         direction = transaction["direction"]
-        hours = float(transaction.get("hours", 0.0))
+        hours = abs(signed_balance_effect(transaction))
         earned.setdefault(category, 0.0)
         used.setdefault(category, 0.0)
         worked.setdefault(category, 0.0)
         net.setdefault(category, 0.0)
 
-        if direction in WORKED_DIRECTIONS:
+        effect = direction_effect(direction)
+        if direction == "worked":
             worked[category] += hours
             earned[category] += hours
             net[category] += hours
-        elif direction in EARNED_DIRECTIONS:
-            earned[category] += hours
-            net[category] += hours
-        elif direction in USED_DIRECTIONS:
-            used[category] += hours
-            net[category] -= hours
         elif direction == "starting_balance":
             continue
-        else:
+        elif effect is BalanceEffect.INCREASE:
             earned[category] += hours
             net[category] += hours
+        elif effect is BalanceEffect.DECREASE:
+            used[category] += hours
+            net[category] -= hours
 
     return {
         "pay_period": pay_period,

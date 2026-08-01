@@ -91,8 +91,7 @@ Linux / macOS:
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
-pip install -r requirements-dev.txt
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 Windows PowerShell:
@@ -100,8 +99,7 @@ Windows PowerShell:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements-dev.txt
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ## Developer packaging
@@ -284,9 +282,7 @@ Current GUI features:
 Run from source:
 
 ```bash
-pip install -r requirements.txt
-pip install -r requirements-gui.txt
-pip install -e .
+pip install -e ".[gui]"
 FedLeaveCalendar
 ```
 
@@ -592,6 +588,16 @@ Commands and common options:
 		Notes:
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when you need them for correction or deletion.
 			- Legacy voided transactions are automatically removed from the data file when it is loaded.
+
+	years
+		List backend-recognized leave years and visible leave categories.
+
+		Syntax:
+			fedleave years [--json] [--data-dir PATH]
+
+		Notes:
+			- The GUI uses this command instead of inspecting leave-year files directly.
+			- Invalid leave-year files are reported as warnings and are not offered for selection.
 
 	set-day
 		Authoritatively set signed leave values for one day.
@@ -1191,11 +1197,12 @@ Commands with native JSON output:
 - `validate`
 - `rollover`
 - `compare-leave-balances`
+- `list`
+- `years`
 
 Commands without `--json`:
 
 - `init`
-- `list`
 - `starting-balance set`
 - `export-data`
 - `import-data`

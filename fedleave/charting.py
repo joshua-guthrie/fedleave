@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 from .cli_helpers import load_leave_year, parse_iso_date
 from .config import get_default_data_dir as resolve_default_data_dir
 from .ledger import calculate_balances
+from .transaction_effects import signed_balance_effect, transaction_is_effective
 from .executable_search import is_executable, iter_executable_candidates
 from .project_info import HELP_EPILOG
 from .chart_style import (
@@ -268,7 +269,7 @@ def category_balance_points(
         [
             tx
             for tx in snapshot.get("transactions", [])
-            if not tx.get("void") and tx.get("category") == category
+            if transaction_is_effective(tx) and tx.get("category") == category
         ],
         key=lambda tx: (tx.get("date", ""), str(tx.get("id", ""))),
     )
@@ -289,12 +290,8 @@ def category_balance_points(
 
         while tx_index < len(transactions) and date.fromisoformat(transactions[tx_index]["date"]) <= period_end:
             tx = transactions[tx_index]
-            hours = decimal_hours(tx.get("hours"))
-            direction = tx.get("direction")
-            if direction in {"earned", "worked", "adjusted", "restored", "corrected", "reconciled", "forced_increase"}:
-                running += hours
-            elif direction in {"used", "expired", "forfeited", "forced_decrease"}:
-                running -= hours
+            if tx.get("direction") != "starting_balance":
+                running += decimal_hours(signed_balance_effect(tx))
             tx_index += 1
 
         points.append((period_end, running))

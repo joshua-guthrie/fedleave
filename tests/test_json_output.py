@@ -16,6 +16,7 @@ from fedleave.cli import (
     rollover,
     validate,
     void,
+    years,
 )
 from fedleave.config import init_config
 from fedleave.ledger import add_transaction_to_leave_year, create_transaction
@@ -44,6 +45,48 @@ def _init_data_dir(data_dir: Path) -> Path:
 
 def _json_output(capsys):
     return json.loads(capsys.readouterr().out)
+
+
+def test_years_json_reports_backend_owned_metadata(tmp_path: Path, capsys):
+    data_dir = tmp_path / "data"
+    _init_data_dir(data_dir)
+    invalid_path = data_dir / "leave_years" / "2027.json"
+    invalid_path.write_text("not json", encoding="utf-8")
+    year_path = data_dir / "leave_years" / "2026.json"
+    leave_year = json.loads(year_path.read_text(encoding="utf-8"))
+    leave_year["transactions"].append(
+        {
+            "id": "20260310-001",
+            "date": "2026-03-10",
+            "category": "overtime",
+            "direction": "worked",
+            "hours": 2.0,
+            "status": "worked",
+        }
+    )
+    write_json(year_path, leave_year, backup=False)
+    capsys.readouterr()
+
+    years(json_output=True, data_dir=data_dir)
+
+    payload = _json_output(capsys)
+    assert payload["years"] == [
+        {
+            "leave_year": 2026,
+            "start_date": "2026-01-11",
+            "end_date": "2027-01-09",
+            "valid": True,
+        },
+        {
+            "leave_year": 2027,
+            "start_date": None,
+            "end_date": None,
+            "valid": False,
+        },
+    ]
+    assert "annual" in payload["visible_categories"]
+    assert "overtime" in payload["visible_categories"]
+    assert payload["warnings"] and payload["warnings"][0].startswith("2027.json:")
 
 
 def test_add_balance_and_activity_emit_json(tmp_path: Path, capsys):

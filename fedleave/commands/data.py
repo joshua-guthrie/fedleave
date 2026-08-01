@@ -12,6 +12,7 @@ from ..cli_helpers import load_leave_year, parse_iso_date
 from ..config import get_default_data_dir, load_config
 from ..ledger import apply_fixes_to_leave_year, validate_leave_year
 from ..storage import atomic_write_json, ensure_data_dir, load_json, remove_legacy_transaction_history, write_json
+from ..transaction_effects import transaction_is_effective
 from ..wms_import import (
     WmsImportError,
     build_leave_year_skeleton,
@@ -19,6 +20,116 @@ from ..wms_import import (
     parse_wms_http_leave_report,
     report_transaction_keys,
 )
+
+
+def _nonzero_number(value: object) -> bool:
+    try:
+        return abs(float(value)) > 1e-9
+    except (TypeError, ValueError):
+        return False
+
+
+@app.command(name="years")
+def years(
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
+    data_dir: Path | None = typer.Option(None, help="Data directory override."),
+) -> None:
+    """List backend-recognized leave years and visible leave categories."""
+    if not isinstance(json_output, bool):
+        json_output = False
+    if isinstance(data_dir, OptionInfo):
+        data_dir = None
+
+    year_dir = get_default_data_dir(data_dir) / "leave_years"
+    records: list[dict[str, object]] = []
+    warnings: list[str] = []
+    visible_categories: set[str] = set()
+
+    if year_dir.exists():
+        for path in sorted(year_dir.glob("*.json")):
+            if not path.stem.isdigit():
+                continue
+            year = int(path.stem)
+            try:
+                leave_year = load_json(path)
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                records.append(
+                    {
+                        "leave_year": year,
+                        "start_date": None,
+                        "end_date": None,
+                        "valid": False,
+                    }
+                )
+                warnings.append(f"{path.name}: {exc}")
+                continue
+            if not isinstance(leave_year, dict):
+                records.append(
+                    {
+                        "leave_year": year,
+                        "start_date": None,
+                        "end_date": None,
+                        "valid": False,
+                    }
+                )
+                warnings.append(f"{path.name}: expected a JSON object")
+                continue
+
+            start_date = leave_year.get("leave_year_start")
+            end_date = leave_year.get("leave_year_end")
+            try:
+                start_date = parse_iso_date(str(start_date)).isoformat()
+                end_date = parse_iso_date(str(end_date)).isoformat()
+                valid = int(leave_year.get("leave_year", year)) == year
+            except (TypeError, ValueError):
+                valid = False
+            if not valid:
+                warnings.append(f"{path.name}: invalid leave-year metadata")
+            record = {
+                "leave_year": year,
+                "start_date": start_date,
+                "end_date": end_date,
+                "valid": valid,
+            }
+            records.append(record)
+
+            for field in ("starting_balances", "carryover_from_previous_year"):
+                values = leave_year.get(field, {})
+                if isinstance(values, dict):
+                    visible_categories.update(
+                        str(category)
+                        for category, value in values.items()
+                        if _nonzero_number(value)
+                    )
+            for transaction in leave_year.get("transactions", []):
+                if not isinstance(transaction, dict):
+                    continue
+                try:
+                    effective = transaction_is_effective(transaction)
+                except ValueError as exc:
+                    record["valid"] = False
+                    warnings.append(f"{path.name}: {exc}")
+                    continue
+                if effective and _nonzero_number(transaction.get("hours")):
+                    visible_categories.add(str(transaction.get("category", "")))
+
+    payload = {
+        "years": records,
+        "visible_categories": sorted(category for category in visible_categories if category),
+        "warnings": warnings,
+    }
+    if json_output:
+        _print_json(payload)
+        return
+    if not records:
+        console.print("No leave years found.")
+        return
+    for record in records:
+        validity = "valid" if record["valid"] else "invalid"
+        console.print(
+            f"{record['leave_year']}: {record['start_date'] or 'unknown'} to "
+            f"{record['end_date'] or 'unknown'} ({validity})"
+        )
 
 
 @app.command()

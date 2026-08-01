@@ -75,6 +75,23 @@ elif args[:1] == ["list"]:
             }
         )
     )
+elif args[:1] == ["years"]:
+    print(
+        json.dumps(
+            {
+                "years": [
+                    {
+                        "leave_year": 2026,
+                        "start_date": "2026-01-11",
+                        "end_date": "2027-01-09",
+                        "valid": True,
+                    }
+                ],
+                "visible_categories": ["annual", "sick"],
+                "warnings": [],
+            }
+        )
+    )
 elif args[:1] == ["--version"]:
     print("fedleave 0.2.0")
 else:
@@ -115,6 +132,10 @@ def test_gui_backend_uses_fedleave_binary_for_month_and_set_day(tmp_path: Path):
     assert balance["year"] == 2026
     assert balance["as_of"] == "2026-08-08"
     assert balance["balances"]["annual"] == 92.0
+
+    metadata = backend.leave_years()
+    assert metadata["years"][0]["leave_year"] == 2026
+    assert metadata["visible_categories"] == ["annual", "sick"]
 
     transactions = backend.list_transactions(2026)
     assert len(transactions) == 1
@@ -242,6 +263,7 @@ def test_run_chart_app_uses_bundled_companion_executable(tmp_path: Path, monkeyp
     assert captured["kwargs"]["text"] is True
     assert captured["kwargs"]["capture_output"] is True
     assert captured["kwargs"]["check"] is False
+    assert captured["kwargs"]["timeout"] == backend_module.GRAPHIC_COMMAND_TIMEOUT_SECONDS
 
 
 def test_find_fedleave_reports_search_paths_when_missing(tmp_path: Path, monkeypatch):
@@ -285,3 +307,17 @@ def test_gui_backend_hides_windows_console_when_launching_backend(monkeypatch, t
     assert captured["kwargs"]["text"] is True
     assert captured["kwargs"]["capture_output"] is True
     assert captured["kwargs"]["check"] is False
+    assert captured["kwargs"]["timeout"] == backend_module.DEFAULT_COMMAND_TIMEOUT_SECONDS
+
+
+def test_gui_backend_reports_command_timeout(monkeypatch, tmp_path: Path):
+    fake = _fake_fedleave(tmp_path / "fedleave")
+    backend = FedleaveBackend(BackendOptions(fedleave_path=str(fake)))
+
+    def time_out(command, **kwargs):
+        raise backend_module.subprocess.TimeoutExpired(command, kwargs["timeout"])
+
+    monkeypatch.setattr(backend_module.subprocess, "run", time_out)
+
+    with pytest.raises(backend_module.BackendError, match="did not respond within 30 seconds"):
+        backend.version()

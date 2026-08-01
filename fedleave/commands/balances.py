@@ -20,6 +20,7 @@ from ..ledger import (
 from ..payperiods import normalize_pay_period, pay_period_pay_date
 from ..storage import load_json
 from ..storage import write_json
+from ..transaction_effects import signed_balance_effect, transaction_is_effective
 
 
 _DISPLAY_CATEGORY_LABELS = {
@@ -42,13 +43,11 @@ _DISPLAY_CATEGORY_LABELS = {
     "restored_annual": "RA",
 }
 
-_NEGATIVE_DIRECTIONS = {"used", "expired", "forfeited", "forced_decrease"}
-
-
 def _display_line(transaction: dict) -> str:
     label = _DISPLAY_CATEGORY_LABELS.get(transaction.get("category"), str(transaction.get("category", "")))
-    hours = float(transaction.get("hours", 0.0))
-    sign = "-" if transaction.get("direction") in _NEGATIVE_DIRECTIONS else "+"
+    signed_hours = signed_balance_effect(transaction)
+    hours = abs(signed_hours)
+    sign = "-" if signed_hours < 0 else "+"
     return f"{label} {sign}{hours:.1f}"
 
 
@@ -83,7 +82,7 @@ def _holiday_names_by_date(year: int, data_dir: Path | None) -> dict[str, str]:
 def _transactions_by_date(leave_year: dict, start: _date, end: _date) -> dict[str, list[dict]]:
     entries: dict[str, list[dict]] = {}
     for transaction in leave_year.get("transactions", []):
-        if transaction.get("void"):
+        if not transaction_is_effective(transaction):
             continue
         try:
             transaction_date = parse_iso_date(str(transaction.get("date", "")))

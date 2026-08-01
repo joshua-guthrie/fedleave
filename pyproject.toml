@@ -8,6 +8,32 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+dependencies = [
+  "holidays",
+  "icalendar",
+  "Pillow",
+  "pydantic>=2,<3",
+  "python-dateutil",
+  "rich",
+  "typer>=0.12,<1",
+]
+
+[project.optional-dependencies]
+gui = [
+  "PySide6>=6,<7",
+]
+test = [
+  "hypothesis",
+  "pytest",
+  "pytest-cov",
+  "pytest-qt",
+]
+build = [
+  "pyinstaller>=6,<7",
+]
+dev = [
+  "fedleave[gui,test,build]",
+]
 
 [project.urls]
 Homepage = "https://www.westmouthbay.com/fedleave-application/"
