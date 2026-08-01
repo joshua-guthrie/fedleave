@@ -124,6 +124,21 @@ def test_distribution_workflow_publishes_only_master_to_rolling_channel() -> Non
         "install.sh",
     ):
         assert asset_name in workflow
+    assert "Commit rolling installers to master" in workflow
+    assert "git lfs install --local" in workflow
+    assert "git add installers" in workflow
+    assert "git push origin HEAD:master" in workflow
+    assert "[skip ci]" in workflow
+
+
+def test_large_committed_installer_mirrors_use_git_lfs() -> None:
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+    for artifact in (
+        "installers/FedLeave-Setup-Latest-Windows-x64.exe",
+        "installers/FedLeave-Latest-Linux-x86_64.tar.gz",
+    ):
+        assert f"{artifact} filter=lfs diff=lfs merge=lfs -text" in attributes
 
 
 def test_runtime_dependencies_and_bundle_manifest_remain_lean() -> None:

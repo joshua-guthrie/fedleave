@@ -218,6 +218,11 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: false
+
       - uses: actions/download-artifact@v4
         with:
           pattern: fedleave-*
@@ -319,3 +324,32 @@ jobs:
             gh api "repos/$GITHUB_REPOSITORY/releases/tags/beta" \
               --jq '.assets[] | [.id, .name] | @tsv'
           )
+
+      - name: Commit rolling installers to master
+        env:
+          BUILD_VERSION: ${{ needs.metadata.outputs.package-version }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          git lfs version
+          git lfs install --local
+          mkdir -p installers
+          cp rolling-assets/FedLeave-Setup-Latest-Windows-x64.exe installers/
+          cp rolling-assets/FedLeave-Setup-Latest-Windows-x64.exe.sha256 installers/
+          cp rolling-assets/FedLeave-Latest-Linux-x86_64.tar.gz installers/
+          cp rolling-assets/FedLeave-Latest-Linux-x86_64.tar.gz.sha256 installers/
+          cp rolling-assets/install.sh installers/install.sh
+          chmod +x installers/install.sh
+          printf 'source_commit=%s\nversion=%s\n' \
+            "$SOURCE_COMMIT" "$BUILD_VERSION" > installers/BUILD.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add installers
+          if git diff --cached --quiet; then
+            echo "Committed installer mirrors already match this build."
+            exit 0
+          fi
+          git commit -m "Build installers for ${SOURCE_COMMIT::12} [skip ci]"
+          git push origin HEAD:master

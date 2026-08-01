@@ -1,0 +1,2 @@
+installers/FedLeave-Setup-Latest-Windows-x64.exe filter=lfs diff=lfs merge=lfs -text
+installers/FedLeave-Latest-Linux-x86_64.tar.gz filter=lfs diff=lfs merge=lfs -text

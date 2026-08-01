@@ -37,7 +37,9 @@ the source repository.
 Download
 [FedLeave-Setup-Latest-Windows-x64.exe](https://github.com/joshua-guthrie/fedleave/releases/download/beta/FedLeave-Setup-Latest-Windows-x64.exe)
 and run the installation wizard. This stable link is replaced after every
-successful `master` build. It installs FedLeave in
+successful `master` build. A
+[committed Git LFS mirror](https://github.com/joshua-guthrie/fedleave/raw/refs/heads/master/installers/FedLeave-Setup-Latest-Windows-x64.exe)
+is updated by the same workflow. It installs FedLeave in
 `C:\Program Files\FedLeave`, registers it in Windows Installed Apps, creates a
 FedLeave Start menu folder, and offers an optional desktop shortcut.
 
@@ -81,6 +83,11 @@ after validation, and commands are linked beneath `/usr/local/bin`. The archive
 contains its own Python runtime; the destination does not need Python, `pip`, a
 virtual environment, Git, or build tools. Use `--help` to see custom
 `--install-root` and `--bin-dir` options.
+
+The bootstrap, archive, and checksum are also committed under `installers/`
+after every successful `master` build. The existing website-facing URLs above
+remain unchanged; committed-file URLs are listed in
+[`installers/README.md`](installers/README.md).
 
 ## Development Setup
 
@@ -395,6 +402,12 @@ installer/checksum, Linux archive/checksum, and `install.sh`. The `beta` tag is
 advanced to that commit. It is a rolling download bucket, not a versioned
 release; no version tags or manual release process are used. Feature branches
 and pull requests cannot replace the public installers.
+
+The workflow then commits those five files plus `BUILD.txt` under
+`installers/`. Git LFS stores the Windows installer and Linux archive; their
+checksums, bootstrap, and build identity remain ordinary Git files. The
+generated commit uses `[skip ci]` because it contains the outputs of the source
+commit's already completed Distribution run.
 
 The Linux archive embeds its exact development version and commit hash even
 though its public download filename is stable. The bootstrap installs that
