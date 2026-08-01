@@ -1,3 +1,5 @@
+"""Present balances, pay-period activity, daily activity, and month views."""
+
 from __future__ import annotations
 
 import calendar as _calendar

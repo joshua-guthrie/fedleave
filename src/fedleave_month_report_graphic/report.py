@@ -1,3 +1,5 @@
+"""Load calendar data and render the standalone monthly SVG/PNG report."""
+
 from __future__ import annotations
 
 import argparse
@@ -68,39 +70,57 @@ NEGATIVE_DIRECTIONS = {"used", "expired", "forfeited", "voided"}
 
 
 class MonthReportError(Exception):
+    """Base error carrying the process exit status for report failures."""
+
     exit_code = 1
 
 
 class ArgumentError(MonthReportError):
+    """Command-line arguments are missing, inconsistent, or invalid."""
+
     exit_code = 2
 
 
 class FedleaveMissingError(MonthReportError):
+    """The report could not locate its FedLeave CLI backend."""
+
     exit_code = 3
 
 
 class FedleaveCommandError(MonthReportError):
+    """The backend process returned a failure status."""
+
     exit_code = 4
 
 
 class FedleaveJsonError(MonthReportError):
+    """The backend response was not the expected JSON object."""
+
     exit_code = 5
 
 
 class OutputError(MonthReportError):
+    """The requested output path cannot be used safely."""
+
     exit_code = 7
 
 
 class RenderError(MonthReportError):
+    """Rendering or image conversion failed."""
+
     exit_code = 8
 
 
 class ResolutionError(MonthReportError):
+    """The output resolution is outside supported bounds."""
+
     exit_code = 9
 
 
 @dataclass
 class Options:
+    """Validated command-line choices for one report run."""
+
     output_file: Path
     year: int
     month: int
@@ -114,6 +134,8 @@ class Options:
 
 @dataclass
 class ReportData:
+    """Backend payloads and timestamps required by both renderers."""
+
     month_json: dict[str, Any]
     balance_json: dict[str, Any]
     projected_json: dict[str, Any]
@@ -131,6 +153,7 @@ def _die(message: str, exc_type: type[MonthReportError]) -> None:
 
 
 def parse_month(value: str) -> int:
+    """Parse a month number or full English month name."""
     text = str(value).strip()
     if text.isdigit():
         month = int(text)
@@ -146,6 +169,7 @@ def parse_month(value: str) -> int:
 
 
 def parse_args(argv: list[str] | None = None) -> Options:
+    """Validate command-line input and return normalized report options."""
     parser = argparse.ArgumentParser(
         prog="fedleaveMonthReportGraphic",
         description="Generate a landscape FedLeave graphical month report.",
@@ -202,6 +226,7 @@ def parse_args(argv: list[str] | None = None) -> Options:
 
 
 def find_fedleave(explicit: Path | None = None) -> Path:
+    """Locate the backend in explicit, bundled, source, or PATH locations."""
     searched: list[Path] = []
     if explicit is not None:
         candidate = explicit.resolve()

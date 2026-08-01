@@ -1,3 +1,5 @@
+"""Derive read-only seasonality, balance, and leave-lifecycle analytics."""
+
 from __future__ import annotations
 
 import calendar
@@ -227,7 +229,11 @@ def _comp_lots(
 
 
 def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> dict[str, Any]:
-    """Build all read-only analytics tables for one normalized leave-year payload."""
+    """Build all read-only analytics tables for one normalized leave-year payload.
+
+    The returned dictionary is a view model: chart and table code can present it
+    without repeating transaction filtering or federal leave calculations.
+    """
     today = today or date.today()
     start = date.fromisoformat(str(payload["leave_year_start"]))
     end = date.fromisoformat(str(payload["leave_year_end"]))

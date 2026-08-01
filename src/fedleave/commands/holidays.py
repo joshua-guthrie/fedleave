@@ -1,3 +1,5 @@
+"""Generate, import, and display cached federal holidays."""
+
 from __future__ import annotations
 
 import json

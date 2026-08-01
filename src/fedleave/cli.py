@@ -1,3 +1,5 @@
+"""Register all command modules and compatibility help commands."""
+
 from __future__ import annotations
 
 import typer

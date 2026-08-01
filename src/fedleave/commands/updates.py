@@ -1,3 +1,5 @@
+"""Expose rolling-installer update checks through the command line."""
+
 from __future__ import annotations
 
 import typer

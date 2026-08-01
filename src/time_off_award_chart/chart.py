@@ -1,3 +1,5 @@
+"""Configure and launch the shared renderer for time-off awards."""
+
 from __future__ import annotations
 
 from fedleave.charting import LeaveChartSpec, run_chart_app

@@ -1,3 +1,5 @@
+"""Add, replace, reconcile, correct, list, and delete ledger transactions."""
+
 from __future__ import annotations
 
 import json

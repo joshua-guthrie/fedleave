@@ -1,3 +1,5 @@
+"""Verify leave-year rollover previews, carryover, and expiring-lot identity."""
+
 from pathlib import Path
 
 from fedleave.cli import rollover
@@ -28,21 +30,19 @@ def test_rollover_preview_and_apply(tmp_path: Path):
 
     year_file = data_dir / "leave_years" / "2026.json"
     leave_year = __import__("json").loads(year_file.read_text())
-    # add a transaction to change annual balance
     t = create_transaction(date="2026-06-01", category="annual", direction="used", hours=20.0, existing_ids=[])
     add_transaction_to_leave_year(leave_year, t)
     write_json(year_file, leave_year)
 
-    # preview
     rollover(from_year=2026, to_year=2027, preview=True, data_dir=data_dir)
 
-    # apply
     rollover(from_year=2026, to_year=2027, preview=False, data_dir=data_dir)
 
     new_file = data_dir / "leave_years" / "2027.json"
     assert new_file.exists()
     new_ly = __import__("json").loads(new_file.read_text())
-    # carried annual includes init-seeded accruals and remains capped by the carryover limit
+    # Initialization seeds all 26 accruals, so the expected carryover includes
+    # those accruals as well as the starting balance and recorded leave use.
     assert abs(new_ly["starting_balances"]["annual"] - 236.0) < 1e-6
     assert abs(new_ly["starting_balances"]["sick"] - 154.0) < 1e-6
 

@@ -1,3 +1,5 @@
+"""Install a validated Windows suite and manage its shortcuts transactionally."""
+
 from __future__ import annotations
 
 import argparse
@@ -49,6 +51,7 @@ def install_system(
     desktop_dir: Path | None = None,
     start_menu_dir: Path | None = None,
 ) -> None:
+    """Replace the installed tree and roll it back if validation or shortcuts fail."""
     source = dist_dir.resolve()
     if not source.is_dir():
         raise FileNotFoundError(f"Install source does not exist: {source}")
@@ -102,6 +105,7 @@ def install_system(
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the restricted helper command parser."""
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
     install = subparsers.add_parser("install-system")
@@ -110,6 +114,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch one explicitly requested Windows helper operation."""
     args = build_parser().parse_args(argv)
     if args.command == "install-system":
         install_system(Path(args.dist_dir))

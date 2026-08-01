@@ -1,3 +1,5 @@
+"""Perform Linux installer steps that may require elevated privileges."""
+
 from __future__ import annotations
 
 import argparse
@@ -9,6 +11,7 @@ from pathlib import Path
 
 
 def repair_build_workspace(build_root: Path, uid: int, gid: int) -> None:
+    """Return a previously elevated build workspace to its project owner."""
     if not build_root.exists():
         return
 
@@ -21,6 +24,7 @@ def repair_build_workspace(build_root: Path, uid: int, gid: int) -> None:
 
 
 def write_linux_wrappers(repo_root: Path, current_link: Path) -> None:
+    """Create command wrappers and a desktop entry for the active suite."""
     scripts = (
         tomllib.loads((repo_root / "pyproject.toml").read_text(encoding="utf-8")).get("project", {}).get("scripts", {})
     )
@@ -61,6 +65,7 @@ def write_linux_wrappers(repo_root: Path, current_link: Path) -> None:
 
 
 def cleanup_old_versions(versions_dir: Path, keep_count: int) -> None:
+    """Remove oldest version directories after a successful activation."""
     items = sorted([p for p in versions_dir.iterdir() if p.is_dir()], key=lambda path: path.name)
     if len(items) <= keep_count:
         return
@@ -69,6 +74,7 @@ def cleanup_old_versions(versions_dir: Path, keep_count: int) -> None:
 
 
 def install_system(repo_root: Path, dist_dir: Path, version: str, keep_versions: int) -> None:
+    """Stage a suite version, activate it, then update wrappers and retention."""
     install_root = Path("/opt/fedleave")
     versions = install_root / "versions"
     versions.mkdir(parents=True, exist_ok=True)
@@ -93,6 +99,7 @@ def install_system(repo_root: Path, dist_dir: Path, version: str, keep_versions:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the restricted helper command parser."""
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -111,6 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch one explicitly requested privileged helper operation."""
     args = build_parser().parse_args(argv)
     if args.command == "repair-build-workspace":
         repair_build_workspace(Path(args.build_root), args.uid, args.gid)

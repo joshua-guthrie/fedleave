@@ -1,3 +1,5 @@
+"""Share data-directory, leave-year loading, and date parsing across commands."""
+
 from __future__ import annotations
 
 import re
@@ -12,15 +14,18 @@ from .validation import sanitize_text as sanitize_text
 
 
 def resolve_data_dir(data_dir: Path | None) -> Path:
+    """Resolve a command's optional data-directory override."""
     return get_default_data_dir(data_dir)
 
 
 def get_leave_year_path(year: int, data_dir: Path | None) -> Path:
+    """Return the conventional JSON path for a numbered leave year."""
     base_dir = resolve_data_dir(data_dir)
     return base_dir / "leave_years" / f"{year}.json"
 
 
 def load_leave_year(year: int, data_dir: Path | None = None) -> dict[str, Any]:
+    """Load a leave year and persist any required legacy/expiration migration."""
     path = get_leave_year_path(year, data_dir)
     if not path.exists():
         raise FileNotFoundError(f"Leave year file not found: {path}")
@@ -38,6 +43,7 @@ def load_leave_year(year: int, data_dir: Path | None = None) -> dict[str, Any]:
 
 
 def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = None) -> tuple[int, dict[str, Any]]:
+    """Find and load the leave year whose inclusive bounds contain a date."""
     base = get_default_data_dir(data_dir)
     year_dir = base / "leave_years"
     if not year_dir.exists():
@@ -69,6 +75,7 @@ def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = N
 
 
 def normalize_iso_date(date_str: str) -> str:
+    """Zero-pad a structurally valid year-month-day string."""
     match = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})", date_str.strip())
     if not match:
         return date_str
@@ -77,6 +84,7 @@ def normalize_iso_date(date_str: str) -> str:
 
 
 def parse_iso_date(date_str: str) -> date:
+    """Parse an ISO date or the user-facing ``today`` keyword."""
     if date_str.strip().lower() == "today":
         return date.today()
 

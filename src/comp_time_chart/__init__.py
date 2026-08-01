@@ -1,2 +1,3 @@
-# Comp Time Chart for the Year - Companion to fedleave
+"""Compensatory-time balance chart companion application."""
+
 from fedleave import __version__ as __version__

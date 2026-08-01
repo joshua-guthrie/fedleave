@@ -1,3 +1,10 @@
+"""Model transactions and calculate balances and activity from a leave ledger.
+
+This module owns domain calculations. Command modules handle user interaction
+and persistence, while all balance-changing directions are interpreted through
+``transaction_effects`` so CLI, GUI, reports, and analytics share one rule set.
+"""
+
 from __future__ import annotations
 
 import re
@@ -45,6 +52,12 @@ TRANSACTION_STATUSES = list(EFFECT_STATUSES)
 
 
 class Transaction(BaseModel):
+    """A validated, persistable event that changes or describes leave hours.
+
+    Pydantic validators run when an instance is created, providing one boundary
+    for category, direction, status, date, and hour validation.
+    """
+
     id: str
     date: str
     category: str
@@ -97,6 +110,7 @@ class Transaction(BaseModel):
 
 
 def generate_transaction_id(date_str: str, existing_ids: list[str]) -> str:
+    """Return the first unused one-based transaction ID for a calendar date."""
     base = date_str.replace("-", "")
     sequence = 1
     used = {transaction_id.split("-")[-1] for transaction_id in existing_ids if transaction_id.startswith(base)}
@@ -111,6 +125,7 @@ def normalize_direction(
     worked: float | None,
     adjusted: float | None,
 ) -> tuple[str, float]:
+    """Resolve exactly one CLI direction option into its name and hours."""
     values = {
         "earned": earned,
         "used": used,
@@ -134,6 +149,7 @@ def create_transaction(
     source: str = "manual",
     existing_ids: list[str] = None,
 ) -> Transaction:
+    """Create a validated transaction with a date-based unique identifier."""
     existing_ids = existing_ids or []
     transaction_id = generate_transaction_id(date, existing_ids)
     try:
@@ -178,6 +194,11 @@ def calculate_balances(
     include_projected: bool = False,
     project_until: str | None = None,
 ) -> dict[str, float]:
+    """Calculate category balances through a cutoff and optional projection.
+
+    Projected automatic accruals already present in the ledger are counted once;
+    missing future accruals are synthesized only for the calculation.
+    """
     totals: dict[str, float] = {category: 0.0 for category in TRANSACTION_CATEGORIES}
     starting_balances = leave_year.get("starting_balances", {})
     for category, amount in starting_balances.items():
@@ -241,6 +262,7 @@ def calculate_balances(
 def calculate_use_or_lose(
     leave_year: dict[str, Any], balances: dict[str, float], config: dict[str, Any] | None = None
 ) -> dict[str, float]:
+    """Split projected annual leave into carryover and use-or-lose hours."""
     carryover_limit = 240.0
     if config is not None:
         carryover_limit = float(config.get("rules", {}).get("annual", {}).get("carryover_limit_hours", carryover_limit))
@@ -255,6 +277,7 @@ def calculate_use_or_lose(
 
 
 def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, dict[str, float]]:
+    """Summarize effective earned, used, and net hours for one date."""
     target = _parse_iso_date(day)
     earned: dict[str, float] = {}
     used: dict[str, float] = {}
@@ -288,6 +311,7 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
 
 
 def find_pay_period(leave_year: dict[str, Any], day: str) -> dict[str, Any]:
+    """Return the pay-period record containing ``day``."""
     target = _parse_iso_date(day)
     for pay_period in leave_year.get("pay_periods", []):
         start = _parse_iso_date(pay_period["start_date"])
@@ -309,6 +333,7 @@ def _has_auto_accrual(leave_year: dict[str, Any], category: str, accrual_date: s
 
 
 def accrual_hours_for_date(leave_year: dict[str, Any], category: str, accrual_date: str) -> float:
+    """Return the latest accrual rate effective on a pay-period date."""
     target = _parse_iso_date(accrual_date)
     if category == "annual":
         base_hours = float(leave_year.get("annual_leave_accrual_hours", 0.0))
@@ -342,6 +367,7 @@ def upsert_accrual_rate_change(
     hours_per_pay_period: float,
     reason: str = "",
 ) -> dict[str, Any]:
+    """Insert or replace an accrual-rate change and update later auto accruals."""
     if category not in {"annual", "sick"}:
         raise ValueError("Automatic accrual changes are supported only for annual and sick leave.")
     if hours_per_pay_period < 0:
@@ -429,6 +455,7 @@ def ensure_automatic_accruals(leave_year: dict[str, Any], through_date: str) -> 
 
 
 def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[str, Any]:
+    """Summarize effective activity for the pay period containing ``day``."""
     pay_period = find_pay_period(leave_year, day)
     start = _parse_iso_date(pay_period["start_date"])
     end = _parse_iso_date(pay_period["end_date"])
@@ -476,6 +503,7 @@ def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[
 
 
 def add_transaction_to_leave_year(leave_year: dict[str, Any], transaction: Transaction) -> None:
+    """Append a validated transaction's JSON-compatible representation."""
     if "transactions" not in leave_year:
         leave_year["transactions"] = []
     leave_year["transactions"].append(transaction.model_dump())

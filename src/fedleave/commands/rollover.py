@@ -1,3 +1,5 @@
+"""Preview and apply carryover from one federal leave year to the next."""
+
 from __future__ import annotations
 
 import json

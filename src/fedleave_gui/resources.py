@@ -1,3 +1,5 @@
+"""Locate help and image assets in source and PyInstaller runtime layouts."""
+
 from __future__ import annotations
 
 import sys
@@ -30,6 +32,7 @@ def _candidate_roots() -> list[Path]:
 
 
 def find_data_file(*parts: str) -> Path:
+    """Return the first matching packaged data file from ordered search roots."""
     for root in _candidate_roots():
         candidate = root.joinpath(*parts)
         if candidate.exists():
@@ -46,6 +49,7 @@ def asset_file(filename: str) -> Path:
 
 
 def window_icon() -> QIcon:
+    """Load the application icon, returning an empty Qt icon when unavailable."""
     try:
         return QIcon(str(asset_file("fedleave-icon.ico")))
     except FileNotFoundError:

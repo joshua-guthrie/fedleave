@@ -27,6 +27,7 @@ class PackagingError(RuntimeError):
 
 
 def project_metadata() -> dict:
+    """Return the authoritative PEP 621 project metadata table."""
     with PYPROJECT.open("rb") as handle:
         data = tomllib.load(handle)
     project = data.get("project")
@@ -36,6 +37,7 @@ def project_metadata() -> dict:
 
 
 def project_version() -> str:
+    """Return the validated release version used in artifact names."""
     version = project_metadata().get("version")
     if not isinstance(version, str) or not version:
         raise PackagingError("pyproject.toml does not declare project.version")
@@ -45,6 +47,7 @@ def project_version() -> str:
 
 
 def project_scripts() -> list[str]:
+    """Return every executable name declared by the package metadata."""
     scripts = project_metadata().get("scripts")
     if not isinstance(scripts, dict) or not scripts:
         raise PackagingError("pyproject.toml does not declare any project.scripts")
@@ -52,6 +55,7 @@ def project_scripts() -> list[str]:
 
 
 def abbreviated_sha(explicit_sha: str | None = None) -> str:
+    """Return a sanitized eight-character source commit identity."""
     sha = explicit_sha or os.environ.get("GITHUB_SHA")
     if not sha:
         result = subprocess.run(
@@ -69,6 +73,7 @@ def abbreviated_sha(explicit_sha: str | None = None) -> str:
 
 
 def development_version(sha: str | None = None) -> str:
+    """Return a PEP 440 build version traceable to a source commit."""
     # PEP 440 development/local suffixes retain the human-readable project
     # version while making every branch artifact traceable to a commit.
     return f"{project_version()}.dev0+g{abbreviated_sha(sha)}"
@@ -87,11 +92,13 @@ def numeric_windows_version(version: str) -> str:
 
 
 def expected_executable(bundle_dir: Path, platform: str, command: str) -> Path:
+    """Return the platform-specific path expected for one bundled command."""
     suffix = ".exe" if platform == "windows" else ""
     return bundle_dir / f"{command}{suffix}"
 
 
 def validate_bundle(bundle_dir: Path, platform: str) -> list[Path]:
+    """Require the shared runtime and every declared application executable."""
     if platform not in {"linux", "windows"}:
         raise PackagingError(f"Unsupported bundle platform: {platform}")
     if not bundle_dir.is_dir():
@@ -118,6 +125,7 @@ def validate_bundle(bundle_dir: Path, platform: str) -> list[Path]:
 
 
 def write_checksum(path: Path) -> Path:
+    """Write a sha256sum-compatible checksum beside an artifact."""
     hasher = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -129,6 +137,7 @@ def write_checksum(path: Path) -> Path:
 
 
 def validate_file_size(path: Path, max_mib: float) -> int:
+    """Return artifact size after enforcing a packaging regression limit."""
     if not path.is_file():
         raise PackagingError(f"File does not exist: {path}")
     if max_mib <= 0:
@@ -141,6 +150,7 @@ def validate_file_size(path: Path, max_mib: float) -> int:
 
 
 def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tuple[Path, Path]:
+    """Atomically create the versioned Linux archive and its checksum."""
     validate_bundle(bundle_dir, "linux")
     if not SAFE_VERSION.fullmatch(version):
         raise PackagingError(f"Version is unsafe for artifact filenames: {version!r}")
@@ -166,12 +176,14 @@ def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tu
 
 
 def verify_tag(tag: str) -> None:
+    """Require a release tag to match the authoritative project version."""
     expected = f"v{project_version()}"
     if tag != expected:
         raise PackagingError(f"Release tag {tag!r} does not match pyproject.toml version; expected {expected!r}")
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the release-packaging command parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -204,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Dispatch one release-packaging operation."""
     args = build_parser().parse_args(argv)
     try:
         if args.command == "version":

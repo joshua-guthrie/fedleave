@@ -1,3 +1,5 @@
+"""Persist calendar GUI preferences independently from leave ledger data."""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +11,8 @@ from pathlib import Path
 
 @dataclass
 class GuiSettings:
+    """User preferences and reminder state stored by the calendar GUI."""
+
     fedleave_path: str = ""
     data_dir: str = ""
     first_day_of_week: str = "Sunday"
@@ -27,6 +31,7 @@ class GuiSettings:
 
 
 def settings_path() -> Path:
+    """Return the platform-appropriate per-user GUI settings path."""
     if sys.platform.startswith("win"):
         base = Path(os.getenv("LOCALAPPDATA") or Path.home() / "AppData" / "Local")
     else:
@@ -35,6 +40,7 @@ def settings_path() -> Path:
 
 
 def load_settings() -> GuiSettings:
+    """Load recognized settings, falling back safely when the file is invalid."""
     path = settings_path()
     if not path.exists():
         return GuiSettings()
@@ -50,6 +56,7 @@ def load_settings() -> GuiSettings:
 
 
 def save_settings(settings: GuiSettings) -> None:
+    """Write all current GUI settings to the per-user configuration file."""
     path = settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(asdict(settings), indent=2) + "\n", encoding="utf-8")

@@ -1,3 +1,5 @@
+"""Share data loading, rendering, and CLI behavior across chart companions."""
+
 from __future__ import annotations
 
 import argparse
@@ -42,6 +44,8 @@ Y_MIN = Decimal("0")
 
 @dataclass(frozen=True)
 class LeaveChartSpec:
+    """Static identity and data selection for one balance-chart executable."""
+
     app_name: str
     title: str
     category: str
@@ -51,6 +55,8 @@ class LeaveChartSpec:
 
 @dataclass(frozen=True)
 class ComparisonChartSpec:
+    """Static identity and scale policy for one comparison-chart executable."""
+
     app_name: str
     title: str
     category: str
@@ -71,6 +77,8 @@ COMPARISON_CATEGORY_LABELS = {
 
 
 class ChartDimensions:
+    """Scale the common chart coordinate system to an output resolution."""
+
     def __init__(self, width_pixels: int = BASE_WIDTH, y_max: Decimal = Decimal("10")):
         self.width = width_pixels
         self.height = int(width_pixels * BASE_ASPECT_RATIO)
@@ -119,6 +127,7 @@ def _executable_names(app_name: str) -> tuple[str, ...]:
 
 
 def find_companion_app(app_name: str, explicit: str | None = None) -> Path:
+    """Locate a bundled or PATH-visible companion executable."""
     if explicit:
         path = Path(explicit).expanduser()
         if is_executable(path):
@@ -165,6 +174,7 @@ def get_default_data_dir() -> Path:
 
 
 def infer_leave_year(data_dir: Path) -> int:
+    """Choose the leave year containing today, falling back to the latest."""
     leave_year_dir = data_dir / "leave_years"
     year_files = sorted(leave_year_dir.glob("*.json"))
     if not year_files:
@@ -199,6 +209,7 @@ def infer_leave_year(data_dir: Path) -> int:
 
 
 def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, Any]:
+    """Refresh automatic accruals through the CLI, then load its ledger file."""
     data_dir = data_dir or get_default_data_dir()
     args = ["balance", "--year", str(year), "--json", "--data-dir", str(data_dir)]
     run_fedleave(args)
@@ -257,6 +268,7 @@ def category_balance_points(
     year: int,
     data_dir: Path | None = None,
 ) -> tuple[list[tuple[date, Decimal]], dict[str, Any], Decimal]:
+    """Calculate category balances at each pay-period end for one leave year."""
     snapshot = get_leave_year_data(year, data_dir)
     starts = snapshot.get("starting_balances", {})
     running = decimal_hours(starts.get(category, 0))
@@ -310,6 +322,7 @@ def x_positions(count: int, dims: ChartDimensions) -> list[float]:
 
 
 def catmull_rom(points: list[tuple[float, float]], samples_per_segment: int = 18) -> list[tuple[float, float]]:
+    """Interpolate a smooth curve through comparison-chart points."""
     if len(points) < 3:
         return points
     smooth: list[tuple[float, float]] = []
@@ -359,6 +372,7 @@ def render_balance_chart(
     dims: ChartDimensions,
     y_step: Decimal,
 ) -> None:
+    """Render a pay-period balance line to a PNG file."""
     image = Image.new("RGB", (dims.width, dims.height), BACKGROUND)
     draw = ImageDraw.Draw(image)
 
@@ -423,6 +437,7 @@ def comparison_chart_points(
     as_of: str,
     data_dir: Path | None = None,
 ) -> tuple[list[dict[str, Any]], Decimal, str]:
+    """Calculate the same calendar-date balance across available leave years."""
     base_dir = resolve_default_data_dir(data_dir)
     year_dir = base_dir / "leave_years"
     if not year_dir.exists():
@@ -469,6 +484,7 @@ def render_comparison_chart(
     y_step: Decimal,
     x_label: str,
 ) -> None:
+    """Render year-over-year values to a smoothed PNG line chart."""
     image = Image.new("RGB", (dims.width, dims.height), BACKGROUND)
     draw = ImageDraw.Draw(image)
 
@@ -535,6 +551,7 @@ def render_comparison_chart(
 
 
 def run_fedleave(args: list[str]) -> Any:
+    """Run the sibling CLI and return its decoded JSON result."""
     try:
         fedleave = find_companion_app("fedleave")
     except FileNotFoundError as exc:
@@ -550,6 +567,7 @@ def run_fedleave(args: list[str]) -> Any:
 
 
 def run_chart_app(spec: LeaveChartSpec) -> None:
+    """Parse common balance-chart options and render one configured category."""
     parser = argparse.ArgumentParser(
         description=f"Create {spec.title.lower()} balance chart PNG using fedleave data.",
         epilog=HELP_EPILOG,
@@ -612,6 +630,7 @@ def run_chart_app(spec: LeaveChartSpec) -> None:
 
 
 def run_comparison_chart_app(spec: ComparisonChartSpec) -> None:
+    """Parse common comparison options and render one configured category."""
     parser = argparse.ArgumentParser(
         description=f"Create {spec.title.lower()} PNG using fedleave data.",
         epilog=HELP_EPILOG,

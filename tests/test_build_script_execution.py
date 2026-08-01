@@ -1,3 +1,5 @@
+"""Smoke-test both platform launch paths without building full binaries."""
+
 from __future__ import annotations
 
 import json

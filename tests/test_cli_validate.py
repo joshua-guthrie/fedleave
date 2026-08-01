@@ -1,3 +1,5 @@
+"""Verify CLI validation applies safe canonicalization fixes to stored data."""
+
 import json
 from pathlib import Path
 
@@ -17,9 +19,9 @@ def test_validate_applies_fixes(tmp_path: Path):
     (ly_dir / "2026.json").write_text(json.dumps(bad), encoding="utf-8")
 
     with pytest.raises(SystemExit):
-        # calling CLI command function directly; validate raises Typer Exit
+        # Direct command-function calls expose Typer's requested exit as the
+        # ``SystemExit`` raised by its public exception boundary.
         validate(data_dir=data_dir, apply=True)
 
-    # file should be updated with normalized date
     updated = json.loads((ly_dir / "2026.json").read_text(encoding="utf-8"))
     assert updated["transactions"][0]["date"] == "2026-01-11"

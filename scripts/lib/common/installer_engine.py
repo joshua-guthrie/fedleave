@@ -1,3 +1,10 @@
+"""Build, validate, install, repair, and remove FedLeave application suites.
+
+Platform entry scripts normalize their environment and delegate here so Linux
+and Windows share target discovery, PyInstaller configuration, and lifecycle
+rules while retaining small privileged platform helpers.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -25,6 +32,8 @@ EXIT_LOCKED = 91
 
 @dataclass
 class Options:
+    """Normalized command-line choices controlling one installer operation."""
+
     platform: str
     unattended: bool
     build_only: bool
@@ -46,6 +55,8 @@ class Options:
 
 @dataclass
 class BuildTarget:
+    """One application entry point and its PyInstaller-specific requirements."""
+
     name: str
     module: str
     func: str
@@ -57,12 +68,16 @@ class BuildTarget:
 
 
 class InstallerError(RuntimeError):
+    """An actionable installer failure paired with a stable process exit code."""
+
     def __init__(self, message: str, code: int = EXIT_BUILD_FAILED) -> None:
         super().__init__(message)
         self.code = code
 
 
 class InstallerEngine:
+    """Coordinate one locked build, installation, maintenance, or removal run."""
+
     def __init__(self, repo_root: Path, options: Options) -> None:
         self.repo_root = repo_root
         self.options = options
@@ -80,6 +95,7 @@ class InstallerEngine:
         self._log_handle = self.log_path.open("a", encoding="utf-8")
 
     def log(self, message: str) -> None:
+        """Write a timestamped message to both the console and operation log."""
         line = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}"
         print(line)
         if not hasattr(self, "_log_handle"):
@@ -88,6 +104,7 @@ class InstallerEngine:
         self._log_handle.flush()
 
     def run(self) -> dict[str, Any]:
+        """Resolve and execute exactly one operation under the installer lock."""
         with self._lock_or_fail():
             operation = self._resolve_operation()
             self.log(f"Operation: {operation}")
@@ -828,6 +845,7 @@ class InstallerEngine:
 
 
 def parse_args(argv: list[str]) -> Options:
+    """Parse installer options and reject incompatible operation combinations."""
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--platform", choices=["linux", "windows"], required=True)
     parser.add_argument("--unattended", action="store_true")
@@ -886,6 +904,7 @@ def parse_args(argv: list[str]) -> Options:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the installer engine and serialize known failures for automation."""
     argv = argv if argv is not None else sys.argv[1:]
     repo_root = Path(__file__).resolve().parents[3]
 

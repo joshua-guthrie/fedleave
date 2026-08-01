@@ -1,3 +1,5 @@
+"""Initialize, validate, import, export, and describe FedLeave data stores."""
+
 from __future__ import annotations
 
 import json

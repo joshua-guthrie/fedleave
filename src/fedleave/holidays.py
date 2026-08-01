@@ -1,3 +1,5 @@
+"""Build the holiday cache from OPM calendar data or the holidays package."""
+
 from __future__ import annotations
 
 import urllib.error
@@ -59,6 +61,7 @@ def _parse_ics(ics_bytes: bytes) -> dict[str, object]:
 
 
 def download_ics(url: str) -> bytes:
+    """Download an iCalendar document, translating URL errors for the CLI."""
     try:
         with urllib.request.urlopen(url, timeout=30) as response:
             return response.read()
@@ -67,6 +70,7 @@ def download_ics(url: str) -> bytes:
 
 
 def generate_opm_holidays(year: int, ics_url: str = DEFAULT_OPM_ICS_URL) -> dict[str, object]:
+    """Return one year's observed holidays from the OPM iCalendar feed."""
     data = _parse_ics(download_ics(ics_url))
     events = [h for h in data["holidays"] if h["observed_date"].startswith(f"{year}-")]
     if not events:
@@ -86,6 +90,7 @@ def generate_federal_holidays(
     source: str = "python_holidays",
     ics_url: str = DEFAULT_OPM_ICS_URL,
 ) -> dict[str, object]:
+    """Generate a holiday-cache payload from the configured source."""
     if source == "python_holidays":
         us_holidays = holidays.US(years=[year])
         entries = []

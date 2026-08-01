@@ -1,3 +1,5 @@
+"""Implement accrual-rate changes and update affected automatic entries."""
+
 from __future__ import annotations
 
 from pathlib import Path

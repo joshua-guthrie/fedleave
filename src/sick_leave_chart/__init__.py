@@ -1,2 +1,3 @@
-# Sick Leave Chart for the Year - Companion to fedleave
+"""Sick-leave balance chart companion application."""
+
 from fedleave import __version__ as __version__

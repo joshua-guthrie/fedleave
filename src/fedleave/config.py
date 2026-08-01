@@ -1,3 +1,9 @@
+"""Define persisted configuration schemas and initialize a FedLeave data store.
+
+Pydantic models describe the JSON shape while initialization coordinates the
+configuration, leave-year ledger, pay periods, accruals, and holiday cache.
+"""
+
 from __future__ import annotations
 
 import json
@@ -20,11 +26,15 @@ console = Console()
 
 
 class UserConfig(BaseModel):
+    """User-facing identity and time-zone preferences."""
+
     display_name: str = "User"
     timezone: str = "America/New_York"
 
 
 class DefaultsConfig(BaseModel):
+    """Default accrual, schedule, and time-entry settings."""
+
     annual_leave_accrual_hours: float = 6.0
     sick_leave_accrual_hours: float = 4.0
     time_increment_hours: float = 0.25
@@ -36,6 +46,8 @@ class DefaultsConfig(BaseModel):
 
 
 class HolidaysConfig(BaseModel):
+    """Holiday source, caching, and display policy."""
+
     enabled: bool = True
     country: str = "US"
     source_preference: str = "opm_ics_then_python_holidays"
@@ -49,17 +61,23 @@ class HolidaysConfig(BaseModel):
 
 
 class AnnualRules(BaseModel):
+    """Annual-leave carryover and use-or-lose policy."""
+
     carryover_limit_hours: float = 240.0
     track_use_or_lose: bool = True
     allow_restored_leave: bool = True
 
 
 class SickRules(BaseModel):
+    """Sick-leave carryover and expiration policy."""
+
     carryover_limit_hours: float | None = None
     expires: bool = False
 
 
 class CompRules(BaseModel):
+    """Compensatory-time expiration and reminder policy."""
+
     expires: bool = True
     expiration_pay_periods_after_earned: int = 26
     expiration_action: str = "warn"
@@ -70,6 +88,8 @@ class CompRules(BaseModel):
 
 
 class TravelCompRules(BaseModel):
+    """Travel-comp expiration, extension, and reminder policy."""
+
     expires: bool = True
     expiration_pay_periods_after_earned: int = 26
     expiration_action: str = "forfeit"
@@ -79,6 +99,8 @@ class TravelCompRules(BaseModel):
 
 
 class CreditRules(BaseModel):
+    """Credit-hour earning, use, balance, and carryover limits."""
+
     enabled: bool = True
     max_carryover_hours: float = 24.0
     max_earn_per_day_hours: float | None = None
@@ -93,6 +115,8 @@ class CreditRules(BaseModel):
 
 
 class TimeOffAwardRules(BaseModel):
+    """Time-off-award expiration and extension policy."""
+
     expires: bool = False
     expiration_days_after_earned: int | None = None
     agency_policy_required: bool = True
@@ -102,6 +126,8 @@ class TimeOffAwardRules(BaseModel):
 
 
 class RestoredAnnualRules(BaseModel):
+    """Restored annual-leave expiration and extension policy."""
+
     expires: bool = True
     expiration_leave_years_after_restored: int = 2
     expiration_action: str = "forfeit"
@@ -110,11 +136,15 @@ class RestoredAnnualRules(BaseModel):
 
 
 class ReligiousCompRules(BaseModel):
+    """Religious compensatory-time policy flags."""
+
     expires: bool = False
     agency_policy_required: bool = True
 
 
 class Config(BaseModel):
+    """Complete schema for the persisted ``config.json`` file."""
+
     schema_version: int = 1
     user: UserConfig = Field(default_factory=UserConfig)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
@@ -134,6 +164,8 @@ class Config(BaseModel):
 
 
 class LeaveYear(BaseModel):
+    """Persisted ledger metadata and transactions for one federal leave year."""
+
     schema_version: int = 1
     leave_year: int
     leave_year_start: str
@@ -156,6 +188,7 @@ class LeaveYear(BaseModel):
 
 
 def get_default_data_dir(data_dir: Path | None = None) -> Path:
+    """Return an explicit data directory or the platform-appropriate default."""
     if data_dir is not None:
         return data_dir
 
@@ -179,6 +212,7 @@ def get_default_data_dir(data_dir: Path | None = None) -> Path:
 
 
 def load_config(data_dir: Path | None = None) -> dict[str, Any]:
+    """Load ``config.json`` from the selected data store."""
     config_path = get_default_data_dir(data_dir) / "config.json"
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
@@ -194,6 +228,11 @@ def init_config(
     holiday_source: str = "python_holidays",
     holiday_ics_url: str = DEFAULT_OPM_ICS_URL,
 ) -> None:
+    """Create any missing configuration, leave-year, and holiday files.
+
+    Existing files remain authoritative, so rerunning initialization repairs an
+    incomplete store without replacing user data.
+    """
     data_dir = get_default_data_dir(data_dir)
     ensure_data_dir(data_dir)
 
@@ -201,11 +240,11 @@ def init_config(
     config.user.display_name = "User"
     config.defaults.annual_leave_accrual_hours = annual_accrual
     config.holidays.source_preference = holiday_source
-    # sanitize holiday ICS URL
+    # Store only a safe HTTP(S) source; an invalid optional override should not
+    # prevent initialization when the known OPM default remains available.
     try:
         config.holidays.ics_url = sanitize_url(holiday_ics_url)
     except Exception:
-        # fallback to default if provided URL invalid
         config.holidays.ics_url = DEFAULT_OPM_ICS_URL
 
     config_path = data_dir / "config.json"

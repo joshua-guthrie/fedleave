@@ -1,3 +1,5 @@
+"""Launch analytics in package and frozen PyInstaller execution contexts."""
+
 if __package__:
     from .app import main
 else:

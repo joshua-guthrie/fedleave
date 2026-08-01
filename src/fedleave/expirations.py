@@ -1,3 +1,5 @@
+"""Track expiring leave as earned lots and allocate later use in FIFO order."""
+
 from __future__ import annotations
 
 from copy import deepcopy
@@ -15,6 +17,7 @@ EPSILON = 0.000001
 
 
 def expiration_rules(config: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+    """Merge configured expiration policies over defaults by leave category."""
     defaults = Config().model_dump()["rules"]
     supplied = (config or {}).get("rules", {})
     result: dict[str, dict[str, Any]] = {}
@@ -69,7 +72,11 @@ def synchronize_expirations(
     *,
     as_of: date | None = None,
 ) -> dict[str, Any]:
-    """Assign expiration dates, FIFO-link uses, and post configured expirations."""
+    """Assign expiration dates, FIFO-link uses, and post configured expirations.
+
+    A use that spans earned lots is split into linked transactions so each lot's
+    remaining balance and eventual disposal remain auditable.
+    """
     as_of = as_of or date.today()
     rules = expiration_rules(config)
     transactions = leave_year.setdefault("transactions", [])
@@ -195,6 +202,7 @@ def expiration_report(
     *,
     as_of: date | None = None,
 ) -> dict[str, Any]:
+    """Return lot status, reminder thresholds, and disposal totals as of a date."""
     as_of = as_of or date.today()
     state = synchronize_expirations(leave_year, config, as_of=as_of)
     rows = []

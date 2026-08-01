@@ -1,2 +1,3 @@
-# Annual Leave Chart for the Year - Companion to fedleave
+"""Annual-leave balance chart companion application."""
+
 from fedleave import __version__ as __version__

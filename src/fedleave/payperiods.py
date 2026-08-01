@@ -1,3 +1,5 @@
+"""Generate federal biweekly pay periods and their associated pay dates."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -29,6 +31,7 @@ def normalize_pay_period(
     pay_period: Mapping[str, object],
     payday_offset_days: int = DEFAULT_PAYDAY_OFFSET_DAYS,
 ) -> dict[str, object]:
+    """Copy a pay-period record and add a backward-compatible pay date."""
     normalized = dict(pay_period)
     pay_date = pay_period_pay_date(normalized, payday_offset_days)
     if pay_date:
@@ -37,6 +40,7 @@ def normalize_pay_period(
 
 
 def generate_pay_periods(start_date: date, count: int = 26) -> list[dict[str, str | int]]:
+    """Generate consecutive 14-day pay periods beginning at ``start_date``."""
     pay_periods: list[dict[str, str | int]] = []
     current_start = start_date
     for number in range(1, count + 1):

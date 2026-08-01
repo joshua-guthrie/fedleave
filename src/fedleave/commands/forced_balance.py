@@ -1,3 +1,5 @@
+"""Set an exact balance by recording an auditable difference transaction."""
+
 from __future__ import annotations
 
 from pathlib import Path

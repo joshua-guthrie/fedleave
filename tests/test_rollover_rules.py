@@ -1,3 +1,5 @@
+"""Verify configured annual carryover limits govern rollover records."""
+
 from pathlib import Path
 
 from fedleave.cli import rollover
@@ -26,14 +28,12 @@ def test_rollover_respects_carryover_limit(tmp_path: Path):
         data_dir=data_dir,
     )
 
-    # reduce balance slightly
     year_file = data_dir / "leave_years" / "2026.json"
     ly = __import__("json").loads(year_file.read_text())
     t = create_transaction(date="2026-06-01", category="annual", direction="used", hours=5.0, existing_ids=[])
     add_transaction_to_leave_year(ly, t)
     write_json(year_file, ly)
 
-    # set carryover limit in config
     cfg = __import__("json").loads((data_dir / "config.json").read_text())
     cfg.setdefault("rules", {}).setdefault("annual", {})["carryover_limit_hours"] = 10.0
     write_json(data_dir / "config.json", cfg)
@@ -44,7 +44,6 @@ def test_rollover_respects_carryover_limit(tmp_path: Path):
     assert new_file.exists()
     new_ly = __import__("json").loads(new_file.read_text())
     assert abs(new_ly["starting_balances"]["annual"] - 10.0) < 1e-6
-    # verify starting-balance transaction created
     txs = new_ly.get("transactions", [])
     assert any(
         tx.get("category") == "annual"

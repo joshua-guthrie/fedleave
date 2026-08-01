@@ -1,3 +1,5 @@
+"""Configure the sick-leave year-over-year comparison chart."""
+
 from __future__ import annotations
 
 from fedleave.charting import ComparisonChartSpec, run_comparison_chart_app

@@ -1,3 +1,10 @@
+"""Adapt GUI actions to the packaged FedLeave command-line executables.
+
+The calendar deliberately uses subprocesses instead of importing command code,
+keeping the GUI and CLI as independently packaged applications with a stable
+JSON boundary.
+"""
+
 from __future__ import annotations
 
 import json
@@ -13,10 +20,14 @@ from fedleave.executable_search import is_executable, iter_executable_candidates
 
 
 class BackendError(RuntimeError):
+    """A backend process failed or returned an invalid response."""
+
     pass
 
 
 class BackendMissingError(BackendError):
+    """A required packaged executable could not be located."""
+
     pass
 
 
@@ -26,6 +37,8 @@ GRAPHIC_COMMAND_TIMEOUT_SECONDS = 120.0
 
 @dataclass(frozen=True)
 class BackendOptions:
+    """Optional executable and data-directory overrides from GUI settings."""
+
     fedleave_path: str | None = None
     data_dir: str | None = None
 
@@ -77,6 +90,8 @@ def find_analytics(explicit: str | None = None) -> Path:
 
 
 class FedleaveBackend:
+    """Provide typed GUI operations over FedLeave CLI subprocess calls."""
+
     def __init__(self, options: BackendOptions | None = None) -> None:
         self.options = options or BackendOptions()
 
@@ -95,6 +110,7 @@ class FedleaveBackend:
             raise BackendError(f"fedleave backend did not respond within {timeout:g} seconds.") from exc
 
     def run_json(self, args: list[str], *, include_data_dir: bool = True) -> dict[str, Any]:
+        """Run a CLI command and require a successful JSON object response."""
         fedleave = find_fedleave(self.options.fedleave_path)
         command = [str(fedleave), *args]
         if include_data_dir and self.options.data_dir:
@@ -112,6 +128,7 @@ class FedleaveBackend:
         return payload
 
     def run_text(self, args: list[str], *, include_data_dir: bool = True) -> str:
+        """Run a CLI command and return its successful standard output."""
         fedleave = find_fedleave(self.options.fedleave_path)
         command = [str(fedleave), *args]
         if include_data_dir and self.options.data_dir:
@@ -275,6 +292,7 @@ class FedleaveBackend:
         resolution: int = 1920,
         data_dir: str | None = None,
     ) -> None:
+        """Run a packaged chart executable with the selected GUI context."""
         chart_app = find_companion_app(app_name)
         command = [
             str(chart_app),
@@ -312,6 +330,7 @@ def run_month_report_graphic(
     data_dir: str | None = None,
     graphic_path: str | None = None,
 ) -> None:
+    """Run the month-report companion and require successful completion."""
     graphic = find_month_report_graphic(graphic_path)
     command = [
         str(graphic),

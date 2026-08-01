@@ -1,3 +1,5 @@
+"""Read, migrate, back up, and atomically replace FedLeave JSON data."""
+
 from __future__ import annotations
 
 import json
@@ -16,6 +18,7 @@ LEGACY_TRANSACTION_AUDIT_FIELDS = {
 
 
 def ensure_data_dir(data_dir: Path) -> None:
+    """Create the standard data-store directories when they are missing."""
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "leave_years").mkdir(exist_ok=True)
     (data_dir / "holiday_cache").mkdir(exist_ok=True)
@@ -23,6 +26,12 @@ def ensure_data_dir(data_dir: Path) -> None:
 
 
 def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
+    """Serialize JSON beside its destination, then atomically replace the file.
+
+    Writing in the destination directory keeps the final ``Path.replace`` on
+    one filesystem. A failed serialization or replacement removes its temporary
+    file and leaves the previous destination intact.
+    """
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exists: {path}")
 
@@ -47,6 +56,7 @@ def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
 
 
 def backup_file(path: Path) -> Path:
+    """Copy a data file into its store's backup directory under a unique name."""
     if not path.exists():
         raise FileNotFoundError(path)
     if path.parent.name in {"leave_years", "holiday_cache"}:
@@ -68,6 +78,7 @@ def backup_file(path: Path) -> Path:
 
 
 def load_json(path: Path) -> dict:
+    """Load one UTF-8 JSON object from disk."""
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -101,6 +112,7 @@ def remove_legacy_transaction_history(data: dict) -> bool:
 
 
 def write_json(path: Path, data: dict, backup: bool = True) -> None:
+    """Optionally back up an existing file, then replace it atomically."""
     if backup and path.exists():
         backup_file(path)
     atomic_write_json(path, data, overwrite=True)

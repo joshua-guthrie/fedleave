@@ -1,3 +1,5 @@
+"""Verify human-friendly correction lookup can be previewed without writing."""
+
 import json
 from pathlib import Path
 
@@ -25,5 +27,4 @@ def test_correct_by_date_preview(tmp_path: Path):
     add_transaction_to_leave_year(ly, tx)
     write_json(year_file, ly)
 
-    # preview the correction by search_date/search_type — should not raise
     correct(search_date="2026-06-01", search_type="annual", hours=3.0, reason="Adjust", preview=True, data_dir=data_dir)

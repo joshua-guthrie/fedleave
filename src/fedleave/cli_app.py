@@ -1,3 +1,5 @@
+"""Configure the Typer application shared by FedLeave CLI commands."""
+
 from __future__ import annotations
 
 import json

@@ -1,3 +1,5 @@
+"""Verify release artifacts, rolling publication policy, and bootstrap safety."""
+
 from __future__ import annotations
 
 import hashlib

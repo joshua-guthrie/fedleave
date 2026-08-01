@@ -1,2 +1,3 @@
-# Credit Hours Chart for the Year - Companion to fedleave
+"""Credit-hours balance chart companion application."""
+
 from fedleave import __version__ as __version__

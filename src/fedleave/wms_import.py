@@ -1,3 +1,5 @@
+"""Parse FRC-E WMS clocking-report HTML into FedLeave transactions."""
+
 from __future__ import annotations
 
 import platform
@@ -52,6 +54,8 @@ class WmsImportError(ValueError):
 
 @dataclass(frozen=True)
 class WmsTransactionSpec:
+    """Normalized transaction fields derived from one supported WMS row."""
+
     date: str
     category: str
     direction: str
@@ -63,6 +67,8 @@ class WmsTransactionSpec:
 
 @dataclass(frozen=True)
 class WmsImportReport:
+    """Parsed report metadata and its normalized transaction specifications."""
+
     leave_year: int
     leave_year_start: str
     leave_year_end: str
@@ -74,6 +80,8 @@ class WmsImportReport:
 
 @dataclass(frozen=True)
 class _WmsRule:
+    """Map a WMS leave code to FedLeave category and direction values."""
+
     category: str
     direction: str
 
@@ -117,6 +125,12 @@ _CODE_RULES: dict[str, _WmsRule] = {
 
 
 class _ClockingReportParser(HTMLParser):
+    """Collect cell text from JasperReports ``jrPage`` tables.
+
+    ``HTMLParser`` invokes the ``handle_*`` callbacks as it walks the document;
+    the depth counters keep nested markup from becoming separate table rows.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self._jr_page_depth = 0
@@ -259,6 +273,7 @@ def _row_to_spec(row: list[str], row_number: int | None = None) -> WmsTransactio
 
 
 def parse_wms_http_leave_report(html_text: str) -> WmsImportReport:
+    """Parse and validate a WMS clocking report without modifying stored data."""
     parser = _ClockingReportParser()
     parser.feed(html_text.replace("&nbsp;", " "))
     if not parser.rows:
@@ -302,6 +317,7 @@ def parse_wms_http_leave_report(html_text: str) -> WmsImportReport:
 
 
 def build_leave_year_skeleton(report: WmsImportReport, annual_accrual: float) -> dict[str, Any]:
+    """Create an empty leave-year payload matching a report's date range."""
     start = date.fromisoformat(report.leave_year_start)
     pay_periods = generate_pay_periods(start, 26)
     leave_year = LeaveYear(
@@ -339,6 +355,7 @@ def build_leave_year_skeleton(report: WmsImportReport, annual_accrual: float) ->
 def build_transactions_from_report(
     report: WmsImportReport, existing_ids: list[str]
 ) -> tuple[list[dict[str, Any]], list[str]]:
+    """Convert parsed specifications to validated transactions and used IDs."""
     transactions: list[dict[str, Any]] = []
     used_ids = list(existing_ids)
     for spec in report.specs:
@@ -358,4 +375,5 @@ def build_transactions_from_report(
 
 
 def report_transaction_keys(report: WmsImportReport) -> set[tuple[str, str, str]]:
+    """Return the date/category/direction keys used for authoritative import."""
     return {(spec.date, spec.category, spec.direction) for spec in report.specs}

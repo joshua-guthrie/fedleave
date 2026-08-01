@@ -1,3 +1,5 @@
+"""Verify corrections preserve transaction identity and lot metadata."""
+
 import json
 from pathlib import Path
 
@@ -28,7 +30,6 @@ def test_correct_updates_transaction_in_place(tmp_path: Path):
     )
 
     year_file = data_dir / "leave_years" / "2026.json"
-    # add a transaction
     leave_year = json.loads(year_file.read_text())
     t = create_transaction(date="2026-03-10", category="annual", direction="used", hours=4.0, existing_ids=[])
     t.expiration_date = "2026-12-31"
@@ -36,7 +37,6 @@ def test_correct_updates_transaction_in_place(tmp_path: Path):
     add_transaction_to_leave_year(leave_year, t)
     write_json(year_file, leave_year)
 
-    # perform correction
     correct(id=t.id, hours=3.0, reason="Only used 3 hours", data_dir=data_dir)
 
     ly2 = json.loads(year_file.read_text())

@@ -1,3 +1,5 @@
+"""Locate sibling executables in source, virtualenv, and frozen layouts."""
+
 from __future__ import annotations
 
 import os
@@ -7,6 +9,7 @@ from typing import Iterator
 
 
 def is_executable(candidate: Path) -> bool:
+    """Return whether a path is runnable on the current platform."""
     if not candidate.is_file():
         return False
     if sys.platform.startswith("win"):
@@ -50,6 +53,7 @@ def _candidate_roots() -> Iterator[Path]:
 
 
 def iter_executable_candidates(app_name: str) -> Iterator[Path]:
+    """Yield ordered candidate paths without requiring that they exist."""
     names = _executable_names(app_name)
     for root in _candidate_roots():
         for name in names:

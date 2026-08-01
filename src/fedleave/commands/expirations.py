@@ -1,3 +1,5 @@
+"""Report expiring leave lots and record approved expiration extensions."""
+
 from __future__ import annotations
 
 from datetime import date, datetime

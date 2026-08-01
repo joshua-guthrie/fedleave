@@ -1,3 +1,5 @@
+"""Create sortable analytics tables and Qt-rendered chart graphics."""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
@@ -63,6 +65,8 @@ NUMERIC_KEYS = {
 
 
 class SortableTableItem(QTableWidgetItem):
+    """Sort numeric table cells by their stored value instead of display text."""
+
     def __lt__(self, other: QTableWidgetItem) -> bool:
         own_value = self.data(Qt.UserRole)
         other_value = other.data(Qt.UserRole)
@@ -110,6 +114,7 @@ def _display(value: Any) -> str:
 
 
 def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> QTableWidget:
+    """Build a read-only, sortable table from row dictionaries and column keys."""
     table = QTableWidget(len(rows), len(columns))
     table.setMinimumHeight(1)
     table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Ignored)
@@ -174,6 +179,7 @@ def render_bar_chart(
     label_key: str,
     series: list[tuple[str, str]],
 ) -> QPixmap:
+    """Render grouped vertical bars into an export-quality Qt pixmap."""
     pixmap = QPixmap(WIDTH, HEIGHT)
     pixmap.fill(QColor(BACKGROUND))
     painter = QPainter(pixmap)
@@ -258,6 +264,7 @@ def render_horizontal_bar_chart(
     label_key: str,
     series: list[tuple[str, str]],
 ) -> QPixmap:
+    """Render grouped horizontal bars into an export-quality Qt pixmap."""
     pixmap = QPixmap(WIDTH, HORIZONTAL_HEIGHT)
     pixmap.fill(QColor(BACKGROUND))
     painter = QPainter(pixmap)
@@ -345,6 +352,7 @@ def render_horizontal_bar_chart(
 
 
 def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
+    """Render daily leave totals as a week-column calendar heatmap."""
     parsed = [(date.fromisoformat(str(row["date"])), row) for row in rows]
     if parsed:
         first = parsed[0][0]
@@ -412,6 +420,8 @@ def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
 
 
 class AnalyticsChartWindow(QMainWindow):
+    """Show one analytic as both a graphic and its supporting data table."""
+
     def __init__(
         self,
         title: str,

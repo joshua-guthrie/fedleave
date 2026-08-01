@@ -1,3 +1,5 @@
+"""Lock every transaction direction and status to one fail-closed effect rule."""
+
 from __future__ import annotations
 
 import pytest

@@ -1,3 +1,5 @@
+"""Regenerate README screenshots from deterministic sample leave data."""
+
 from __future__ import annotations
 
 import os
@@ -351,6 +353,7 @@ def _gui_screenshots(data_dir: Path) -> None:
 
 
 def main() -> int:
+    """Create temporary sample data and capture every documented application."""
     EXAMPLES.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="fedleave-readme-") as temp_name:
         data_dir = Path(temp_name) / "data"

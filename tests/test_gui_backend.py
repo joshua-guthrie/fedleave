@@ -1,3 +1,5 @@
+"""Exercise the GUI-to-CLI subprocess contract and bundle discovery rules."""
+
 import sys
 import types
 from pathlib import Path

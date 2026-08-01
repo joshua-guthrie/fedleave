@@ -1,3 +1,5 @@
+"""Compare the installed build identity with the published rolling installer."""
+
 from __future__ import annotations
 
 import re
@@ -33,6 +35,11 @@ def check_for_updates(
     opener=urlopen,
     timeout: float = 5.0,
 ) -> dict[str, Any]:
+    """Return update metadata without allowing network failures to escape.
+
+    The injectable opener keeps the network boundary deterministic in tests and
+    lets callers treat an unavailable check as a normal result.
+    """
     request = Request(
         PUBLISHED_BUILD_URL,
         headers={

@@ -1,3 +1,5 @@
+"""Expose the FedLeave version and embedded source-build identity."""
+
 from __future__ import annotations
 
 import os

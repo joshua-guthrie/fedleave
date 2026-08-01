@@ -1,3 +1,5 @@
+"""Build the calendar window, editing dialogs, menus, and backend workflows."""
+
 from __future__ import annotations
 
 import calendar
@@ -109,6 +111,8 @@ CHART_APP_CATEGORIES = {
 
 @dataclass
 class DayValue:
+    """A category and signed hour value prepared for calendar display."""
+
     category: str
     value: float
 
@@ -231,6 +235,8 @@ def _balance_date_label(selected: date, today: date | None = None) -> str:
 
 
 class DayCell(QPushButton):
+    """Render one clickable calendar day with leave and schedule markers."""
+
     def __init__(self, day: dict[str, Any], settings: GuiSettings) -> None:
         super().__init__()
         self.day = day
@@ -306,6 +312,8 @@ class DayCell(QPushButton):
 
 
 class DayEditDialog(QDialog):
+    """Collect authoritative signed leave values and comments for one day."""
+
     def __init__(self, day: dict[str, Any], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Edit {day['date']}")
@@ -394,6 +402,8 @@ class DayEditDialog(QDialog):
 
 
 class SaveDayPreviewDialog(QDialog):
+    """Require review of existing and replacement values before saving a day."""
+
     _COLUMN_WEIGHT_SUM = 5
 
     def __init__(
@@ -475,6 +485,8 @@ class SaveDayPreviewDialog(QDialog):
 
 
 class AbbreviationsDialog(QDialog):
+    """Display the read-only mapping of calendar abbreviations to leave types."""
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Leave Abbreviations")
@@ -521,6 +533,8 @@ class DiagnosticDialog(QDialog):
 
 
 class PreferencesDialog(QDialog):
+    """Edit backend paths, calendar display choices, and reminder preferences."""
+
     def __init__(self, settings: GuiSettings, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Preferences")
@@ -597,6 +611,8 @@ class PreferencesDialog(QDialog):
 
 
 class StartYearDialog(QDialog):
+    """Collect metadata and starting balances for a new leave year."""
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Start New Leave Year")
@@ -639,6 +655,8 @@ class StartYearDialog(QDialog):
 
 
 class SelectMonthDialog(QDialog):
+    """Select a calendar year and month for display."""
+
     def __init__(self, year: int, month: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Select Month")
@@ -670,6 +688,8 @@ class SelectMonthDialog(QDialog):
 
 
 class SelectDateDialog(QDialog):
+    """Select one date for a date-sensitive calendar action."""
+
     def __init__(self, title: str, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(title)
@@ -697,6 +717,8 @@ class SelectDateDialog(QDialog):
 
 
 class ChangeAccrualDialog(QDialog):
+    """Collect an effective date and a new annual accrual rate."""
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Change Annual Accrual")
@@ -739,6 +761,8 @@ class ChangeAccrualDialog(QDialog):
 
 
 class ForceBalanceDialog(QDialog):
+    """Collect an exact category balance and its required audit comment."""
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Force Leave Balance")
@@ -791,6 +815,8 @@ class ForceBalanceDialog(QDialog):
 
 
 class ExpirationStatusDialog(QDialog):
+    """Display active earned lots, deadlines, and use-rate guidance."""
+
     def __init__(self, payload: dict[str, Any], reminders: list[int], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Expiring Leave Status")
@@ -852,6 +878,8 @@ class ExpirationStatusDialog(QDialog):
 
 
 class ChangeLeaveYearDialog(QDialog):
+    """Choose one valid stored leave year for the calendar."""
+
     def __init__(self, years: list[int], current_year: int, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Change Leave Year")
@@ -880,6 +908,8 @@ class ChangeLeaveYearDialog(QDialog):
 
 
 class TransactionDateRangeDialog(QDialog):
+    """Collect inclusive dates for the transaction viewer."""
+
     def __init__(self, start: date, end: date, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("View Leave Transactions")
@@ -914,6 +944,8 @@ class TransactionDateRangeDialog(QDialog):
 
 
 class LeaveTransactionsDialog(QDialog):
+    """Display a sortable, read-only transaction table for a date range."""
+
     def __init__(
         self, start: date, end: date, transactions: list[dict[str, Any]], parent: QWidget | None = None
     ) -> None:
@@ -1010,6 +1042,13 @@ def _visible_categories(source: FedleaveBackend | dict[str, Any]) -> set[str]:
 
 
 class MainWindow(QMainWindow):
+    """Coordinate the calendar UI, CLI backend, companions, and user settings.
+
+    Qt owns child widgets through their parent relationships; this window keeps
+    explicit references only for independent chart windows and subprocesses
+    whose lifetimes must extend beyond the callback that created them.
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self.settings = load_settings()

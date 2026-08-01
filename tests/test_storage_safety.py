@@ -1,3 +1,5 @@
+"""Verify atomic writes and backups preserve data under failure and collision."""
+
 from __future__ import annotations
 
 from datetime import datetime

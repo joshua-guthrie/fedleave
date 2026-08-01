@@ -1,3 +1,5 @@
+"""Create the Qt application and start the FedLeave calendar window."""
+
 from __future__ import annotations
 
 import sys
@@ -9,6 +11,7 @@ from .resources import window_icon
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Initialize Qt ownership, show the main window, and enter the event loop."""
     app = QApplication(argv or sys.argv)
     app.setApplicationName("FedLeave Calendar")
     app.setOrganizationName("fedleave")

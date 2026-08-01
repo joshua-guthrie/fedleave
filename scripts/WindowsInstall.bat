@@ -1,4 +1,5 @@
 @echo off
+rem Repository entry point for the shared Python build/install engine on Windows.
 setlocal enabledelayedexpansion
 
 set "SCRIPT_DIR=%~dp0"

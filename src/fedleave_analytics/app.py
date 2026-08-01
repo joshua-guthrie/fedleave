@@ -1,3 +1,5 @@
+"""Build the analytics GUI and load normalized data from the FedLeave CLI."""
+
 from __future__ import annotations
 
 import argparse
@@ -214,6 +216,7 @@ def _payload_value(data: dict[str, Any], path: str) -> Any:
 
 
 def load_analytics_data(backend: Path, data_dir: str | None, year: int) -> dict[str, Any]:
+    """Load one leave year through the CLI boundary and derive analytics."""
     command = [str(backend), "list", "--year", str(year), "--json"]
     if data_dir:
         command.extend(["--data-dir", data_dir])
@@ -230,6 +233,12 @@ def load_analytics_data(backend: Path, data_dir: str | None, year: int) -> dict[
 
 
 class AnalyticsLoader(QObject):
+    """Run backend loading on a Qt worker thread and report through signals.
+
+    Qt signals transfer the result back to the GUI thread, where widgets may be
+    updated safely; the worker never manipulates interface objects directly.
+    """
+
     finished = Signal(dict)
     failed = Signal(str)
 
@@ -248,6 +257,8 @@ class AnalyticsLoader(QObject):
 
 
 class TransactionDialog(QDialog):
+    """Display the source transactions supporting a selected analytic value."""
+
     def __init__(self, rows: list[dict[str, Any]], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Supporting Transactions")
@@ -272,6 +283,8 @@ def _format_number(value: Any) -> str:
 
 
 class AnalyticsWindow(QMainWindow):
+    """Coordinate analytics loading, navigation, chart popups, and CSV export."""
+
     def __init__(
         self,
         backend: Path,

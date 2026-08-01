@@ -1,3 +1,5 @@
+"""Maintain one authoritative starting balance for each leave category."""
+
 from __future__ import annotations
 
 from pathlib import Path

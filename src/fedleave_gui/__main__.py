@@ -1,3 +1,5 @@
+"""Launch the calendar GUI as a Python module."""
+
 from __future__ import annotations
 
 import sys

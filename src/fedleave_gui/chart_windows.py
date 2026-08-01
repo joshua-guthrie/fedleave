@@ -1,3 +1,5 @@
+"""Display, export, and print chart images from the calendar GUI."""
+
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt, QTimer
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
 
 
 class LeaveChartDialog(QDialog):
+    """Show one full-quality chart with viewport fitting and export actions."""
+
     def __init__(self, title: str, pixmap: QPixmap, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WA_DeleteOnClose, True)
