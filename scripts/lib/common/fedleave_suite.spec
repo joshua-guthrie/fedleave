@@ -26,7 +26,7 @@ for target in config["targets"]:
 
     analysis = Analysis(
         [target["entry"]],
-        pathex=[config["repo_root"]],
+        pathex=[config["source_root"]],
         binaries=binaries,
         datas=datas,
         hiddenimports=hidden_imports,

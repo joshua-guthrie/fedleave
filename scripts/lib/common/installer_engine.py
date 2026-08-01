@@ -244,6 +244,7 @@ class InstallerEngine:
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config = {
             "repo_root": str(self.repo_root),
+            "source_root": str(self.repo_root / "src"),
             "suite_name": suite_name,
             # These are development/test-only or an intentionally removed
             # heavyweight optional dependency. Excluding them also keeps a
@@ -308,9 +309,9 @@ class InstallerEngine:
         """Exercise build discovery and command construction without running PyInstaller."""
         self._ensure_python()
         targets = self._load_targets()
-        repo_path = str(self.repo_root)
-        if repo_path not in sys.path:
-            sys.path.insert(0, repo_path)
+        source_path = str(self.repo_root / "src")
+        if source_path not in sys.path:
+            sys.path.insert(0, source_path)
         smoke_root = self.build_root / "smoke-test"
         entries_dir = smoke_root / "entries"
         work_dir = smoke_root / "work"

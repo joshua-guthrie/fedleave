@@ -16,8 +16,10 @@ def _candidate_roots() -> list[Path]:
         path = raw if raw.is_absolute() else Path.cwd() / raw
         resolved = path.resolve()
         candidate_roots.append(resolved if resolved.is_dir() else resolved.parent)
-    here = Path(__file__).resolve().parents[1]
-    candidate_roots.extend([here, here / "dist", here.parent / "dist"])
+    project_root = Path(__file__).resolve().parents[2]
+    candidate_roots.extend(
+        [project_root, project_root / "dist", project_root.parent / "dist"]
+    )
 
     seen: set[Path] = set()
     ordered: list[Path] = []

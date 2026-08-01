@@ -25,14 +25,12 @@ def _candidate_roots() -> Iterator[Path]:
     for raw in (Path(sys.argv[0]), Path(sys.executable)):
         path = raw.expanduser()
         if not path.is_absolute():
-            path = (Path.cwd() / path).resolve()
-        else:
-            path = path.resolve()
+            path = Path.cwd() / path
         root = path if path.is_dir() else path.parent
         roots.append(root)
         roots.append(root.parent)
 
-    package_root = Path(__file__).resolve().parents[1]
+    package_root = Path(__file__).resolve().parents[2]
     roots.extend(
         [
             package_root,
@@ -45,7 +43,10 @@ def _candidate_roots() -> Iterator[Path]:
         if resolved in seen:
             continue
         seen.add(resolved)
-        yield resolved
+        # Preserve the logical directory. Resolving a virtual-environment
+        # interpreter symlink can jump to the system Python directory and
+        # skip companion executables installed beside that interpreter.
+        yield root
 
 
 def iter_executable_candidates(app_name: str) -> Iterator[Path]:

@@ -11,8 +11,9 @@ import pytest
 import fedleave.executable_search as executable_search
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+SOURCE_ROOT = ROOT / "src"
+if str(SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SOURCE_ROOT))
 
 
 def _install_chart_import_stubs(monkeypatch):

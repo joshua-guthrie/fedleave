@@ -27,7 +27,7 @@ def _run(command: list[str]) -> None:
 
 
 def _sample_data(data_dir: Path) -> None:
-    sys.path.insert(0, str(ROOT))
+    sys.path.insert(0, str(ROOT / "src"))
     from fedleave.config import init_config
     from fedleave.ledger import add_transaction_to_leave_year, create_transaction
     from fedleave.storage import load_json, write_json

@@ -135,7 +135,7 @@ def test_runtime_dependencies_and_bundle_manifest_remain_lean() -> None:
     manifest = (
         ROOT / "scripts" / "lib" / "common" / "application_manifest.toml"
     ).read_text(encoding="utf-8")
-    charting = (ROOT / "fedleave" / "charting.py").read_text(encoding="utf-8")
+    charting = (ROOT / "src" / "fedleave" / "charting.py").read_text(encoding="utf-8")
 
     for dependency in ("numpy", "pytest", "hypothesis", "pyinstaller"):
         assert dependency not in runtime_requirements

@@ -124,7 +124,7 @@ def test_credit_hours_are_analyzed_and_heatmaps_only_include_nonzero_series():
 
 
 def test_analytics_package_entrypoint_supports_direct_execution():
-    entrypoint = Path(__file__).parents[1] / "fedleave_analytics" / "__main__.py"
+    entrypoint = Path(__file__).parents[1] / "src" / "fedleave_analytics" / "__main__.py"
     result = subprocess.run(
         [sys.executable, str(entrypoint), "--help"],
         capture_output=True,
