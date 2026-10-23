@@ -242,42 +242,62 @@ class FedleaveBackend:
                 args.extend([f"{option}-comment", comments.get(category, "")])
         return self.run_json(args)
 
-    def init_year(
+    def _creation_args(
         self,
         *,
         year: int,
-        leave_year_start: str,
-        annual_accrual: float,
-        annual_start: float,
-        sick_start: float,
-        credit_start: float,
-        comp_start: float,
-        travel_comp_start: float,
-        restored_annual_start: float,
-    ) -> str:
-        return self.run_text(
+        from_year: int | None = None,
+        pay_periods: int | None = None,
+        expected_fingerprint: str | None = None,
+        **manual_options,
+    ) -> list[str]:
+        args = ["init", "--year", str(year)]
+        if from_year is not None:
+            if manual_options:
+                raise BackendError("Carryover cannot include manual starting balances.")
+            args.extend(["--from-year", str(from_year)])
+        else:
+            for key, value in manual_options.items():
+                args.extend(
+                    [
+                        "--" + key.replace("_", "-"),
+                        _format_number(value) if isinstance(value, (int, float)) else str(value),
+                    ]
+                )
+        if pay_periods is not None:
+            args.extend(["--pay-periods", str(pay_periods)])
+        if expected_fingerprint is not None:
+            args.extend(["--expected-fingerprint", expected_fingerprint])
+        return args
+
+    def init_year(self, **options) -> str:
+        """Create an independent manual year using the configured CLI and store."""
+        return self.run_text(self._creation_args(**options))
+
+    def preview_year(self, **options) -> dict[str, Any]:
+        return self.run_json([*self._creation_args(**options), "--preview", "--json"])
+
+    def create_carryover_year(
+        self, *, year: int, from_year: int, expected_fingerprint: str, pay_periods: int | None = None
+    ) -> dict[str, Any]:
+        return self.run_json(
             [
-                "init",
-                "--year",
-                str(year),
-                "--leave-year-start",
-                leave_year_start,
-                "--annual-accrual",
-                _format_number(annual_accrual),
-                "--annual-start",
-                _format_number(annual_start),
-                "--sick-start",
-                _format_number(sick_start),
-                "--credit-start",
-                _format_number(credit_start),
-                "--comp-start",
-                _format_number(comp_start),
-                "--travel-comp-start",
-                _format_number(travel_comp_start),
-                "--restored-annual-start",
-                _format_number(restored_annual_start),
+                *self._creation_args(
+                    year=year, from_year=from_year, pay_periods=pay_periods, expected_fingerprint=expected_fingerprint
+                ),
+                "--json",
             ]
         )
+
+    def reconcile_carryover(
+        self, year: int, *, preview: bool = True, expected_fingerprint: str | None = None
+    ) -> dict[str, Any]:
+        args = ["carryover-reconcile", "--year", str(year), "--json"]
+        if preview:
+            args.append("--preview")
+        if expected_fingerprint:
+            args.extend(["--expected-fingerprint", expected_fingerprint])
+        return self.run_json(args)
 
     def validate(self) -> dict[str, Any]:
         return self.run_json(["validate", "--json"])

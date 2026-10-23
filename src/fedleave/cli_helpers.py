@@ -9,7 +9,7 @@ from typing import Any
 
 from .config import get_default_data_dir, load_config
 from .expirations import synchronize_expirations
-from .storage import load_json, remove_legacy_transaction_history, write_json
+from .storage import load_json, remove_legacy_transaction_history
 from .validation import sanitize_text as sanitize_text
 
 
@@ -25,21 +25,25 @@ def get_leave_year_path(year: int, data_dir: Path | None) -> Path:
 
 
 def load_leave_year(year: int, data_dir: Path | None = None) -> dict[str, Any]:
-    """Load a leave year and persist any required legacy/expiration migration."""
+    """Load and normalize a private copy. Only explicit mutations persist it."""
     path = get_leave_year_path(year, data_dir)
     if not path.exists():
         raise FileNotFoundError(f"Leave year file not found: {path}")
     leave_year = load_json(path)
-    changed = remove_legacy_transaction_history(leave_year)
+    remove_legacy_transaction_history(leave_year)
     try:
         config = load_config(data_dir)
     except FileNotFoundError:
         config = None
-    if synchronize_expirations(leave_year, config)["changed"]:
-        changed = True
-    if changed:
-        write_json(path, leave_year)
+    synchronize_expirations(leave_year, config)
     return leave_year
+
+
+def load_read_snapshot(year: int, data_dir: Path | None = None) -> dict[str, Any]:
+    """Canonical linked read model used by CLI reports and their consumers."""
+    from .cross_year import resolve_snapshot
+
+    return resolve_snapshot(resolve_data_dir(data_dir), year)
 
 
 def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = None) -> tuple[int, dict[str, Any]]:
@@ -54,21 +58,18 @@ def resolve_leave_year_for_date(transaction_date: str, data_dir: Path | None = N
         if not path.is_file() or path.suffix != ".json":
             continue
         leave_year = load_json(path)
-        changed = remove_legacy_transaction_history(leave_year)
+        remove_legacy_transaction_history(leave_year)
         try:
             config = load_config(data_dir)
         except FileNotFoundError:
             config = None
-        if synchronize_expirations(leave_year, config)["changed"]:
-            changed = True
-        if changed:
-            write_json(path, leave_year)
         try:
             start = parse_iso_date(str(leave_year.get("leave_year_start", "")))
             end = parse_iso_date(str(leave_year.get("leave_year_end", "")))
         except ValueError:
             continue
         if start <= target <= end:
+            synchronize_expirations(leave_year, config)
             return int(leave_year.get("leave_year", path.stem)), leave_year
 
     raise FileNotFoundError(f"No leave year contains date {transaction_date}")

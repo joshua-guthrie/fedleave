@@ -64,6 +64,7 @@ def test_tools_menu_hides_internal_data_folder(monkeypatch):
         "Change Accrual...",
         "Force Leave Balance...",
         "Expiring Leave Status...",
+        "Reconcile Carryover...",
         "Validate Data",
         "Export FedLeave Data...",
         "Import FedLeave Data...",

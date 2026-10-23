@@ -14,7 +14,7 @@ def test_version_option_reports_package_version():
     assert result.stdout.strip() == f"fedleave {__version__}"
 
 
-def test_cli_startup_removes_legacy_history_from_default_store(tmp_path, monkeypatch):
+def test_cli_startup_preserves_legacy_files_during_readonly_commands(tmp_path, monkeypatch):
     data_dir = tmp_path / "xdg" / "fedleave"
     year_dir = data_dir / "leave_years"
     year_dir.mkdir(parents=True)
@@ -40,5 +40,9 @@ def test_cli_startup_removes_legacy_history_from_default_store(tmp_path, monkeyp
 
     assert result.exit_code == 0
     migrated = json.loads(year_file.read_text(encoding="utf-8"))
-    assert migrated["transactions"] == [{"id": "active"}]
-    assert "starting_balance_history" not in migrated
+    assert migrated["transactions"] == [
+        {"id": "active", "void": False, "void_reason": None},
+        {"id": "obsolete", "void": True},
+    ]
+    assert migrated["starting_balance_history"] == [{"old_hours": 1.0}]
+    assert not (year_file.parent.parent / "backups").exists()

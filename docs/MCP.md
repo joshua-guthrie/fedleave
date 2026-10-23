@@ -75,8 +75,7 @@ Windows:
 The ordinary CLI datastore default applies exactly, including platform
 environment variables. No MCP-only directory is selected. A tool's `data_dir`
 argument can select any datastore accepted by the CLI under the same OS account.
-The CLI's eager startup migration still uses its ordinary default datastore,
-even when a leaf command selects another store, just as with direct CLI use.
+Startup performs no datastore migration. Each command uses its selected store exclusively.
 
 For an optional policy, add `"args": ["--config", "/absolute/path/policy.json"]`
 (escape Windows backslashes in JSON), or configure the trusted launch environment
@@ -179,7 +178,7 @@ In restricted modes, `data_dir` fixes the selected datastore. The CLI's `--data-
 applicable schema, but a caller can select only that directory or an exact
 canonical directory in `allowed_data_dirs`. Alternate spellings resolve to the
 same path. The selected directory also becomes the child CLI's startup default,
-so its eager migration cannot touch an unrelated default store.
+so every operation stays within the selected store.
 
 File inputs require a location under `file_read_roots`; exports require
 `file_write_roots` and `allow_file_output`. Empty root lists deny file access.
@@ -209,18 +208,17 @@ edit source, executables, or policy directly. Use OS permissions and isolated
 accounts for stronger boundaries, and do not give an agent other file-editing
 tools that can rewrite its own policy or installed application.
 
-### Reads that require maintenance
+### Read-only accounting
 
-Existing CLI reads may remove legacy history, synchronize expirations, or post
-missing accruals. In read-only and confirm-writes modes, a storage write guard
-refuses those writes and reports that maintenance is required. It does not
-silently persist them or calculate balances using a second implementation.
-Perform the maintenance through the normal CLI or an authorized unattended
-connector, then retry the read. Full-access and unattended reads retain normal
-CLI maintenance behavior. Full-access children clear inherited `FEDLEAVE_MCP_*`
-datastore pins/write guards; restricted children receive their own trusted
-boundaries. Lock files/directories are coordination metadata, separate from
-leave-record writes.
+Reports, discovery and previews resolve legacy history, missing accruals,
+expiration events and linked carryovers on private snapshots. They never persist
+maintenance changes or create missing lock files/directories. Existing shared
+locks coordinate with CLI writers. Read-only connectors can inspect legacy data
+without a separate maintenance pass. `fedleave_snapshot` exposes the same
+canonical state to chart/analytics consumers. Creation and reconciliation preview
+flags are side-effect-free; explicit apply remains governed by launch policy.
+Full-access children clear inherited MCP datastore pins/write guards;
+restricted children receive their own trusted boundaries.
 
 ### Remaining trust boundary
 
@@ -259,8 +257,8 @@ or confirmation workflow; the CLI's existing storage backups remain unchanged.
 
 `tools/list` is generated from the real Typer/Click registry at startup.
 There is one stable tool per executable command path, plus `fedleave_version`.
-The current inventory has **31 tools and 273 parameter entries**, including
-inherited parameters and automatically registered help options. The 30 CLI
+The current inventory has **33 tools and 298 parameter entries**, including
+inherited parameters and automatically registered help options. The 32 CLI
 command paths include the compatibility alias `use-or-loose`.
 
 Tool names normalize the full path: `starting-balance set` becomes
@@ -334,12 +332,11 @@ CLI stdin is a closed pipe, providing noninteractive EOF on Windows and Linux.
 Stdin is never forwarded and no prompt is automatically answered. Validation
 retains CLI exit 2 when issues were found, even if requested fixes were applied.
 
-Annotations conservatively account for possible effects: reports may perform
-startup migration/backfill, and conditional tools such as rollover, correction,
-and validation can write. A static tool annotation cannot change per invocation;
-`preview: true` skips the primary write, while normal CLI maintenance can still
-occur. In restricted read-only profiles the child guard prevents maintenance
-writes as well.
+Annotations describe the CLI's effects: reports use read-only snapshots, while
+conditional tools such as rollover, reconciliation, correction and validation
+can write when explicitly applied. Static annotations cannot change per
+invocation; creation/reconciliation `preview: true` performs no datastore
+maintenance or writes. Restricted child guards also enforce filesystem policy.
 
 Results contain the same envelope in MCP text content and `structuredContent`:
 `ok`, `exit_code`, `stdout`, `stderr`, and `format`. JSON-capable responses also

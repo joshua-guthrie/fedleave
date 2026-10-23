@@ -83,7 +83,7 @@ def years(
             try:
                 start_date = parse_iso_date(str(start_date)).isoformat()
                 end_date = parse_iso_date(str(end_date)).isoformat()
-                valid = int(leave_year.get("leave_year", year)) == year
+                valid = int(leave_year.get("leave_year", year)) == year and start_date <= end_date
             except (TypeError, ValueError):
                 valid = False
             if not valid:
@@ -94,6 +94,14 @@ def years(
                 "end_date": end_date,
                 "valid": valid,
             }
+            from ..payperiods import validate_pay_periods
+
+            try:
+                validate_pay_periods(leave_year)
+                record["carryover_eligible"] = valid
+            except (ValueError, KeyError, TypeError) as exc:
+                record["carryover_eligible"] = False
+                record["carryover_error"] = str(exc)
             records.append(record)
 
             for field in ("starting_balances", "carryover_from_previous_year"):
@@ -135,51 +143,132 @@ def years(
 
 @app.command()
 def init(
-    year: int = typer.Option(..., help="Leave year."),
-    leave_year_start: str = typer.Option(..., help="Leave year start date YYYY-MM-DD or today."),
-    annual_accrual: float = typer.Option(6.0, help="Annual leave accrual hours per pay period."),
-    annual_start: float = typer.Option(0.0, help="Starting annual leave hours."),
-    sick_start: float = typer.Option(0.0, help="Starting sick leave hours."),
-    comp_start: float = typer.Option(0.0, help="Starting comp time hours."),
-    credit_start: float = typer.Option(0.0, help="Starting credit hours."),
-    travel_comp_start: float = typer.Option(0.0, help="Starting travel comp hours."),
-    time_off_award_start: float = typer.Option(0.0, help="Starting time-off award hours."),
-    religious_comp_start: float = typer.Option(0.0, help="Starting religious comp hours."),
-    restored_annual_start: float = typer.Option(0.0, help="Starting restored annual leave hours."),
+    year: int = typer.Option(..., help="New leave year (create only)."),
+    leave_year_start: str | None = typer.Option(
+        None, help="Manual start date; carryover derives the adjacent source end + 1 day."
+    ),
+    annual_accrual: float | None = typer.Option(None, help="Manual annual accrual hours per period (default 6)."),
+    annual_start: float | None = typer.Option(None, help="Manual starting annual hours."),
+    sick_start: float | None = typer.Option(None, help="Manual starting sick hours."),
+    comp_start: float | None = typer.Option(None, help="Manual starting comp hours."),
+    credit_start: float | None = typer.Option(None, help="Manual starting credit hours."),
+    travel_comp_start: float | None = typer.Option(None, help="Manual starting travel comp hours."),
+    time_off_award_start: float | None = typer.Option(None, help="Manual starting time-off award hours."),
+    religious_comp_start: float | None = typer.Option(None, help="Manual starting religious comp hours."),
+    restored_annual_start: float | None = typer.Option(None, help="Manual starting restored annual hours."),
     holiday_source: str = typer.Option("python_holidays", help="Holiday source: python_holidays or opm_ics."),
     holiday_ics_url: str = typer.Option(
         "https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics",
-        help="iCalendar URL to download federal holidays from when --holiday-source=opm_ics.",
+        help="Holiday calendar URL.",
     ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    manual: bool = typer.Option(False, help="Independent manual baseline; this is the legacy default."),
+    from_year: int | None = typer.Option(
+        None, help="Explicit adjacent predecessor; mutually exclusive with manual balances."
+    ),
+    preview: bool = typer.Option(False, help="Read-only creation preview; creates no directories or files."),
+    json_output: bool = typer.Option(False, "--json", help="Machine-readable preview or creation result."),
+    pay_periods: int | None = typer.Option(None, help="Explicit agency schedule of 26 or 27 pay periods."),
+    expected_fingerprint: str | None = typer.Option(None, help="Reject apply if the reviewed preview changed."),
 ) -> None:
+    """Create with Manual Starting Balances or Carry Over From Previous Leave Year.
+
+    Default manual init never imports predecessor history and emits no generic
+    no-carryover warning. Both modes refuse an existing destination.
+    """
+    from ..config import console as config_console
     from ..config import init_config
+    from ..cross_year import AccountingError, fingerprint, manual_ledger
+    from .rollover import create_from_previous, report_error
 
-    # validate leave_year_start early to avoid creating bad state
+    balances = {
+        "annual": annual_start,
+        "sick": sick_start,
+        "comp": comp_start,
+        "credit": credit_start,
+        "travel_comp": travel_comp_start,
+        "time_off_award": time_off_award_start,
+        "religious_comp": religious_comp_start,
+        "restored_annual": restored_annual_start,
+    }
+    base = get_default_data_dir(data_dir)
+    if from_year is not None:
+        if manual or any(value is not None for value in balances.values()) or annual_accrual is not None:
+            report_error(
+                AccountingError(
+                    "MIXED_INITIALIZATION_MODES",
+                    "--from-year cannot be combined with --manual, starting balances (including zero), or manual accrual",
+                ),
+                json_output,
+            )
+        start = parse_iso_date(leave_year_start).isoformat() if leave_year_start else None
+        create_from_previous(
+            from_year,
+            year,
+            base,
+            preview=preview,
+            json_output=json_output,
+            start=start,
+            pay_periods=pay_periods,
+            expected=expected_fingerprint,
+        )
+        return
     try:
-        leave_year_start = parse_iso_date(leave_year_start).isoformat()
-    except ValueError as exc:
-        console.print(f"[red]ERROR:[/red] {exc}")
-        raise typer.Exit(code=2)
-
-    init_config(
-        year=year,
-        leave_year_start=leave_year_start,
-        annual_accrual=annual_accrual,
-        starting_balances={
-            "annual": annual_start,
-            "sick": sick_start,
-            "comp": comp_start,
-            "credit": credit_start,
-            "travel_comp": travel_comp_start,
-            "time_off_award": time_off_award_start,
-            "religious_comp": religious_comp_start,
-            "restored_annual": restored_annual_start,
-        },
-        holiday_source=holiday_source,
-        holiday_ics_url=holiday_ics_url,
-        data_dir=data_dir,
-    )
+        if not leave_year_start:
+            raise AccountingError("MISSING_START_DATE", "Manual mode requires --leave-year-start")
+        start = parse_iso_date(leave_year_start).isoformat()
+        entered = {category: 0.0 if amount is None else amount for category, amount in balances.items()}
+        accrual = 6.0 if annual_accrual is None else annual_accrual
+        ledger = manual_ledger(
+            year,
+            start,
+            accrual,
+            entered,
+            pay_periods=pay_periods,
+            config=load_config(base) if (base / "config.json").exists() else {},
+        )
+        path = base / "leave_years" / f"{year}.json"
+        if path.exists() or path.is_symlink():
+            raise AccountingError("DESTINATION_EXISTS", str(path))
+        token = fingerprint({"ledger": ledger, "config": load_config(base) if (base / "config.json").exists() else {}})
+        if expected_fingerprint is not None and expected_fingerprint != token:
+            raise AccountingError("STALE_PREVIEW", "Manual inputs or policy changed; regenerate preview")
+        result = {
+            "action": "preview" if preview else "applied",
+            "initialization_mode": "manual",
+            "source_leave_year": None,
+            "leave_year": year,
+            "leave_year_start": start,
+            "leave_year_end": ledger["leave_year_end"],
+            "pay_period_count": ledger["pay_period_count"],
+            "opening_balances": entered,
+            "preview_fingerprint": token,
+            "warnings": [],
+            "created_file": None,
+        }
+        if not preview:
+            quiet = config_console.quiet
+            config_console.quiet = json_output
+            try:
+                init_config(
+                    year,
+                    start,
+                    accrual,
+                    entered,
+                    data_dir=base,
+                    holiday_source=holiday_source,
+                    holiday_ics_url=holiday_ics_url,
+                    pay_period_count=ledger["pay_period_count"],
+                )
+            finally:
+                config_console.quiet = quiet
+            result["created_file"] = str(path)
+    except (ValueError, OSError, TypeError) as exc:
+        report_error(exc, json_output)
+    if json_output:
+        _print_json(result)
+    elif preview:
+        console.print(result)
 
 
 def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
@@ -190,8 +279,6 @@ def _read_json_files_by_stem(directory: Path) -> dict[str, dict]:
         if not path.is_file() or path.suffix != ".json":
             continue
         data = load_json(path)
-        if directory.name == "leave_years" and remove_legacy_transaction_history(data):
-            write_json(path, data)
         result[path.stem] = data
     return result
 
@@ -536,3 +623,27 @@ def validate(
         _print_json({"ok": True, "results": results})
         return
     console.print("Validation completed: no issues found")
+
+
+@app.command("snapshot")
+def snapshot_command(
+    year: int = typer.Option(..., help="Leave year to resolve with its explicit carryover ancestry."),
+    json_output: bool = typer.Option(False, "--json"),
+    data_dir: Path | None = typer.Option(None),
+) -> None:
+    """Read-only accounting snapshot for charts, analytics, and integrations."""
+    from ..cross_year import resolve_snapshot, seed_accruals
+    from .rollover import report_error
+
+    try:
+        snapshot = resolve_snapshot(get_default_data_dir(data_dir), year)
+        seed_accruals(snapshot)
+        result = dict(snapshot)
+        result["snapshot_rules"] = snapshot.config
+        result["accounting_warnings"] = snapshot.warnings
+    except (ValueError, OSError, TypeError, KeyError) as exc:
+        report_error(exc, json_output)
+    if json_output:
+        _print_json(result)
+    else:
+        console.print(result)

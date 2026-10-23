@@ -109,7 +109,7 @@ def test_tool_annotations_account_for_maintenance_and_conditional_writes(tmp_pat
                 tools = {t.name: t for t in (await client.list_tools()).tools}
                 assert tools["fedleave_version"].annotations.read_only_hint
                 assert not tools["fedleave_add"].annotations.read_only_hint
-                assert tools["fedleave_balance"].annotations.read_only_hint == (policy.mode == "read_only")
+                assert tools["fedleave_balance"].annotations.read_only_hint
                 assert tools["fedleave_rollover"].annotations.destructive_hint
                 assert tools["fedleave_validate"].annotations.destructive_hint
                 assert tools["fedleave_check_for_updates"].annotations.open_world_hint

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import date, timedelta
+from typing import Any
 
 DEFAULT_PAYDAY_OFFSET_DAYS = 6
 
@@ -57,3 +58,40 @@ def generate_pay_periods(start_date: date, count: int = 26) -> list[dict[str, st
         )
         current_start = current_end + timedelta(days=1)
     return pay_periods
+
+
+def leave_year_period_count(start: date, year: int) -> int:
+    """Count biweekly starts before the next calendar year on this schedule.
+
+    January schedules naturally include the occasional 27-period leave year.
+    Agencies with a December boundary can explicitly select 26/27 periods.
+    """
+    if start.year != year:
+        raise ValueError("UNSUPPORTED_PAY_PERIODS: specify --pay-periods for a non-January schedule")
+    count = ((date(year + 1, 1, 1) - start).days + 13) // 14
+    if count not in {26, 27}:
+        raise ValueError("UNSUPPORTED_PAY_PERIODS: schedule must contain 26 or 27 periods")
+    return count
+
+
+def validate_pay_periods(leave_year: dict[str, Any]) -> None:
+    """Reject inconsistent numbering, boundaries, gaps and overlaps."""
+    periods = leave_year.get("pay_periods", [])
+    count = leave_year.get("pay_period_count", len(periods))
+    if count not in {26, 27} or len(periods) != count:
+        raise ValueError("UNSUPPORTED_PAY_PERIODS: expected 26 or 27 complete pay periods")
+    expected = date.fromisoformat(leave_year["leave_year_start"])
+    for number, period in enumerate(periods, 1):
+        end = expected + timedelta(days=13)
+        if (
+            period.get("start_date") != expected.isoformat()
+            or period.get("end_date") != end.isoformat()
+            or period.get("pay_period_number") != number
+        ):
+            raise ValueError(f"SOURCE_NOT_CONTIGUOUS: invalid pay period {number}")
+        accrual = date.fromisoformat(str(period.get("accrual_date") or end.isoformat()))
+        if not expected <= accrual <= end:
+            raise ValueError(f"UNSUPPORTED_PAY_PERIODS: accrual outside period {number}")
+        expected = end + timedelta(days=1)
+    if leave_year["leave_year_end"] != (expected - timedelta(days=1)).isoformat():
+        raise ValueError("SOURCE_NOT_CONTIGUOUS: leave-year end disagrees with pay periods")

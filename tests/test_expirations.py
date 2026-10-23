@@ -58,9 +58,11 @@ def test_expiration_engine_assigns_dates_and_fifo_links_usage() -> None:
 
 def test_expiration_report_posts_configured_travel_comp_forfeiture() -> None:
     lot = _transaction("20260120-001", "2026-01-20", "travel_comp", "earned", 8)
+    lot["expiration_date"] = "2026-12-01"
     leave_year = _year([lot])
 
-    report = expiration_report(leave_year, Config().model_dump(), as_of=date(2027, 2, 1))
+    # A disposition belongs to the ledger containing its effective date.
+    report = expiration_report(leave_year, Config().model_dump(), as_of=date(2026, 12, 2))
 
     forfeitures = [tx for tx in leave_year["transactions"] if tx["direction"] == "forfeited"]
     assert len(forfeitures) == 1

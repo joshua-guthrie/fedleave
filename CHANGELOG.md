@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Support independent manual creation and explicit CLI-previewed prior-year carryover in CLI and Calendar, with create-only destinations and GUI-only manual confirmation.
+- Correct adjacent 26/27-period boundaries, single-count openings, credit caps, nonexpiring award carryover, stable lot origins and inclusive expiration deadlines.
+- Resolve reports/charts on read-only linked snapshots; legacy migrations and missing accruals are computed in memory during queries.
+- Detect stale carryovers and explicitly reconcile complete successor chains with genuine activity preserved, backups, preview fingerprints and interruption recovery.
+
 - Default policy-free MCP launches to full CLI access for authorized agents, including destructive operations, imports/exports, network calls, and alternate datastores. Keep existing restricted policy files and add explicit `full_access` configuration.
 - Execute newly registered CLI commands automatically in full-access MCP sessions while retaining typed arguments, subprocess limits, locking, and optional restricted permissions.
 - Report validation issues without prompting on noninteractive CLI/MCP input; `--apply` explicitly requests fixes.

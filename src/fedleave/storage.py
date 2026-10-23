@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -36,6 +37,8 @@ def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
     file and leaves the previous destination intact.
     """
     check_write(path)
+    if path.is_symlink() or path.parent.is_symlink():
+        raise ValueError(f"INVALID_PATH: refusing symbolic-link JSON destination: {path}")
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exists: {path}")
 
@@ -50,9 +53,17 @@ def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
             delete=False,
         ) as f:
             temp_path = Path(f.name)
-            json.dump(data, f, indent=2, sort_keys=False)
+            json.dump(data, f, indent=2, sort_keys=False, allow_nan=False)
             f.write("\n")
-        temp_path.replace(path)
+            f.flush()
+            os.fsync(f.fileno())
+        if overwrite:
+            temp_path.replace(path)
+        else:
+            # Atomic create-if-absent; a racing creator must never be replaced
+            # between an existence check and the final filesystem operation.
+            os.link(temp_path, path)
+            temp_path.unlink()
     except Exception:
         if temp_path is not None and temp_path.exists():
             temp_path.unlink()

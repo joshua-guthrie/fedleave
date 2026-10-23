@@ -9,7 +9,8 @@ import typer
 from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
-from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date
+from ..cli_helpers import load_read_snapshot as load_leave_year
+from ..cli_helpers import parse_iso_date
 from ..config import get_default_data_dir, load_config
 from ..expirations import EXPIRING_CATEGORIES, expiration_report, expiration_rules, synchronize_expirations
 from ..storage import load_json, write_json
@@ -31,7 +32,10 @@ def expirations(
     category: str | None = typer.Option(None, help="Only include one expiring leave category."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    as_of: str | None = typer.Option(None, help="Historical or prospective as-of date YYYY-MM-DD; default today."),
 ) -> None:
+    if isinstance(as_of, OptionInfo):
+        as_of = None
     if isinstance(year, OptionInfo):
         year = None
     if isinstance(within_pay_periods, OptionInfo):
@@ -71,9 +75,10 @@ def expirations(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
 
-    report = expiration_report(leave_year, _config(data_dir))
-    if report.pop("changed", False):
-        write_json(get_leave_year_path(year, data_dir), leave_year)
+    selected_date = parse_iso_date(as_of) if as_of else date.today()
+    report = expiration_report(leave_year, _config(data_dir), as_of=selected_date)
+    report.pop("changed", None)
+    report["warnings"].extend(getattr(leave_year, "warnings", []))
     rows = report["lots"]
     if category:
         rows = [row for row in rows if row["category"] == category]
@@ -84,6 +89,8 @@ def expirations(
     if json_output:
         _print_json(report)
         return
+    for warning in report["warnings"]:
+        console.print(f"{warning['code']}: {warning.get('message', '')}")
     console.print(f"Expiration status as of {report['as_of']}")
     if report["earliest_expiration_date"]:
         console.print(f"Earliest expiration: {report['earliest_expiration_date']}")
@@ -126,9 +133,7 @@ def expiration_extend(
     config = _config(data_dir)
     for path in sorted((base / "leave_years").glob("*.json")):
         payload = load_json(path)
-        changed = synchronize_expirations(payload, config)["changed"]
-        if changed:
-            write_json(path, payload)
+        synchronize_expirations(payload, config)
         for transaction in payload.get("transactions", []):
             if str(transaction.get("id")) == id and not transaction.get("void"):
                 found, found_path, leave_year = transaction, path, payload
@@ -150,10 +155,21 @@ def expiration_extend(
     if extended_date <= current:
         console.print("[red]ERROR:[/red] --new-date must be later than the current expiration date.")
         raise typer.Exit(code=2)
+    found.setdefault("original_expiration_date", current.isoformat())
+    found.setdefault("expiration_extensions", []).append(
+        {
+            "previous_expiration_date": current.isoformat(),
+            "new_expiration_date": extended_date.isoformat(),
+            "reason": reason.strip(),
+            "approved_at": datetime.now().isoformat(),
+        }
+    )
     found["expiration_date"] = extended_date.isoformat()
     found["expiration_pay_period"] = None
     found["expiration_extension_reason"] = reason.strip()
     found["expiration_extended_at"] = datetime.now().isoformat()
+    found["extension_approved_in_leave_year"] = leave_year.get("leave_year")
+    synchronize_expirations(leave_year, config)
     write_json(found_path, leave_year)
     result = {
         "action": "expiration_extended",

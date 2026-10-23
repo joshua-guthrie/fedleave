@@ -297,7 +297,7 @@ def test_main_uses_supplied_data_dir_for_inferred_year(tmp_path, monkeypatch, ca
 
 
 @pytest.mark.parametrize("module_name", ["annual_leave_chart.chart", "sick_leave_chart.chart"])
-def test_get_leave_year_data_reads_leave_year_file_after_fedleave_balance(tmp_path, monkeypatch, module_name):
+def test_get_leave_year_data_uses_cli_snapshot(tmp_path, monkeypatch, module_name):
     _install_chart_import_stubs(monkeypatch)
     module = importlib.import_module(module_name)
 
@@ -317,13 +317,13 @@ def test_get_leave_year_data_reads_leave_year_file_after_fedleave_balance(tmp_pa
 
     def fake_run_fedleave(args):
         captured["args"] = args
-        return {"balances": {"annual": 120, "sick": 180}}
+        return leave_year
 
     monkeypatch.setattr(module, "run_fedleave", fake_run_fedleave)
 
     assert module.get_leave_year_data(2026, data_dir) == leave_year
     assert captured["args"] == [
-        "balance",
+        "snapshot",
         "--year",
         "2026",
         "--json",

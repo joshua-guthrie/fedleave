@@ -82,7 +82,7 @@ def test_read_only_uses_cli_but_refuses_implicit_migrations(tmp_path):
     path.write_text(json.dumps(data))
     before = path.read_bytes()
     result = call(reader, "years")
-    assert not result["ok"] and "migration/backfill" in result["stderr"]
+    assert result["ok"], result
     assert path.read_bytes() == before
     assert "sensitive" not in result["stderr"]
 

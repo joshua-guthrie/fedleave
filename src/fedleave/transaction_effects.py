@@ -20,6 +20,7 @@ TRANSACTION_DIRECTIONS = (
     "adjusted",
     "expired",
     "forfeited",
+    "paid_out",
     "starting_balance",
     "restored",
     "corrected",
@@ -50,7 +51,7 @@ INCREASE_DIRECTIONS = frozenset(
         "forced_increase",
     }
 )
-DECREASE_DIRECTIONS = frozenset({"used", "expired", "forfeited", "forced_decrease"})
+DECREASE_DIRECTIONS = frozenset({"used", "expired", "forfeited", "paid_out", "forced_decrease"})
 INEFFECTIVE_STATUSES = frozenset({"denied", "cancelled"})
 
 

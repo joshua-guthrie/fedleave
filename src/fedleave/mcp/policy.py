@@ -20,15 +20,17 @@ class PolicyError(ValueError):
 # This is a side-effect review of CLI implementations, never tool definitions.
 # Unknown additions execute in full_access; restricted profiles require review.
 CLASSIFICATIONS = {
+    "carryover-reconcile": "conditional",
+    "snapshot": "read",
     "accrual-change": "write",
-    "activity": "read_backfill",
+    "activity": "read",
     "add": "write",
-    "balance": "read_backfill",
+    "balance": "read",
     "check-for-updates": "network",
-    "compare-leave-balances": "read_backfill",
+    "compare-leave-balances": "read",
     "correct": "write",
     "expiration-extend": "write",
-    "expirations": "read_backfill",
+    "expirations": "read",
     "export-data": "file_output",
     "force-balance": "high_impact",
     "help": "read",
@@ -36,17 +38,17 @@ CLASSIFICATIONS = {
     "import-data": "import",
     "import-wms-http": "import",
     "init": "write",
-    "list": "read_backfill",
-    "month": "read_backfill",
-    "pay-period": "read_backfill",
-    "pay-periods": "read_backfill",
+    "list": "read",
+    "month": "read",
+    "pay-period": "read",
+    "pay-periods": "read",
     "reconcile": "write",
     "rollover": "conditional",
     "set-day": "write",
     "starting-balance set": "write",
     "types": "read",
-    "use-or-loose": "read_backfill",
-    "use-or-lose": "read_backfill",
+    "use-or-loose": "read",
+    "use-or-lose": "read",
     "validate": "conditional",
     "void": "high_impact",
     "years": "read",
@@ -57,7 +59,7 @@ def classification(path, special=None):
     kind = "read" if special == "--version" else CLASSIFICATIONS.get(" ".join(path), "unclassified")
     return {
         "kind": kind,
-        "startup_migration_possible": bool(path),
+        "startup_migration_possible": False,
         "interactive": path == ("validate",),
         "conditional": kind == "conditional",
     }
@@ -84,7 +86,7 @@ def effects(command, values):
         return dict.fromkeys(result, False)
     if command.path == ("validate",):
         result["write"] = bool(values.get("apply"))
-    elif command.path == ("rollover",):
+    elif command.path in {("rollover",), ("carryover-reconcile",)}:
         result["write"] = result["high_impact"] = not values.get("preview", False)
     elif command.path == ("holidays",):
         action = values.get("action")
@@ -93,7 +95,12 @@ def effects(command, values):
     elif command.path == ("import-data",):
         result["high_impact"] = bool(values.get("overwrite"))
     elif command.path == ("init",):
-        result["network"] = values.get("holiday_source") == "opm_ics"
+        result["write"] = not values.get("preview", False)
+        result["network"] = (
+            not values.get("preview", False)
+            and not values.get("from_year")
+            and values.get("holiday_source") == "opm_ics"
+        )
     elif command.path == ("correct",):
         result["write"] = not values.get("preview", False)
     return result

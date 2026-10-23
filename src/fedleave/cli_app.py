@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 
-import portalocker
 import typer
 from rich.console import Console
 
@@ -30,7 +29,7 @@ Usage:
     fedleave COMMAND [OPTIONS]
 
 Primary commands:
-    init        Initialize or repair the data directory and create missing leave year JSON
+    init        Create a manual year or explicitly carry from a previous year
     add         Add a transaction to a leave year
     set-day     Authoritatively set signed leave values for one day
     accrual-change
@@ -60,13 +59,23 @@ Primary commands:
                 Import a FRC-E WMS HTTP Leave Report from HTML
     correct     Update a transaction in place
     void        Delete a transaction (legacy command name)
-    rollover    Preview or apply leave year rollover
+    rollover    Preview or create an adjacent year with category-aware carryover
+    carryover-reconcile
+                Preview or explicitly refresh generated carryovers across successor years
+    snapshot    Read-only accounting snapshot for charts and integrations
     holidays    Manage federal holiday data
     help        Show this detailed help
 
 Command details and examples:
 
-    fedleave init --year YEAR --leave-year-start YYYY-MM-DD|today [options]
+    fedleave init --year YEAR --leave-year-start YYYY-MM-DD|today [--manual] [options]
+        Default: Manual Starting Balances, no predecessor import and no generic warning.
+        --preview --json            Read-only manual preview
+        --pay-periods 26|27         Explicit agency schedule
+    fedleave init --from-year SOURCE --year TARGET [--preview] [--json] [--expected-fingerprint HASH]
+        Carry Over From Previous Leave Year; reject manual flags, including zero-valued flags.
+        Derives start from source end + one day and refuses an existing destination.
+        Original lot origins/deadlines are retained; source history remains unchanged.
         --annual-accrual FLOAT       Annual leave accrual hours per pay period (default 6)
         --annual-start FLOAT         Starting annual leave hours
         --sick-start FLOAT           Starting sick leave hours
@@ -180,9 +189,17 @@ Command details and examples:
         fedleave void --id 20260310-002 --reason "Entered in error"
 
     fedleave rollover --from-year YEAR --to-year YEAR [--preview] [--json] [--data-dir PATH]
-        Preview or apply end-of-year rollover logic (carryover, forfeitures, starting balances, holiday generation).
+        Same category-aware create-only service as init --from-year; preview never writes.
     Example:
         fedleave rollover --from-year 2026 --to-year 2027 --preview
+
+    fedleave carryover-reconcile --year YEAR [--preview] [--json] [--expected-fingerprint HASH] [--data-dir PATH]
+        Reconcile generated carryover records across all dependent successor years.
+        Preserve genuine transactions; back up revised files and journal multi-year apply.
+        --repair-openings removes legacy mirrored opening rows without linking a manual year.
+        --recover restores originals after an interrupted reconciliation.
+    fedleave snapshot --year YEAR --json [--data-dir PATH]
+        Resolve explicit ancestry once for a read-only chart/analytics snapshot.
 
     fedleave holidays generate --year YEAR [--source python_holidays|opm_ics] [--data-dir PATH]
     fedleave holidays fetch --year YEAR --file path/to/opm.ics [--data-dir PATH]
@@ -235,19 +252,9 @@ def main(
     ),
 ) -> None:
     """Federal leave and time tracker."""
-    from .config import get_default_data_dir
-    from .locking import datastore_lock
-    from .storage import migrate_leave_year_files
-
-    try:
-        with datastore_lock(get_default_data_dir()):
-            migrate_leave_year_files(get_default_data_dir())
-    except portalocker.exceptions.LockException:
-        typer.echo("Datastore busy: lock wait timed out; retry the command.", err=True)
-        raise typer.Exit(75) from None
-    except (OSError, ValueError, json.JSONDecodeError):
-        # The requested command reports malformed or inaccessible data with context.
-        pass
+    # Startup, discovery and previews must not migrate or create another store.
+    # Explicit mutations normalize only the ledger they actually modify.
+    pass
 
 
 starting_balance_app = typer.Typer(help="Manage leave year starting balances.")

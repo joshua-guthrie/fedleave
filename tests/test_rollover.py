@@ -89,4 +89,8 @@ def test_rollover_preserves_expiring_leave_as_individual_lots(tmp_path: Path):
     assert carried[0]["original_earned_date"] == "2026-09-01"
     source_after = __import__("json").loads(source_path.read_text())
     original = next(tx for tx in source_after["transactions"] if tx["id"] == lot.id)
-    assert original["rolled_over_to_transaction_id"] == carried[0]["id"]
+    # Forward links previously removed source lots from historical reports.
+    # Lineage now belongs to the destination; the source remains unchanged.
+    assert "rolled_over_to_transaction_id" not in original
+    assert carried[0]["origin_leave_year"] == 2026
+    assert carried[0]["origin_transaction_id"] == lot.id

@@ -12,14 +12,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from dateutil.parser import isoparse
 from pydantic import BaseModel, Field
 from rich.console import Console
 
 from .holidays import DEFAULT_OPM_ICS_URL, generate_federal_holidays
-from .ledger import ensure_automatic_accruals
-from .payperiods import generate_pay_periods
-from .storage import atomic_write_json, ensure_data_dir, migrate_leave_year_files
+from .storage import atomic_write_json, ensure_data_dir
 from .validation import sanitize_url
 
 console = Console()
@@ -233,6 +230,7 @@ def init_config(
     data_dir: Path | None = None,
     holiday_source: str = "python_holidays",
     holiday_ics_url: str = DEFAULT_OPM_ICS_URL,
+    pay_period_count: int | None = None,
 ) -> None:
     """Create any missing configuration, leave-year, and holiday files.
 
@@ -240,8 +238,6 @@ def init_config(
     incomplete store without replacing user data.
     """
     data_dir = get_default_data_dir(data_dir)
-    ensure_data_dir(data_dir)
-
     config = Config()
     config.user.display_name = "User"
     config.defaults.annual_leave_accrual_hours = annual_accrual
@@ -255,31 +251,24 @@ def init_config(
 
     config_path = data_dir / "config.json"
 
-    try:
-        leave_year_start_date = isoparse(leave_year_start).date()
-    except Exception as exc:
-        raise ValueError(
-            f"Invalid leave year start date: {leave_year_start}. Use YYYY-MM-DD, for example 2026-01-11."
-        ) from exc
-    pay_periods = generate_pay_periods(leave_year_start_date, 26)
-    leave_year_end = pay_periods[-1]["end_date"]
-    year_path = data_dir / "leave_years"
-    year_file = year_path / f"{year}.json"
-    holiday_cache_path = data_dir / "holiday_cache" / f"federal_holidays_{year}.json"
+    from .cross_year import AccountingError, manual_ledger
 
-    leave_year = LeaveYear(
-        leave_year=year,
-        leave_year_start=leave_year_start_date.isoformat(),
-        leave_year_end=leave_year_end,
-        pay_period_count=len(pay_periods),
-        annual_leave_accrual_hours=annual_accrual,
-        sick_leave_accrual_hours=4.0,
-        starting_balances=starting_balances,
-        carryover_from_previous_year=starting_balances.copy(),
-        pay_periods=pay_periods,
+    existing_config = load_config(data_dir) if config_path.exists() else {}
+    leave_year_data = manual_ledger(
+        year, leave_year_start, annual_accrual, starting_balances, pay_periods=pay_period_count, config=existing_config
     )
-    leave_year_data = leave_year.model_dump()
-    ensure_automatic_accruals(leave_year_data, leave_year_end)
+    year_file = data_dir / "leave_years" / f"{year}.json"
+    holiday_cache_path = data_dir / "holiday_cache" / f"federal_holidays_{year}.json"
+    if year_file.exists() or year_file.is_symlink():
+        raise AccountingError("DESTINATION_EXISTS", str(year_file))
+    if year_file.parent.is_symlink() or holiday_cache_path.parent.is_symlink():
+        raise AccountingError("INVALID_PATH", "Datastore subdirectories must not be symbolic links")
+    holiday_cache = (
+        None
+        if holiday_cache_path.exists()
+        else generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
+    )
+    ensure_data_dir(data_dir)
 
     created_any = False
 
@@ -290,18 +279,13 @@ def init_config(
         created_any = True
         console.print(f"[green]Created[/green] config file: {config_path}")
 
-    if year_file.exists():
-        migrate_leave_year_files(data_dir)
-        console.print(f"[yellow]INFO:[/yellow] Preserving existing leave year file: {year_file}")
-    else:
-        atomic_write_json(year_file, leave_year_data, overwrite=False)
-        created_any = True
-        console.print(f"[green]Created[/green] leave year file: {year_file}")
+    atomic_write_json(year_file, leave_year_data, overwrite=False)
+    created_any = True
+    console.print(f"[green]Created[/green] leave year file: {year_file}")
 
     if holiday_cache_path.exists():
         console.print(f"[yellow]INFO:[/yellow] Preserving existing holiday cache: {holiday_cache_path}")
     else:
-        holiday_cache = generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
         atomic_write_json(holiday_cache_path, holiday_cache, overwrite=False)
         created_any = True
         console.print(f"[green]Created[/green] holiday cache: {holiday_cache_path}")

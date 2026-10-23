@@ -41,6 +41,13 @@ def starting_balance_set(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
 
+    if leave_year.get("initialization", {}).get("mode") == "carryover":
+        from ..cross_year import AccountingError
+
+        raise AccountingError(
+            "CONFLICTING_CARRYOVER",
+            "Correct source balances and reconcile generated carryover; manual starting-balance edits cannot replace linked openings",
+        )
     starting_balances = leave_year.setdefault("starting_balances", {})
     old_hours = float(starting_balances.get(category, 0.0))
     new_hours = float(hours)

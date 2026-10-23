@@ -7,6 +7,27 @@
 <p><strong>Official project website:</strong>
   <a href="https://www.westmouthbay.com/fedleave-application/">https://www.westmouthbay.com/fedleave-application/</a>
 </p>
+<h2>Creating a New Leave Year</h2>
+<p>Start New Leave Year offers <strong>Manual Starting Balances</strong> with
+<strong>No Previous Leave Year</strong>, or <strong>Carry Over From Previous Leave Year</strong>.
+Manual mode retains the starting-balance inputs. Before creating, the GUI warns
+that previous-year balances, earned dates, lot history and expiration information
+will not be imported, even if no older files exist. Cancel creates nothing.
+Ordinary manual CLI init has no corresponding generic warning.</p>
+<p>Carryover disables manual amounts. Select a valid adjacent predecessor returned
+by the selected CLI, then request a preview. Review opening hours, cap reductions,
+original lots, dates, deadlines and material warnings before confirming. A changed
+selection invalidates the preview. Source/policy changes reject stale apply;
+preview again. Both modes refuse an existing destination. All canonical reads
+and writes use the configured CLI and data directory; the GUI never writes a ledger.</p>
+<p>OPM 2026 ends January 9, 2027; 2027 starts January 10. Actual 26/27-period schedules
+are validated. Expiration dates are inclusive last eligible usage dates, with use
+disallowed the following day. A manual expiring opening has unknown provenance;
+no fictitious earning date or renewed entitlement is created.</p>
+<p>Changed source years produce STALE_CARRYOVER with recomputed read-only balances.
+Use <strong>Tools &gt; Reconcile Carryover</strong> to preview and explicitly apply the full chain, or use <code>fedleave carryover-reconcile --year YEAR --preview --json</code>, review
+all affected years, then explicitly apply. Genuine destination activity is preserved.
+Interrupted reconciliation requires <code>--recover</code>. Manual years remain independent.</p>
 <h2>Calendar Layout</h2>
 <p>The main window shows month navigation, a calendar grid, pay periods touching the displayed month, and balances as of today. Each pay period has its own Type, Earned, Used, and Balance table.</p>
 <h2>Day Cells</h2>

@@ -76,6 +76,7 @@ def test_years_json_reports_backend_owned_metadata(tmp_path: Path, capsys):
             "start_date": "2026-01-11",
             "end_date": "2027-01-09",
             "valid": True,
+            "carryover_eligible": True,
         },
         {
             "leave_year": 2027,
@@ -160,10 +161,12 @@ def test_loading_legacy_data_removes_voided_transactions(tmp_path: Path, capsys)
     assert "annual" in listed["visible_categories"]
     assert listed["category_definitions"]["annual"]["label"] == "Annual"
     stored = json.loads(year_file.read_text(encoding="utf-8"))
-    assert {transaction["id"] for transaction in stored["transactions"]} == listed_ids
-    assert all("void" not in transaction for transaction in stored["transactions"])
-    assert all("correction_reason" not in transaction for transaction in stored["transactions"])
-    assert all("reconcile_history" not in transaction for transaction in stored["transactions"])
+    # Reads normalize private copies and preserve the exact legacy ledger.
+    assert {transaction["id"] for transaction in stored["transactions"]} == listed_ids | {voided.id}
+    assert stored == leave_year
+    assert all("void" not in transaction for transaction in listed["transactions"])
+    assert all("correction_reason" not in transaction for transaction in listed["transactions"])
+    assert all("reconcile_history" not in transaction for transaction in listed["transactions"])
 
     balance(year=2026, as_of="2026-03-10", json_output=True, data_dir=data_dir)
     balances = _json_output(capsys)

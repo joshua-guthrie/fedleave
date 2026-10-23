@@ -8,12 +8,14 @@ and persistence, while all balance-changing directions are interpreted through
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from datetime import date, datetime
 from math import isfinite
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from .categories import CATEGORY_POLICIES
 from .transaction_effects import (
     TRANSACTION_DIRECTIONS as EFFECT_DIRECTIONS,
 )
@@ -27,25 +29,7 @@ from .transaction_effects import (
     transaction_is_effective,
 )
 
-TRANSACTION_CATEGORIES = [
-    "annual",
-    "sick",
-    "overtime",
-    "comp",
-    "credit",
-    "travel_comp",
-    "admin",
-    "lwop",
-    "military",
-    "court",
-    "religious_comp",
-    "time_off_award",
-    "excused",
-    "holiday",
-    "flex",
-    "other",
-    "restored_annual",
-]
+TRANSACTION_CATEGORIES = list(CATEGORY_POLICIES)
 
 TRANSACTION_DIRECTIONS = list(EFFECT_DIRECTIONS)
 TRANSACTION_STATUSES = list(EFFECT_STATUSES)
@@ -57,6 +41,8 @@ class Transaction(BaseModel):
     Pydantic validators run when an instance is created, providing one boundary
     for category, direction, status, date, and hour validation.
     """
+
+    model_config = ConfigDict(extra="allow")
 
     id: str
     date: str
@@ -199,6 +185,21 @@ def calculate_balances(
     Projected automatic accruals already present in the ledger are counted once;
     missing future accruals are synthesized only for the calculation.
     """
+    expiration_state = None
+    if hasattr(leave_year, "config") or "snapshot_rules" in leave_year:
+        from .expirations import synchronize_expirations
+
+        leave_year = deepcopy(leave_year)
+        calculation_date = project_until if include_projected and project_until else until_date
+        if calculation_date is None:
+            calculation_date = leave_year.get("leave_year_end")
+        if include_projected and calculation_date is None:
+            calculation_date = leave_year.get("leave_year_end")
+        expiration_state = synchronize_expirations(
+            leave_year,
+            getattr(leave_year, "config", leave_year.get("snapshot_rules")),
+            as_of=_parse_iso_date(calculation_date) if calculation_date else date.today(),
+        )
     totals: dict[str, float] = {category: 0.0 for category in TRANSACTION_CATEGORIES}
     starting_balances = leave_year.get("starting_balances", {})
     for category, amount in starting_balances.items():
@@ -218,6 +219,10 @@ def calculate_balances(
 
     for transaction in leave_year.get("transactions", []):
         if not transaction_is_effective(transaction):
+            continue
+        # Metadata is authoritative when present; old rollover files also
+        # contain mirrored opening rows. Rows alone remain supported.
+        if transaction.get("direction") == "starting_balance" and transaction.get("category") in starting_balances:
             continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if transaction_cutoff is not None and tx_date > transaction_cutoff:
@@ -256,6 +261,13 @@ def calculate_balances(
             if not _has_auto_accrual(leave_year, "sick", accrual_date.isoformat()):
                 totals["sick"] += sick_accrual
 
+    if expiration_state is not None:
+        as_of = _parse_iso_date(calculation_date) if calculation_date else date.today()
+        for lot in expiration_state["lots"]:
+            if lot.get("expiration_date") and str(lot["expiration_date"]) < as_of.isoformat():
+                # Warn-only policy removes availability without inventing a
+                # forfeiture/payout transaction in the canonical ledger.
+                totals[lot["category"]] -= expiration_state["remaining"].get(str(lot["id"]), 0.0)
     return totals
 
 
@@ -285,6 +297,8 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
 
     for transaction in leave_year.get("transactions", []):
         if not transaction_is_effective(transaction):
+            continue
+        if transaction.get("direction") == "starting_balance" or transaction.get("source") == "expiration-rollover":
             continue
         tx_date = _parse_iso_date(transaction.get("date", ""))
         if tx_date != target:
@@ -465,6 +479,8 @@ def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[
     net: dict[str, float] = {}
 
     for transaction in leave_year.get("transactions", []):
+        if transaction.get("direction") == "starting_balance" or transaction.get("source") == "expiration-rollover":
+            continue
         if not transaction_is_effective(transaction):
             continue
         tx_date = _parse_iso_date(transaction.get("date", ""))

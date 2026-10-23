@@ -87,7 +87,10 @@ def _set_day_values(
         replaced = [
             transaction
             for transaction in transactions
-            if transaction.get("date") == date and transaction.get("category") == category
+            if transaction.get("date") == date
+            and transaction.get("category") == category
+            and not transaction.get("carryover_generated")
+            and transaction.get("source") != "expiration-rollover"
         ]
         existing_comment = next(
             (
@@ -235,6 +238,8 @@ def add(
                 existing.get("date") == date
                 and existing.get("category") == category
                 and existing.get("direction") == direction
+                and not existing.get("carryover_generated")
+                and existing.get("source") != "expiration-rollover"
             ):
                 replaced_ids.append(existing.get("id", ""))
             else:
@@ -484,6 +489,8 @@ def reconcile(
         if transaction.get("date") == date
         and transaction.get("category") == category
         and transaction.get("direction") == direction
+        and not transaction.get("carryover_generated")
+        and transaction.get("source") != "expiration-rollover"
     ]
 
     if id:
@@ -715,6 +722,13 @@ def correct(
         )
         return
 
+    if orig.get("carryover_generated") or orig.get("source") == "expiration-rollover":
+        from ..cross_year import AccountingError
+
+        raise AccountingError(
+            "CONFLICTING_CARRYOVER", "Correct the original source entitlement, then reconcile its carryover chain"
+        )
+
     # Sanitize the reason before updating the final record.
     try:
         reason = sanitize_text(reason, field_name="reason")
@@ -780,8 +794,12 @@ def list_transactions(
     if isinstance(data_dir, OptionInfo):
         data_dir = None
 
+    from ..cli_helpers import load_read_snapshot
+    from ..expirations import synchronize_expirations
+
     try:
-        leave_year = load_leave_year(year, data_dir)
+        leave_year = load_read_snapshot(year, data_dir)
+        synchronize_expirations(leave_year, getattr(leave_year, "config", None))
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -826,6 +844,7 @@ def list_transactions(
     except (FileNotFoundError, ValueError):
         category_rules = {}
     companion_metadata = {
+        "warnings": getattr(leave_year, "warnings", []),
         "available_leave_years": available_leave_years,
         "visible_categories": sorted(category for category in visible_categories if category),
         "category_definitions": {
@@ -886,6 +905,13 @@ def void(
             ly = load_leave_year(int(pj.stem), data_dir)
             for t in list(ly.get("transactions", [])):
                 if t.get("id") == id:
+                    if t.get("carryover_generated") or t.get("source") == "expiration-rollover":
+                        from ..cross_year import AccountingError
+
+                        raise AccountingError(
+                            "CONFLICTING_CARRYOVER",
+                            "Void the original source entitlement, then reconcile its carryover chain",
+                        )
                     ly["transactions"].remove(t)
                     write_json(pj, ly)
                     if json_output:

@@ -16,7 +16,7 @@ from fedleave.mcp.catalog import CatalogError, discover, inventory
 from fedleave.mcp.execution import Executor
 from fedleave.mcp.policy import Policy
 
-GOLDEN_NAMES = """accrual_change activity add balance check_for_updates compare_leave_balances correct
+GOLDEN_NAMES = """carryover_reconcile snapshot accrual_change activity add balance check_for_updates compare_leave_balances correct
 expiration_extend expirations export_data force_balance help holidays import_data import_wms_http init list
 month pay_period pay_periods reconcile rollover set_day starting_balance_set types use_or_loose use_or_lose
 validate version void years""".split()

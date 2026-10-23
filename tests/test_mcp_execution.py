@@ -277,7 +277,7 @@ def test_full_access_migrations_match_direct_cli_even_with_inherited_guards(full
     )
     assert direct_result.returncode == result["exit_code"] == 0
     assert json.loads(direct_result.stdout) == result["data"]
-    assert "starting_balance_history" not in json.loads(year_path.read_text())
+    assert json.loads(year_path.read_text())["starting_balance_history"] == [{"old": "private"}]
     assert json.loads(year_path.read_text()) == json.loads((direct / "leave_years" / "2026.json").read_text())
 
 

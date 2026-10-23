@@ -10,7 +10,7 @@ import subprocess
 import sys
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -32,12 +32,12 @@ from .chart_style import (
     TEXT,
     draw_historical_and_future_line,
 )
-from .cli_helpers import load_leave_year, parse_iso_date
+from .cli_helpers import load_read_snapshot as load_leave_year
+from .cli_helpers import parse_iso_date
 from .config import get_default_data_dir as resolve_default_data_dir
 from .executable_search import is_executable, iter_executable_candidates
 from .ledger import calculate_balances
 from .project_info import HELP_EPILOG
-from .transaction_effects import signed_balance_effect, transaction_is_effective
 
 Y_MIN = Decimal("0")
 
@@ -209,18 +209,12 @@ def infer_leave_year(data_dir: Path) -> int:
 
 
 def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, Any]:
-    """Refresh automatic accruals through the CLI, then load its ledger file."""
+    """Obtain the canonical read-only linked snapshot from the selected CLI."""
     data_dir = data_dir or get_default_data_dir()
-    args = ["balance", "--year", str(year), "--json", "--data-dir", str(data_dir)]
-    run_fedleave(args)
-
-    year_file = data_dir / "leave_years" / f"{year}.json"
-    try:
-        return json.loads(year_file.read_text())
-    except FileNotFoundError as exc:
-        raise SystemExit(f"Leave-year file not found: {year_file}") from exc
-    except json.JSONDecodeError as exc:
-        raise SystemExit(f"Failed to parse leave-year file as JSON: {exc}\nFile: {year_file}") from exc
+    payload = run_fedleave(["snapshot", "--year", str(year), "--json", "--data-dir", str(data_dir)])
+    if not isinstance(payload, dict) or "leave_year_start" not in payload:
+        raise SystemExit("fedleave returned an invalid accounting snapshot")
+    return payload
 
 
 def decimal_hours(value: Any) -> Decimal:
@@ -263,49 +257,34 @@ def load_font(size: int, bold: bool = False, scale: float = 1.0) -> ImageFont.Fr
     return ImageFont.load_default()
 
 
+def snapshot_balance_points(snapshot: dict[str, Any], category: str) -> list[tuple[date, Decimal]]:
+    """Use canonical accounting for each point on one pre-resolved snapshot."""
+    periods = list(snapshot.get("pay_periods", []))
+    if not periods:
+        from .payperiods import generate_pay_periods
+
+        periods = generate_pay_periods(
+            date.fromisoformat(snapshot["leave_year_start"]), int(snapshot.get("pay_period_count", 26))
+        )
+    points = []
+    for period in periods:
+        end = pay_period_end_date(period)
+        value = calculate_balances(snapshot, until_date=end.isoformat()).get(category, 0.0)
+        points.append((end, decimal_hours(value)))
+    return points
+
+
 def category_balance_points(
     category: str,
     year: int,
     data_dir: Path | None = None,
 ) -> tuple[list[tuple[date, Decimal]], dict[str, Any], Decimal]:
-    """Calculate category balances at each pay-period end for one leave year."""
+    """Calculate points from the CLI snapshot without a parallel balance formula."""
     snapshot = get_leave_year_data(year, data_dir)
-    starts = snapshot.get("starting_balances", {})
-    running = decimal_hours(starts.get(category, 0))
-
-    transactions = sorted(
-        [
-            tx
-            for tx in snapshot.get("transactions", [])
-            if transaction_is_effective(tx) and tx.get("category") == category
-        ],
-        key=lambda tx: (tx.get("date", ""), str(tx.get("id", ""))),
-    )
-
-    pay_periods = list(snapshot.get("pay_periods", []))
-    if not pay_periods:
-        start = date.fromisoformat(snapshot["leave_year_start"])
-        end = date.fromisoformat(snapshot["leave_year_end"])
-        for index in range(26):
-            period_end = min(start + timedelta(days=index * 14 + 13), end)
-            pay_periods.append({"end_date": period_end.isoformat()})
-
-    tx_index = 0
-    points: list[tuple[date, Decimal]] = []
-    max_balance = running
-    for period_data in pay_periods:
-        period_end = pay_period_end_date(period_data)
-
-        while tx_index < len(transactions) and date.fromisoformat(transactions[tx_index]["date"]) <= period_end:
-            tx = transactions[tx_index]
-            if tx.get("direction") != "starting_balance":
-                running += decimal_hours(signed_balance_effect(tx))
-            tx_index += 1
-
-        points.append((period_end, running))
-        max_balance = max(max_balance, running)
-
-    return points, snapshot, max_balance
+    points = snapshot_balance_points(snapshot, category)
+    opening = decimal_hours(snapshot.get("starting_balances", {}).get(category, 0))
+    maximum = max([opening, *(value for _, value in points)])
+    return points, snapshot, maximum
 
 
 def y_to_px(value: Decimal, dims: ChartDimensions) -> float:
@@ -615,6 +594,7 @@ def run_chart_app(spec: LeaveChartSpec) -> None:
                 "leave_year_start": snapshot.get("leave_year_start"),
                 "leave_year_end": snapshot.get("leave_year_end"),
                 "point_count": len(points),
+                "warnings": snapshot.get("accounting_warnings", []),
                 "resolution_pixels": args.resolution,
                 "image_dimensions": {"width": dims.width, "height": dims.height},
                 "y_axis": {"min": int(dims.y_min), "max": int(dims.y_max)},

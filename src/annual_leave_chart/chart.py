@@ -9,7 +9,7 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import date, timedelta
+from datetime import date
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -188,30 +188,12 @@ def infer_leave_year(data_dir: Path) -> int:
 
 
 def get_leave_year_data(year: int, data_dir: Path | None = None) -> dict[str, Any]:
-    """
-    Get leave year snapshot data using fedleave.
-
-    Args:
-        year: Leave year number
-        data_dir: Optional data directory path
-
-    Returns:
-        Dictionary with leave_year_start, leave_year_end, transactions, starting_balances, etc.
-    """
+    """Obtain the canonical read-only linked snapshot from the selected CLI."""
     data_dir = data_dir or get_default_data_dir()
-
-    # Let fedleave validate the year before reading the ledger.
-    args = ["balance", "--year", str(year), "--json"]
-    args.extend(["--data-dir", str(data_dir)])
-    run_fedleave(args)
-
-    year_file = data_dir / "leave_years" / f"{year}.json"
-    try:
-        return json.loads(year_file.read_text())
-    except FileNotFoundError:
-        raise SystemExit(f"Leave-year file not found: {year_file}")
-    except json.JSONDecodeError as e:
-        raise SystemExit(f"Failed to parse leave-year file as JSON: {e}\nFile: {year_file}")
+    payload = run_fedleave(["snapshot", "--year", str(year), "--json", "--data-dir", str(data_dir)])
+    if not isinstance(payload, dict) or "leave_year_start" not in payload:
+        raise SystemExit("fedleave returned an invalid accounting snapshot")
+    return payload
 
 
 def decimal_hours(value: Any) -> Decimal:
@@ -258,55 +240,12 @@ def load_font(size: int, bold: bool = False, scale: float = 1.0) -> ImageFont.Fr
     return ImageFont.load_default()
 
 
-def annual_balance_points(year: int, data_dir: Path | None = None) -> tuple[list[tuple[date, Decimal]], dict[str, Any]]:
-    """
-    Get annual leave balance points for each pay period.
+def annual_balance_points(year: int, data_dir: Path | None = None):
+    """Use the shared accounting snapshot for each pay-period endpoint."""
+    from fedleave.charting import snapshot_balance_points
 
-    Args:
-        year: Leave year number
-        data_dir: Optional data directory path
-
-    Returns:
-        Tuple of (points list, snapshot dict)
-    """
     snapshot = get_leave_year_data(year, data_dir)
-
-    starts = snapshot.get("starting_balances", {})
-    running = decimal_hours(starts.get("annual", 0))
-
-    # Get all annual leave transactions, sorted by date and ID
-    txs = sorted(
-        [tx for tx in snapshot.get("transactions", []) if not tx.get("void") and tx.get("category") == "annual"],
-        key=lambda tx: (tx.get("date", ""), str(tx.get("id", ""))),
-    )
-
-    # Get pay period end dates
-    pay_periods = snapshot.get("pay_periods", [])
-    if not pay_periods:
-        # Fallback: generate standard 26 pay periods
-        start = date.fromisoformat(snapshot["leave_year_start"])
-        end = date.fromisoformat(snapshot["leave_year_end"])
-        for index in range(26):
-            period_end = min(start + timedelta(days=index * 14 + 13), end)
-            pay_periods.append({"end_date": period_end.isoformat()})
-
-    # Calculate balance at each pay period end
-    tx_index = 0
-    points: list[tuple[date, Decimal]] = []
-    for period_data in pay_periods:
-        period_end = pay_period_end_date(period_data)
-
-        while tx_index < len(txs) and date.fromisoformat(txs[tx_index]["date"]) <= period_end:
-            tx = txs[tx_index]
-            hours = decimal_hours(tx.get("hours"))
-            direction = tx.get("direction")
-            if direction in {"earned", "worked", "adjusted", "restored", "corrected", "reconciled", "forced_increase"}:
-                running += hours
-            elif direction in {"used", "expired", "forfeited", "forced_decrease"}:
-                running -= hours
-            tx_index += 1
-        points.append((period_end, running))
-
+    points = snapshot_balance_points(snapshot, "annual")
     return points, snapshot
 
 
@@ -469,6 +408,7 @@ def main() -> None:
                 "leave_year_start": snapshot.get("leave_year_start"),
                 "leave_year_end": snapshot.get("leave_year_end"),
                 "point_count": len(points),
+                "warnings": snapshot.get("accounting_warnings", []),
                 "resolution_pixels": args.resolution,
                 "image_dimensions": {
                     "width": dims.width,

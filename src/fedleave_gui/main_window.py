@@ -7,6 +7,7 @@ import html
 import subprocess
 import tempfile
 import webbrowser
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -610,19 +611,42 @@ class PreferencesDialog(QDialog):
         return self.settings
 
 
-class StartYearDialog(QDialog):
-    """Collect metadata and starting balances for a new leave year."""
+MANUAL_YEAR_WARNING = (
+    "Manual Starting Balances creates an independent year with No Previous Leave Year. "
+    "Previous-year balances, earned dates, earning/lot history, and expiration information "
+    "will not be imported. Expiring starting balances have unknown provenance until dated "
+    "earning records are supplied."
+)
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+
+class StartYearDialog(QDialog):
+    """Choose a creation mode and review a preview produced by the selected CLI."""
+
+    def __init__(self, parent: QWidget | None = None, backend: FedleaveBackend | None = None) -> None:
         super().__init__(parent)
+        self.backend = backend or getattr(parent, "backend", None)
+        self.preview_payload: dict | None = None
+        self._generation = 0
+        self._closed = False
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="year-preview")
+        self._pending = None
         self.setWindowTitle("Start New Leave Year")
         today = date.today()
         layout = QVBoxLayout(self)
         form = QFormLayout()
+        self.mode = QComboBox()
+        self.mode.addItem("Manual Starting Balances", "manual")
+        self.mode.addItem("Carry Over From Previous Leave Year", "carryover")
+        self.previous = QComboBox()
+        self.previous.addItem("No Previous Leave Year", None)
         self.year = QSpinBox()
-        self.year.setRange(2000, 2100)
+        self.year.setRange(1900, 9998)
         self.year.setValue(today.year)
         self.start = QLineEdit(f"{today.year}-01-01")
+        self.periods = QComboBox()
+        self.periods.addItem("Derive from leave-year schedule", None)
+        self.periods.addItem("26 pay periods (agency schedule)", 26)
+        self.periods.addItem("27 pay periods (agency schedule)", 27)
         self.annual_accrual = self._hours(6.0)
         self.annual = self._hours()
         self.sick = self._hours()
@@ -630,28 +654,254 @@ class StartYearDialog(QDialog):
         self.comp = self._hours()
         self.travel = self._hours()
         self.restored = self._hours()
-        form.addRow("Leave year", self.year)
-        form.addRow("Leave year start date", self.start)
-        form.addRow("Annual accrual rate", self.annual_accrual)
-        form.addRow("Annual leave carryover", self.annual)
-        form.addRow("Sick leave carryover", self.sick)
-        form.addRow("Credit hours carryover", self.credit)
-        form.addRow("Comp time carryover", self.comp)
-        form.addRow("Travel comp carryover", self.travel)
-        form.addRow("Restored annual leave", self.restored)
+        self.award = self._hours()
+        self.religious = self._hours()
+        for label, widget in (
+            ("Creation method", self.mode),
+            ("Previous leave year", self.previous),
+            ("Leave year", self.year),
+            ("Leave year start date", self.start),
+            ("Pay periods", self.periods),
+            ("Annual accrual rate", self.annual_accrual),
+            ("Starting annual leave", self.annual),
+            ("Starting sick leave", self.sick),
+            ("Starting credit hours", self.credit),
+            ("Starting comp time", self.comp),
+            ("Starting travel comp", self.travel),
+            ("Starting restored annual", self.restored),
+            ("Starting time-off award", self.award),
+            ("Starting religious comp", self.religious),
+        ):
+            form.addRow(label, widget)
         layout.addLayout(form)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        self.explanation = QLabel(MANUAL_YEAR_WARNING)
+        self.explanation.setWordWrap(True)
+        layout.addWidget(self.explanation)
+        self.preview_text = QPlainTextEdit()
+        self.preview_text.setReadOnly(True)
+        layout.addWidget(self.preview_text)
+        self.preview_button = QPushButton("Preview with selected CLI")
+        self.preview_button.clicked.connect(self.preview_creation)
+        layout.addWidget(self.preview_button)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Review and Create")
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+        self.timer = QTimer(self)
+        self.timer.setInterval(50)
+        self.timer.timeout.connect(self._poll)
+        self.mode.currentIndexChanged.connect(self._mode_changed)
+        self.previous.currentIndexChanged.connect(self._invalidate)
+        self.year.valueChanged.connect(self._year_changed)
+        self.start.textChanged.connect(self._invalidate)
+        self.periods.currentIndexChanged.connect(self._invalidate)
+        self._manual_inputs = [
+            self.annual_accrual,
+            self.annual,
+            self.sick,
+            self.credit,
+            self.comp,
+            self.travel,
+            self.restored,
+            self.award,
+            self.religious,
+        ]
+        for widget in self._manual_inputs:
+            widget.valueChanged.connect(self._invalidate)
+        self._mode_changed()
 
     def _hours(self, value: float = 0.0) -> QDoubleSpinBox:
         spinner = QDoubleSpinBox()
-        spinner.setRange(0.0, 10000.0)
+        spinner.setRange(0.0, 1000000.0)
         spinner.setSingleStep(0.25)
         spinner.setDecimals(2)
         spinner.setValue(value)
         return spinner
+
+    def _invalidate(self, *_args) -> None:
+        self._generation += 1
+        self.preview_payload = None
+        self.buttons.button(QDialogButtonBox.Ok).setEnabled(self.mode.currentData() == "manual")
+
+    def _year_changed(self, *_args) -> None:
+        self._invalidate()
+        if self.mode.currentData() == "carryover" and self.backend:
+            self._submit("years", self.backend.leave_years)
+
+    def _mode_changed(self, *_args) -> None:
+        self._invalidate()
+        manual = self.mode.currentData() == "manual"
+        for widget in [*self._manual_inputs, self.start]:
+            widget.setEnabled(manual)
+        self.previous.setEnabled(not manual)
+        self.explanation.setText(
+            MANUAL_YEAR_WARNING
+            if manual
+            else "Select the adjacent predecessor. The CLI calculates opening balances, caps, "
+            "original lots and deadlines. Preview before creating."
+        )
+        self.preview_text.clear()
+        if manual:
+            self.previous.clear()
+            self.previous.addItem("No Previous Leave Year", None)
+        elif self.backend:
+            self._submit("years", self.backend.leave_years)
+
+    def _submit(self, kind, operation) -> None:
+        if self._closed:
+            return
+        self._pending = (kind, self._generation, self._executor.submit(operation))
+        self.preview_button.setEnabled(False)
+        self.preview_text.setPlainText("Loading from selected CLI…")
+        self.timer.start()
+
+    def _poll(self) -> None:
+        if not self._pending or not self._pending[2].done():
+            return
+        kind, generation, future = self._pending
+        self._pending = None
+        self.timer.stop()
+        self.preview_button.setEnabled(True)
+        if generation != self._generation or self._closed:
+            return
+        try:
+            payload = future.result()
+        except Exception as exc:
+            self.preview_text.setPlainText(f"Preview failed: {exc}")
+            self.preview_payload = None
+            return
+        if kind == "years":
+            self.previous.clear()
+            self.previous.addItem("Select a previous leave year…", None)
+            for record in payload.get("years", []):
+                year = record["leave_year"]
+                eligible = record.get("carryover_eligible", record.get("valid")) and year == self.year.value() - 1
+                self.previous.addItem(
+                    f"{year}: {record.get('start_date')} – {record.get('end_date')}"
+                    + ("" if eligible else " (not an eligible predecessor)"),
+                    year,
+                )
+                if not eligible:
+                    self.previous.model().item(self.previous.count() - 1).setEnabled(False)
+            self.preview_text.setPlainText("Select the previous year and request a preview.")
+        else:
+            self.preview_payload = payload
+            lines = [
+                f"{payload['leave_year_start']} through {payload['leave_year_end']} "
+                f"({payload['pay_period_count']} pay periods)"
+            ]
+            lines.extend(f"{category}: {hours:.2f} hours" for category, hours in payload["opening_balances"].items())
+            lines.extend(
+                f"Reduction: {row['category']} {row['hours']:.2f} hours ({row['reason']})"
+                for row in payload.get("adjustments", [])
+            )
+            lines.extend(
+                f"Lot {row.get('origin_leave_year')}:{row.get('origin_transaction_id')}: "
+                f"{row['hours']:.2f} hours, earned {row.get('original_earned_date')}, "
+                f"last eligible {row.get('expiration_date') or 'nonexpiring'}"
+                for row in payload.get("lots", [])
+            )
+            lines.extend(f"{warning['code']}: {warning.get('message', '')}" for warning in payload.get("warnings", []))
+            self.preview_text.setPlainText("\n".join(lines))
+            self.buttons.button(QDialogButtonBox.Ok).setEnabled(True)
+
+    def creation_options(self) -> dict:
+        options = {"year": self.year.value(), "pay_periods": self.periods.currentData()}
+        if self.mode.currentData() == "carryover":
+            options["from_year"] = self.previous.currentData()
+        else:
+            options.update(
+                {
+                    "leave_year_start": self.start.text().strip(),
+                    "annual_accrual": self.annual_accrual.value(),
+                    "annual_start": self.annual.value(),
+                    "sick_start": self.sick.value(),
+                    "credit_start": self.credit.value(),
+                    "comp_start": self.comp.value(),
+                    "travel_comp_start": self.travel.value(),
+                    "restored_annual_start": self.restored.value(),
+                    "time_off_award_start": self.award.value(),
+                    "religious_comp_start": self.religious.value(),
+                }
+            )
+        return options
+
+    def preview_creation(self) -> None:
+        if not self.backend:
+            return
+        options = self.creation_options()
+        if self.mode.currentData() == "carryover" and options.get("from_year") is None:
+            self.preview_text.setPlainText("Select an eligible previous leave year first.")
+            return
+        self._submit("preview", lambda: self.backend.preview_year(**options))
+
+    def done(self, result: int) -> None:
+        self._closed = True
+        self.timer.stop()
+        self._executor.shutdown(wait=False, cancel_futures=True)
+        super().done(result)
+
+
+class CarryoverReconciliationDialog(QDialog):
+    """Review a full-chain CLI reconciliation without blocking Qt."""
+
+    def __init__(self, backend: FedleaveBackend, year: int, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Reconcile Carryover")
+        self.resize(700, 500)
+        self.preview_payload = None
+        layout = QVBoxLayout(self)
+        layout.addWidget(
+            QLabel("Review all dependent years. Apply updates only generated openings/lots and backs up revised files.")
+        )
+        self.text = QPlainTextEdit("Loading preview from selected CLI…")
+        self.text.setReadOnly(True)
+        layout.addWidget(self.text)
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttons.button(QDialogButtonBox.Ok).setText("Apply Reviewed Reconciliation")
+        self.buttons.button(QDialogButtonBox.Ok).setEnabled(False)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        layout.addWidget(self.buttons)
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="carryover-reconcile-preview")
+        self._future = self._executor.submit(lambda: backend.reconcile_carryover(year, preview=True))
+        self.timer = QTimer(self)
+        self.timer.setInterval(50)
+        self.timer.timeout.connect(self._poll)
+        self.timer.start()
+
+    def _poll(self) -> None:
+        if not self._future.done():
+            return
+        self.timer.stop()
+        try:
+            payload = self._future.result()
+        except Exception as exc:
+            self.text.setPlainText(f"Preview failed: {exc}")
+            return
+        lines = []
+        for row in payload.get("years", []):
+            lines.append(f"Leave year {row['leave_year']}: " + ("changes required" if row["changed"] else "unchanged"))
+            for category in sorted(set(row["old_openings"]) | set(row["new_openings"])):
+                lines.append(
+                    f"  {category}: {row['old_openings'].get(category, 0):.2f} → {row['new_openings'].get(category, 0):.2f}"
+                )
+            for lot in row.get("new_lots", []):
+                lines.append(
+                    f"  Lot {lot.get('origin_key')}: {lot['hours']:.2f} hours, last eligible {lot.get('expiration_date') or 'nonexpiring'}"
+                )
+            for lot_id in row.get("removed_lot_ids", []):
+                lines.append(f"  Removed generated lot: {lot_id}")
+        lines.extend(f"{warning['code']}: {warning.get('message', '')}" for warning in payload.get("warnings", []))
+        self.text.setPlainText("\n".join(lines) or "No changes required.")
+        self.preview_payload = payload
+        self.buttons.button(QDialogButtonBox.Ok).setEnabled(True)
+
+    def done(self, result: int) -> None:
+        self.timer.stop()
+        self._executor.shutdown(wait=False, cancel_futures=True)
+        super().done(result)
 
 
 class SelectMonthDialog(QDialog):
@@ -824,6 +1074,13 @@ class ExpirationStatusDialog(QDialog):
         layout = QVBoxLayout(self)
         earliest = payload.get("earliest_expiration_date") or "None"
         layout.addWidget(QLabel(f"As of {payload.get('as_of', '')}    Earliest expiration: {earliest}"))
+        for warning in payload.get("warnings", []):
+            label = QLabel(f"{warning['code']}: {warning.get('message', '')}")
+            label.setWordWrap(True)
+            layout.addWidget(label)
+        layout.addWidget(
+            QLabel("Expiration dates are inclusive last eligible usage dates; use is disallowed the following day.")
+        )
         lots = [row for row in payload.get("lots", []) if float(row.get("remaining_hours", 0.0)) > 0]
         summary = []
         for threshold in reminders:
@@ -842,7 +1099,7 @@ class ExpirationStatusDialog(QDialog):
         )
         self.table = QTableWidget(len(lots), 8)
         self.table.setHorizontalHeaderLabels(
-            ["Leave Type", "Earned", "Original Hours", "Remaining", "Expires", "PP Left", "Use / PP", "Lot ID"]
+            ["Leave Type", "Earned", "Original Hours", "Remaining", "Last Eligible", "PP Left", "Use / PP", "Lot ID"]
         )
         self.table.verticalHeader().setVisible(False)
         alignments = (
@@ -1256,6 +1513,7 @@ class MainWindow(QMainWindow):
         self._action(tools_menu, "Change Accrual...", self.change_accrual)
         self._action(tools_menu, "Force Leave Balance...", self.force_leave_balance)
         self._action(tools_menu, "Expiring Leave Status...", self.show_expirations)
+        self._action(tools_menu, "Reconcile Carryover...", self.reconcile_carryover)
         self._action(tools_menu, "Validate Data", self.validate_data)
         self._action(tools_menu, "Export FedLeave Data...", self.export_data)
         self._action(tools_menu, "Import FedLeave Data...", self.import_data)
@@ -1456,6 +1714,10 @@ class MainWindow(QMainWindow):
         snapshot = (
             self.balance_snapshot or (self.month_json.get("balance_as_of_today") if self.month_json else {}) or {}
         )
+        warnings = snapshot.get("warnings", [])
+        message = "; ".join(f"{row['code']}: {row.get('message', '')}" for row in warnings)
+        self.statusBar().showMessage(message)
+        self.balance_button.setToolTip(message)
         balance = snapshot.get("balances") or {}
         use_or_lose = (
             (self.use_or_lose_json or {}).get("use_or_lose") if isinstance(self.use_or_lose_json, dict) else {}
@@ -1529,32 +1791,47 @@ class MainWindow(QMainWindow):
         self.refresh()
 
     def new_leave_year(self) -> None:
-        dialog = StartYearDialog(self)
+        dialog = StartYearDialog(self, backend=self.backend)
         if dialog.exec() != QDialog.Accepted:
             return
-        if (
-            QMessageBox.question(self, "Create Leave Year", f"Create Leave Year {dialog.year.value()}?")
-            != QMessageBox.Yes
-        ):
+        manual = dialog.mode.currentData() == "manual"
+        confirmation = (
+            MANUAL_YEAR_WARNING + "\n\n"
+            if manual
+            else "Carry Over From Previous Leave Year using the reviewed CLI preview.\n\n"
+        )
+        confirmation += f"Create Leave Year {dialog.year.value()}?"
+        if QMessageBox.question(self, "Create Leave Year", confirmation) != QMessageBox.Yes:
             return
         try:
-            self.backend.init_year(
-                year=dialog.year.value(),
-                leave_year_start=dialog.start.text().strip(),
-                annual_accrual=dialog.annual_accrual.value(),
-                annual_start=dialog.annual.value(),
-                sick_start=dialog.sick.value(),
-                credit_start=dialog.credit.value(),
-                comp_start=dialog.comp.value(),
-                travel_comp_start=dialog.travel.value(),
-                restored_annual_start=dialog.restored.value(),
-            )
+            options = dialog.creation_options()
+            if dialog.preview_payload:
+                options["expected_fingerprint"] = dialog.preview_payload["preview_fingerprint"]
+            if manual:
+                self.backend.init_year(**options)
+            else:
+                if not dialog.preview_payload:
+                    raise BackendError("Preview the selected predecessor before creating the year.")
+                self.backend.create_carryover_year(**options)
         except BackendError as exc:
             QMessageBox.warning(self, "Create Failed", str(exc))
             return
         self.balance_as_of = date.today()
         self.year = dialog.year.value()
         self.month = 1
+        self.refresh()
+
+    def reconcile_carryover(self) -> None:
+        dialog = CarryoverReconciliationDialog(self.backend, self.year, self)
+        if dialog.exec() != QDialog.Accepted or not dialog.preview_payload:
+            return
+        try:
+            self.backend.reconcile_carryover(
+                self.year, preview=False, expected_fingerprint=dialog.preview_payload["preview_fingerprint"]
+            )
+        except BackendError as exc:
+            QMessageBox.warning(self, "Reconciliation Failed", str(exc))
+            return
         self.refresh()
 
     def validate_data(self) -> None:

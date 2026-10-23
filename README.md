@@ -20,6 +20,176 @@ It's a little program I'm using to serve as a back end to an AI agent and a dash
 
 
 
+## Creating a New Leave Year
+
+Choose **Manual Starting Balances** or **Carry Over From Previous Leave Year**.
+Both are create-only: an existing destination is refused with `DESTINATION_EXISTS`.
+The CLI is the sole writer of canonical `leave_years/*.json` ledgers. Calendar
+uses its selected CLI executable and data directory for discovery, preview and
+creation; chart companions and analytics consume the same read-only snapshots.
+
+### Manual Starting Balances
+
+Use manual mode for a fresh start, an independent baseline, or an unavailable or
+incomplete older ledger. Legacy `init` remains manual by default, with no prompt
+and no generic no-carryover warning. `--manual` is an optional explicit synonym:
+
+```bash
+fedleave init --year 2027 --leave-year-start 2027-01-10 --annual-start 120 --sick-start 600 --travel-comp-start 40 --data-dir /path/to/data --json
+```
+
+Manual mode never reads an older year, even if one exists or is corrupt. Its
+`initialization` metadata records `mode=manual`, `method=manual` and
+`source_leave_year=null`. This boundary remains authoritative when older files
+are later discovered or edited. A successor explicitly carried from this manual
+year starts with its eligible state; it never reaches across the manual boundary.
+Unspecified balances default to zero. Values must be finite, nonnegative, and
+compatible with the configured time increment (normally 0.25 hours).
+
+A manual 40-hour travel-comp opening remains numerically 40 hours. It does not
+invent a dated earning lot or expiration. Expiration reports identify
+`MISSING_LOT_PROVENANCE`; enter valid original dated earning records as part of
+an explicit baseline correction before relying on lot expiration tracking.
+Do not add an earning credit on top of the same undated opening quantity.
+
+Calendar's **Start New Leave Year** dialog defaults to manual mode with
+**No Previous Leave Year**. The **GUI only** displays a confirmation warning that
+previous-year balances, earned dates, earning/lot history and expiration
+information will not be imported, even when there are no older files. Canceling
+creates nothing. Ordinary manual CLI commands do not display that warning.
+
+### Carry Over From Previous Leave Year
+
+Select the immediately previous leave-year identifier explicitly. Preview first:
+
+```bash
+fedleave init --from-year 2026 --year 2027 --preview --json --data-dir /path/to/data
+fedleave init --from-year 2026 --year 2027 --expected-fingerprint PREVIEW_FINGERPRINT --json --data-dir /path/to/data
+```
+
+Replace `PREVIEW_FINGERPRINT` with the value returned by the first command.
+Applying directly without a fingerprint is also supported; the CLI computes and
+validates its plan under the datastore writer lock. Calendar always submits the
+reviewed fingerprint. A changed source, destination or policy rejects a reviewed
+apply with `STALE_PREVIEW`; preview again. `rollover --from-year 2026 --to-year
+2027` uses the same service and JSON accounting fields, including `--preview`.
+
+Carryover cannot be combined with `--manual`, `--annual-accrual`, or any explicit
+starting-balance flag, **including a zero-valued flag**. An explicitly supplied
+`--leave-year-start` must equal the source end plus one day. Missing/corrupt,
+noncontiguous or inconsistent source metadata is an error, never a zero balance
+or a fallback to another datastore.
+
+The source's actual pay periods determine its closing date. OPM's 2026 year ends
+**2027-01-09**, so 2027 starts **2027-01-10**. The 2023 year has **27** periods and
+ends **2024-01-13**; 2024 starts **2024-01-14**. January schedule counts are derived
+from the biweekly grid. Agencies with different boundaries can explicitly use
+`--pay-periods 26` or `--pay-periods 27`; every period must span 14 days and be
+contiguous, correctly numbered and within the declared year bounds. Legacy
+manual initialization with an arbitrary start retains a 26-period default.
+
+Category policies come from the core registry and configured `rules`:
+
+| Category | Carryover |
+| --- | --- |
+| Annual | Balance up to `carryover_limit_hours` (default 240); excess is itemized separately. |
+| Sick | Full balance by default; a configured carryover limit takes precedence. |
+| Credit | Balance up to `max_carryover_hours` (default 24); excess is itemized. |
+| Comp, travel comp, restored annual | Remaining eligible original lots, preserving earning dates, original entitlement, expiration and approved extension metadata. Restored annual remains separate from annual. |
+| Time-off award | Eligible lots, including nonexpiring awards; configured agency expiration rules apply. |
+| Religious comp | A nonzero balance requires an explicit agency `rules.religious_comp.carryover_mode`; unsupported policy is reported. |
+| Activity categories | Usage history remains in its original year; it creates no positive opening entitlement. |
+
+Supported registry modes are `balance_carryover`, `lot_carryover`,
+`usage_tracking`, and `noncarryable`. Unknown material categories or malformed
+policies produce `UNSUPPORTED_CATEGORY_POLICY`. Reductions are reported with
+category, hours and reason; they do not fabricate monetary payouts or unsupported
+forfeiture rows. Annual 280/limit 240 yields opening 240 and reduction 40; sick
+600 carries 600; credit 30/limit 24 yields opening 24 and reduction 6.
+
+Every opening quantity is counted once. `starting_balances` is authoritative;
+legacy mirrored `starting_balance` rows are excluded from balance arithmetic,
+and `carryover_from_previous_year` is audit metadata. Generated lot records
+credit only the remaining entitlement, never a new grant. Origin year/ID,
+original earned amount/date, predecessor and chain remain traceable through
+successive years. Creation writes only the destination and leaves the source's
+historical lots and financial results unchanged. Older forward
+`rolled_over_to_transaction_id` links do not hide historical lots.
+
+Stored `expiration_date` is the **inclusive last eligible usage date**;
+`expiration_effective_date` is the following day, when use is disallowed.
+Original stored deadlines and approved extensions remain authoritative.
+Comp/travel deadlines advance through actual 14-day periods; period numbering
+uses real 26/27-period boundaries. Restored annual deadlines use successive
+leave-year ends, including 27-period years. FIFO allocation rejects use before
+earning or after eligibility, splits usage across eligible lots, and preserves
+explicit lot links. Warning-only expiration removes availability and reports a
+warning without inventing a disposal transaction. Configured expiration or
+forfeiture takes effect in the ledger owning that date, once.
+
+PPL and FMLA are not introduced by this change. Future categories must register
+their carryover/usage policy and reuse the same snapshots; a carried entitlement
+must never be renewed merely by crossing a year boundary.
+
+### Preview, source edits, and reconciliation
+
+Preview is genuinely read-only, including legacy data: no ledger, backup,
+configuration, holiday cache, directory or new lock file is created. Reports
+normalize legacy history, resolve linked carryovers and compute missing accruals
+on private copies. Existing JSON keys named `automatic_accruals_posted` are
+retained for compatibility; during reports they count rows computed in memory.
+
+The deterministic JSON preview includes `initialization_mode`,
+`source_leave_year`, source/destination dates, `pay_period_count`,
+`opening_balances`, `categories`, `adjustments`, individual `lots`, material
+`warnings`, `source_fingerprint` and `preview_fingerprint`. Existing rollover
+keys (`carry_forward`, `annual_balance`, `sick_balance`, `forfeiture`,
+`created_file`, `created_transaction_ids`) remain available. `forfeiture` is the
+legacy name for the reported annual cap reduction; it is not a posted payout.
+Errors return a nonzero exit and `{"ok":false,"error":{"code":"...","message":"..."}}`.
+
+An older-year correction, void, extension or applicable policy change can make
+later openings stale. Reads recompute linked state in memory with
+`STALE_CARRYOVER`; conflicts or missing source files produce an explicit error
+instead of a falsely verified balance. Use Calendar’s **Tools > Reconcile Carryover** to review and explicitly apply the
+full dependent chain through the selected CLI, or use the CLI commands directly:
+
+```bash
+fedleave carryover-reconcile --year 2027 --preview --json --data-dir /path/to/data
+fedleave carryover-reconcile --year 2027 --expected-fingerprint PREVIEW_FINGERPRINT --json --data-dir /path/to/data
+```
+
+Reconciliation preserves genuine destination transactions and unknown additive
+fields. It lists old/new openings, old/new lots, removed lot IDs, changed years
+and all affected successors. Orphan links or usage exceeding the corrected
+entitlement yield `CONFLICTING_CARRYOVER` for explicit resolution. Unchanged
+reconciliation is a file-preserving no-op. Manual years cannot be silently
+converted or linked. Legacy years without initialization metadata load with
+unknown ancestry and are never automatically attached to an older file.
+
+For legacy duplicated opening representations, an explicit repair is available:
+
+```bash
+fedleave carryover-reconcile --year 2027 --repair-openings --preview --json --data-dir /path/to/data
+fedleave carryover-reconcile --year 2027 --repair-openings --json --data-dir /path/to/data
+```
+
+Revised existing files receive backups. Multi-year apply uses a recoverable
+`carryover-reconciliation.json` journal; a write failure rolls back the original
+ledgers where possible. An interruption leaves `RECOVERY_REQUIRED` rather than
+claiming success. Restore the original state before re-previewing:
+
+```bash
+fedleave carryover-reconcile --year 2027 --recover --json --data-dir /path/to/data
+```
+
+Troubleshoot `DESTINATION_EXISTS` with reconciliation for a linked year, not
+recreation; `MISSING_SOURCE_YEAR` by restoring the correct source;
+`SOURCE_NOT_CONTIGUOUS`/`UNSUPPORTED_PAY_PERIODS` by checking actual schedules;
+`MISSING_LOT_PROVENANCE` by correcting the undated baseline explicitly; and
+`UNSUPPORTED_CATEGORY_POLICY` by supplying the applicable agency policy.
+
+
 ## Limitations
 
 The program is entirely single user.  I suppose it could be made into a multiple user system with seperate data files for each user, but that has never been my use case.  At your own peril.
@@ -123,7 +293,7 @@ operations and remain the user's or agent's responsibility. For less authority,
 use an optional local policy such as `{"mode":"read_only"}` and launch with
 `["--config", "/absolute/path/policy.json"]`. Existing restricted `read_only`,
 `unattended`, and `confirm_writes` policies retain their meanings, including
-read-only refusal of maintenance writes. Existing policy files without `mode`
+read-only computations without maintenance writes. Existing policy files without `mode`
 remain read-only; users who relied on the old policy-free read-only default
 must now configure it explicitly. MCP policy is not an OS sandbox.
 
@@ -263,7 +433,7 @@ fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status r
 fedleave set-day --date 2026-07-08 --annual -5 --credit 2 --authoritative --json
 ```
 
-Check balances. If no date is supplied, balances default to today and the leave year is inferred from today. Older data files that are missing automatic accrual rows are backfilled through the balance date.
+Check balances. If no date is supplied, balances default to today and the leave year is inferred from today. Older data files that are missing automatic accrual rows are computed in memory through the balance date without modifying the ledger.
 
 ```bash
 fedleave balance
@@ -485,7 +655,7 @@ Usage:
 Commands and common options:
 
 	init
-		Initialize or repair the data directory and create missing core files.
+		Create a new leave year using independent manual balances or explicit prior-year carryover.
 
 		Syntax:
 			fedleave init --year YEAR --leave-year-start YYYY-MM-DD|today [--annual-accrual FLOAT] [--annual-start FLOAT] [--sick-start FLOAT] [--comp-start FLOAT] [--credit-start FLOAT] [--travel-comp-start FLOAT] [--holiday-source python_holidays|opm_ics] [--holiday-ics-url URL] [--data-dir PATH]
@@ -693,7 +863,7 @@ Commands and common options:
 		- `--year YEAR` is optional. If omitted, the leave year is inferred from `--as-of`; when `--as-of` is omitted or set to `leave-year-end`, it is inferred from today.
 		- `--as-of YYYY-MM-DD|today|leave-year-end` computes balances using only transactions on or before that date. Future `--as-of` dates include automatic annual and sick accruals through that date.
 		- When `--as-of` is omitted, balances are calculated through today.
-		- `init` creates automatic annual and sick leave accrual transactions for the full leave year. Balance commands backfill missing automatic accrual rows for compatibility with older data files.
+		- `init` creates automatic annual and sick leave accrual transactions for the full leave year. Balance commands compute missing accrual rows in memory for older files.
 		- `--project-to YYYY-MM-DD|today|leave-year-end` projects accruals through the specified date.
 		- `--use-or-lose` prints projected annual carryover and the amount that would be lost at year end based on the configured carryover limit; it enables year-end projection.
 		- `--project` is retained for existing scripts, but is no longer required for normal projection workflows.
@@ -734,7 +904,7 @@ Commands and common options:
 			fedleave pay-period --year YEAR --date YYYY-MM-DD|today [--daily] [--json] [--data-dir PATH]
 
 		Notes:
-			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are backfilled for the containing pay period before totals are calculated.
+			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are resolved in memory for the containing pay period before totals are calculated.
 			- Overtime is shown as `worked`, which is the amount expected for that pay period's paycheck.
 			- `--daily` prints one row for every day in the pay period, including days with no activity.
 			- `--json` emits pay period metadata, activity totals, ending balances, and automatic accrual posting details.
@@ -746,7 +916,7 @@ Commands and common options:
 			fedleave pay-periods --year YEAR [--json] [--data-dir PATH]
 
 		Notes:
-			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are backfilled through the final pay period accrual date before totals are calculated.
+			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are resolved in memory through the final pay period accrual date before totals are calculated.
 			- `--json` emits one structured summary per pay period.
 
 	month
@@ -758,7 +928,7 @@ Commands and common options:
 		Notes:
 			- `--month` is a number from 1 to 12.
 			- The output covers full Sunday-to-Saturday calendar weeks around the display month.
-			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are backfilled through the calendar range before totals are calculated.
+			- Current leave-year files already contain automatic annual and sick accrual rows. Older files are resolved in memory through the calendar range before totals are calculated.
 			- `--json` emits month bounds, calendar bounds, daily entries, display lines, holiday names, pay days, pay-period-end dates, pay-period totals, current balances, projected balances, use-or-lose values, and automatic accrual posting details.
 
 activity
@@ -1661,7 +1831,7 @@ Fields:
 - `projected`: Always `true`.
 - `project_to`: Leave year end date.
 - `balances`: Projected balances at leave year end.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before calculating the projection.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions computed in memory before calculating the projection.
 - `automatic_accruals_posted_through`: Leave year end date used for automatic accrual posting.
 - `use_or_lose`: Use-or-lose payload with carryover limit, projected annual carryover, and projected annual leave lost above the limit.
 
@@ -1728,7 +1898,7 @@ Fields:
 - `activity`: Activity object for the whole pay period. This object also includes `pay_period`.
 - `daily_activity`: List of per-day activity objects when `--daily` is passed; otherwise `null`.
 - `ending_balances`: Balance map through the pay period end date.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted for the period. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions computed in memory for the period. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
 - `automatic_accruals_posted_through`: Period accrual date or end date used for automatic accrual posting.
 
 ### `pay-periods --json`
@@ -1790,7 +1960,7 @@ Fields:
 - `pay_periods[].pay_period`: Pay period object, including `pay_date`. Older data files that do not contain `pay_date` are normalized in command output.
 - `pay_periods[].activity`: Activity object for that pay period.
 - `pay_periods[].ending_balances`: Balance map through that pay period's end date.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the summary. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions computed in memory before producing the summary. For leave years initialized with current versions, this is usually `0` because `init` creates the full year's accrual rows.
 - `automatic_accruals_posted_through`: Final pay period accrual date or end date.
 
 ### `month --json`
@@ -1874,7 +2044,7 @@ Fields:
 - `pay_period_end_dates`: Pay period ending dates in the calendar display range.
 - `balance_as_of_today`: Balance-map payload for today.
 - `projected_balance`: Year-end projected balance payload, including use-or-lose values.
-- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions posted before producing the month.
+- `automatic_accruals_posted`: Number of automatic annual/sick accrual transactions computed in memory before producing the month.
 - `automatic_accruals_posted_through`: Calendar display end date used for automatic accrual posting.
 
 The `fedleaveMonthReportGraphic` companion application consumes this payload directly. For compatibility with older `fedleave` executables, it can still calculate balances with separate `balance --json` calls when the enriched balance fields are missing.
@@ -2004,67 +2174,12 @@ Exit behavior:
 
 ### `rollover --json`
 
-Preview command:
-
-```bash
-fedleave rollover --from-year 2026 --to-year 2027 --preview --json
-```
-
-Preview output:
-
-```json
-{
-  "action": "preview",
-  "from_year": 2026,
-  "to_year": 2027,
-  "annual_balance": 120.0,
-  "carryover_limit": 240.0,
-  "carry_forward": 120.0,
-  "forfeiture": 0.0,
-  "sick_balance": 180.0,
-  "created_file": null,
-  "created_transaction_ids": []
-}
-```
-
-Apply command:
-
-```bash
-fedleave rollover --from-year 2026 --to-year 2027 --json
-```
-
-Apply output:
-
-```json
-{
-  "action": "applied",
-  "from_year": 2026,
-  "to_year": 2027,
-  "annual_balance": 120.0,
-  "carryover_limit": 240.0,
-  "carry_forward": 120.0,
-  "forfeiture": 0.0,
-  "sick_balance": 180.0,
-  "created_file": "/home/user/.local/share/fedleave/leave_years/2027.json",
-  "created_transaction_ids": [
-    "20270111-001",
-    "20270111-002"
-  ]
-}
-```
-
-Fields:
-
-- `action`: `preview` or `applied`.
-- `from_year`: Source leave year.
-- `to_year`: Destination leave year.
-- `annual_balance`: Source annual leave balance before carryover cap.
-- `carryover_limit`: Annual carryover limit used.
-- `carry_forward`: Annual leave carried into the new leave year.
-- `forfeiture`: Annual leave lost above the carryover limit.
-- `sick_balance`: Sick leave carried into the new leave year.
-- `created_file`: New leave-year JSON file path when applied; `null` for preview.
-- `created_transaction_ids`: Starting-balance transaction IDs created in the new leave year when applied.
+`fedleave rollover --from-year 2026 --to-year 2027 --preview --json` returns the
+same accounting preview as `init --from-year 2026 --year 2027 --preview --json`.
+See [Creating a New Leave Year](#creating-a-new-leave-year) for preview fields,
+category policies, dates, fingerprints, create-only apply and reconciliation.
+The historical annual/sick summary fields remain available. `created_file` is
+null and `created_transaction_ids` is empty during preview; apply fills them.
 
 ### Parsing Examples
 

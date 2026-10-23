@@ -11,7 +11,8 @@ import typer
 from typer.models import OptionInfo
 
 from ..cli_app import _print_json, app, console
-from ..cli_helpers import get_leave_year_path, load_leave_year, parse_iso_date, resolve_leave_year_for_date
+from ..cli_helpers import load_read_snapshot as load_leave_year
+from ..cli_helpers import parse_iso_date, resolve_leave_year_for_date
 from ..config import get_default_data_dir, load_config
 from ..ledger import (
     calculate_balances,
@@ -21,7 +22,7 @@ from ..ledger import (
     ensure_automatic_accruals,
 )
 from ..payperiods import normalize_pay_period, pay_period_pay_date
-from ..storage import load_json, write_json
+from ..storage import load_json
 from ..transaction_effects import signed_balance_effect, transaction_is_effective
 
 _DISPLAY_CATEGORY_LABELS = {
@@ -43,6 +44,12 @@ _DISPLAY_CATEGORY_LABELS = {
     "other": "Other",
     "restored_annual": "RA",
 }
+
+
+def _show_accounting_warnings(leave_year: dict, json_output: bool) -> None:
+    if not json_output:
+        for warning in getattr(leave_year, "warnings", []):
+            console.print(f"{warning['code']}: {warning.get('message', '')}")
 
 
 def _display_line(transaction: dict) -> str:
@@ -84,6 +91,8 @@ def _holiday_names_by_date(year: int, data_dir: Path | None) -> dict[str, str]:
 def _transactions_by_date(leave_year: dict, start: _date, end: _date) -> dict[str, list[dict]]:
     entries: dict[str, list[dict]] = {}
     for transaction in leave_year.get("transactions", []):
+        if transaction.get("carryover_generated") or transaction.get("source") == "expiration-rollover":
+            continue
         if not transaction_is_effective(transaction):
             continue
         try:
@@ -169,7 +178,8 @@ def _resolve_balance_leave_year(
         return year, load_leave_year(year, data_dir)
 
     target = "today" if as_of is None or _is_leave_year_end_keyword(as_of) else as_of
-    return resolve_leave_year_for_date(target, data_dir)
+    year, _ = resolve_leave_year_for_date(target, data_dir)
+    return year, load_leave_year(year, data_dir)
 
 
 def _resolve_balance_date(value: str | None, leave_year: dict, *, default_today: bool) -> str | None:
@@ -219,12 +229,17 @@ def balance(
 
     try:
         year, leave_year = _resolve_balance_leave_year(year, as_of, data_dir)
+        _show_accounting_warnings(leave_year, json_output)
         as_of = _resolve_balance_date(as_of, leave_year, default_today=True)
         project_to = _resolve_balance_date(project_to, leave_year, default_today=False)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
@@ -232,10 +247,12 @@ def balance(
     try:
         added_accruals = ensure_automatic_accruals(leave_year, accrual_through)
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
-    if added_accruals:
-        write_json(get_leave_year_path(year, data_dir), leave_year)
 
     include_projected = project or use_or_lose or project_to is not None
     balances = calculate_balances(
@@ -256,6 +273,7 @@ def balance(
     if json_output:
         _print_json(
             {
+                "warnings": getattr(leave_year, "warnings", []),
                 "year": year,
                 "as_of": as_of,
                 "projected": include_projected,
@@ -277,7 +295,9 @@ def balance(
         console.print(f"  {category}: {amount:.2f}")
 
     if added_accruals:
-        console.print(f"Posted {added_accruals} automatic annual/sick accrual transactions through {accrual_through}.")
+        console.print(
+            f"Computed {added_accruals} automatic annual/sick accrual transactions in memory through {accrual_through}."
+        )
 
     if use_or_lose:
         console.print("")
@@ -319,6 +339,7 @@ def pay_period_summary(
 
     try:
         leave_year = load_leave_year(year, data_dir)
+        _show_accounting_warnings(leave_year, json_output)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -328,10 +349,12 @@ def pay_period_summary(
         pay_period = calculate_pay_period_activity(leave_year, date)["pay_period"]
         accrual_through = pay_period.get("accrual_date") or pay_period.get("end_date")
         added_accruals = ensure_automatic_accruals(leave_year, accrual_through)
-        if added_accruals:
-            write_json(get_leave_year_path(year, data_dir), leave_year)
         activity = calculate_pay_period_activity(leave_year, date)
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
@@ -352,6 +375,7 @@ def pay_period_summary(
         activity_output["pay_period"] = normalize_pay_period(activity["pay_period"])
         _print_json(
             {
+                "warnings": getattr(leave_year, "warnings", []),
                 "year": year,
                 "date": date,
                 "pay_period": normalize_pay_period(pay_period),
@@ -425,6 +449,7 @@ def pay_periods_summary(
 
     try:
         leave_year = load_leave_year(year, data_dir)
+        _show_accounting_warnings(leave_year, json_output)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -437,9 +462,11 @@ def pay_periods_summary(
     final_accrual_date = pay_periods[-1].get("accrual_date") or pay_periods[-1].get("end_date")
     try:
         added_accruals = ensure_automatic_accruals(leave_year, final_accrual_date)
-        if added_accruals:
-            write_json(get_leave_year_path(year, data_dir), leave_year)
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
@@ -489,6 +516,7 @@ def pay_periods_summary(
     if json_output:
         _print_json(
             {
+                "warnings": getattr(leave_year, "warnings", []),
                 "year": year,
                 "pay_periods": summaries,
                 "automatic_accruals_posted": added_accruals,
@@ -513,11 +541,16 @@ def month(
     try:
         month_start, month_end, calendar_start, calendar_end = _month_bounds(year, month)
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
     try:
         leave_year = load_leave_year(year, data_dir)
+        _show_accounting_warnings(leave_year, json_output)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -525,10 +558,12 @@ def month(
     try:
         added_accruals = ensure_automatic_accruals(leave_year, calendar_end.isoformat())
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
-    if added_accruals:
-        write_json(get_leave_year_path(year, data_dir), leave_year)
 
     holidays = _holiday_names_by_date(year, data_dir)
     transactions = _transactions_by_date(leave_year, calendar_start, calendar_end)
@@ -595,7 +630,9 @@ def month(
         "pay_periods": pay_period_rows,
         "pay_dates": sorted(pay_dates),
         "pay_period_end_dates": sorted(pay_period_end_dates),
+        "warnings": getattr(leave_year, "warnings", []),
         "balance_as_of_today": {
+            "warnings": getattr(leave_year, "warnings", []),
             "as_of": today.isoformat(),
             "balances": dict(sorted(today_balance.items())),
         },
@@ -650,6 +687,7 @@ def daily_activity(
 
     try:
         leave_year = load_leave_year(year, data_dir)
+        _show_accounting_warnings(leave_year, json_output)
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
@@ -657,6 +695,10 @@ def daily_activity(
     try:
         date = parse_iso_date(date).isoformat()
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
@@ -710,6 +752,10 @@ def compare_leave_balances(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=1)
     except ValueError as exc:
+        if getattr(exc, "code", None):
+            from .rollover import report_error
+
+            report_error(exc, json_output)
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
