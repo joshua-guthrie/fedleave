@@ -1,5 +1,6 @@
 """Executable README examples and packaging discovery for issue #134."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -78,8 +79,11 @@ def test_DOC_014_documented_examples_execute_in_isolated_store(tmp_path):
 def test_cli_help_exposes_modes_and_review_options(command, terms):
     result = CliRunner().invoke(app, [command, "--help"], terminal_width=200, env={"COLUMNS": "200"})
     assert result.exit_code == 0
+    # Actions forces colored Rich output, including styling inside option
+    # names. Assert the visible help text independently of terminal styling.
+    visible_help = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", result.output)
     for term in terms:
-        assert term in result.output
+        assert term in visible_help
 
 
 def test_DOC_015_GUI_help_and_architecture_agree():
