@@ -10,6 +10,9 @@ metadata, documentation, tests, assets, installers, and build orchestration.
 - `src/fedleave/` owns leave-year data, validation, calculations, storage, and
   the Typer command application. `fedleave.commands` contains command adapters;
   calculation and persistence code remains independently callable below it.
+- `src/fedleave/mcp/` discovers the CLI registry, generates tool schemas, enforces
+  trusted launch-time policies, and invokes the sibling CLI through stdio MCP.
+  It uses the official Python MCP SDK and contains no leave calculations.
 - `src/fedleave_gui/` owns the calendar GUI and its subprocess adapter to the
   `fedleave` command. It does not duplicate leave calculations.
 - `src/fedleave_analytics/` owns read-only analytics calculations and their Qt
@@ -34,6 +37,13 @@ The GUI normally invokes the CLI through its sibling `fedleave` executable.
 This keeps the packaged applications consistent with direct CLI use and makes
 the subprocess boundary explicit. Executable discovery checks the active
 interpreter or bundle directory before `PATH`.
+
+CLI leaf invocations hold a per-datastore OS file lock for their entire
+read/modify/write cycle. The eager startup migration has its own lock scope.
+This coordinates standalone CLI processes, GUI backend subprocesses, and MCP
+CLI children without transferring locks between parent and child processes.
+Direct importers of the storage/calculation APIs must acquire `datastore_lock`
+around their own transactions; an atomic JSON replacement alone is insufficient.
 
 ## Compatibility policy
 

@@ -68,5 +68,10 @@ def help() -> None:
     typer.echo(HELP_TEXT)
 
 
+from .locking import coordinate_commands  # noqa: E402
+
+coordinate_commands(app)
+
+
 if __name__ == "__main__":
     app()

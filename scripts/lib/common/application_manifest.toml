@@ -6,6 +6,11 @@ mode = "console"
 hidden_imports = ["fedleave", "holidays", "icalendar"]
 collect_all = ["fedleave"]
 
+[fedleave-mcp]
+mode = "console"
+hidden_imports = ["fedleave.cli", "mcp.server.lowlevel", "mcp.server.stdio", "portalocker"]
+collect_all = ["mcp", "mcp_types", "jsonschema_specifications", "portalocker"]
+
 [FedLeaveCalendar]
 mode = "windowed"
 icon = "assets/fedleave-icon.ico"

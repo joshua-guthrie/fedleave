@@ -192,6 +192,12 @@ def get_default_data_dir(data_dir: Path | None = None) -> Path:
     if data_dir is not None:
         return data_dir
 
+    # Only the trusted MCP launcher sets this in its CLI child environment.
+    # It also confines the eager startup migration to the selected datastore.
+    mcp_data_dir = os.environ.get("FEDLEAVE_MCP_DATA_DIR")
+    if mcp_data_dir:
+        return Path(mcp_data_dir)
+
     if sys.platform.startswith("win"):
         local_appdata = os.getenv("LOCALAPPDATA")
         if local_appdata:

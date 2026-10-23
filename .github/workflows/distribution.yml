@@ -113,6 +113,9 @@ jobs:
           python installer/package.py validate-bundle --platform windows --bundle-dir $installDir
           & "$installDir\fedleave.exe" --version
           if ($LASTEXITCODE -ne 0) { throw "Installed CLI smoke test failed" }
+          python -m pip install "mcp==2.3.0"
+          python scripts/lib/common/mcp_smoke.py --server "$installDir\fedleave-mcp.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Installed MCP stdio read/write smoke test failed" }
 
           $uninstall = Start-Process -FilePath "$installDir\Uninstall.exe" -ArgumentList "/S" -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw "Silent uninstall failed: $($uninstall.ExitCode)" }
@@ -203,6 +206,8 @@ jobs:
             --install-root "$install_root" \
             --bin-dir "$bin_dir"
           "$bin_dir/fedleave" --version
+          python -m pip install "mcp==2.3.0"
+          python scripts/lib/common/mcp_smoke.py --server "$bin_dir/fedleave-mcp"
           test -L "$install_root/current"
 
       - uses: actions/upload-artifact@v4

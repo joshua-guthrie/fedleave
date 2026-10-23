@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 
+import portalocker
 import typer
 from rich.console import Console
 
@@ -235,10 +236,15 @@ def main(
 ) -> None:
     """Federal leave and time tracker."""
     from .config import get_default_data_dir
+    from .locking import datastore_lock
     from .storage import migrate_leave_year_files
 
     try:
-        migrate_leave_year_files(get_default_data_dir())
+        with datastore_lock(get_default_data_dir()):
+            migrate_leave_year_files(get_default_data_dir())
+    except portalocker.exceptions.LockException:
+        typer.echo("Datastore busy: lock wait timed out; retry the command.", err=True)
+        raise typer.Exit(75) from None
     except (OSError, ValueError, json.JSONDecodeError):
         # The requested command reports malformed or inaccessible data with context.
         pass

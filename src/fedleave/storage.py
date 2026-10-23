@@ -8,6 +8,8 @@ from datetime import datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from .storage_guard import check_write
+
 LEGACY_TRANSACTION_AUDIT_FIELDS = {
     "void",
     "void_reason",
@@ -19,6 +21,7 @@ LEGACY_TRANSACTION_AUDIT_FIELDS = {
 
 def ensure_data_dir(data_dir: Path) -> None:
     """Create the standard data-store directories when they are missing."""
+    check_write(data_dir)
     data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "leave_years").mkdir(exist_ok=True)
     (data_dir / "holiday_cache").mkdir(exist_ok=True)
@@ -32,6 +35,7 @@ def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
     one filesystem. A failed serialization or replacement removes its temporary
     file and leaves the previous destination intact.
     """
+    check_write(path)
     if path.exists() and not overwrite:
         raise FileExistsError(f"File already exists: {path}")
 
@@ -64,6 +68,7 @@ def backup_file(path: Path) -> Path:
     else:
         data_dir = path.parent
     backup_dir = data_dir / "backups"
+    check_write(backup_dir)
     backup_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%dT%H%M%S%f")
     counter = 0

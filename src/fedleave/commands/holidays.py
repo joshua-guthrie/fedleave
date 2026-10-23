@@ -12,6 +12,7 @@ from ..cli_helpers import sanitize_text
 from ..config import get_default_data_dir
 from ..holidays import generate_federal_holidays
 from ..storage import write_json
+from ..storage_guard import check_write
 
 
 @app.command()
@@ -29,7 +30,9 @@ def holidays(
     """
     base = get_default_data_dir(data_dir)
     cache_dir = base / "holiday_cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
+    if not cache_dir.exists():
+        check_write(cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
     cache_file = cache_dir / f"federal_holidays_{year}.json"
 
     if action == "generate":

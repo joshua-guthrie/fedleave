@@ -89,6 +89,43 @@ after every successful `master` build. The existing website-facing URLs above
 remain unchanged; committed-file URLs are listed in
 [`installers/README.md`](installers/README.md).
 
+## AI assistants and automation through MCP
+
+Both installers include **`fedleave-mcp`**, a local Model Context Protocol
+server. Compatible assistants, IDEs, and agents can discover every FedLeave CLI
+command, inspect balances and reports, enter leave, reconcile records, correct
+transactions, and use nested commands such as starting balances. The tools and
+their typed arguments are generated from the CLI, so they follow CLI upgrades.
+All calculations and file updates still run through `fedleave`.
+
+Configure your MCP client to launch `fedleave-mcp` over **stdio**. On Windows
+the executable is `C:\Program Files\FedLeave\fedleave-mcp.exe`; on Linux use
+`/usr/local/bin/fedleave-mcp`. The client starts and stops it on demand. There is
+no background service, network listener, separate Python installation, or
+OpenClaw dependency.
+
+The default policy permits reads and refuses writes. To authorize an unattended
+agent, create a local policy file outside your leave-data directory, for example
+`/home/alex/.config/fedleave/mcp-policy.json`:
+
+```json
+{
+  "mode": "unattended",
+  "data_dir": "/home/alex/.local/share/fedleave"
+}
+```
+
+Then set the client's command to `/usr/local/bin/fedleave-mcp` and arguments to
+`["--config", "/home/alex/.config/fedleave/mcp-policy.json"]`, substituting your
+own paths. Authorized ordinary writes run immediately without confirmations.
+Imports, exports, network access, and high-impact operations have separate
+permissions; restricted tools remain discoverable and return explicit errors.
+Read-only requests also refuse implicit data migrations or accrual backfills.
+
+See **[MCP setup and integration](docs/MCP.md)** for complete Windows/Linux
+configuration examples, standard SDK and Inspector clients, permissions,
+concurrent access, troubleshooting, and developer integration.
+
 ## Development Setup
 
 If you want to work on the source tree directly, create a virtual environment and install the project in editable mode:
@@ -176,6 +213,7 @@ On Linux these wrappers are installed in `/usr/local/bin`.
 On Windows these launchers are in the packaged output and keep the same names with `.exe`.
 
 - `fedleave`
+- `fedleave-mcp`
 - `FedLeaveCalendar`
 - `FedLeaveAnalytics`
 - `AnnualLeaveChartForTheYear`

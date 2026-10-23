@@ -27,6 +27,9 @@ SetCompressor /SOLID lzma
 !if ! /FileExists "${SOURCE_DIR}\fedleave.exe"
   !error "Required fedleave CLI is missing from SOURCE_DIR"
 !endif
+!if ! /FileExists "${SOURCE_DIR}\fedleave-mcp.exe"
+  !error "Required FedLeave MCP executable is missing from SOURCE_DIR"
+!endif
 !if ! /FileExists "${SOURCE_DIR}\FedLeaveCalendar.exe"
   !error "Required FedLeave Calendar executable is missing from SOURCE_DIR"
 !endif

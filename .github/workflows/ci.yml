@@ -38,6 +38,15 @@ jobs:
         run: |
           pytest -q --cov=fedleave --cov=fedleave_gui --cov=annual_leave_chart --cov=sick_leave_chart --cov=fedleave_month_report_graphic --cov-branch --cov-report=term-missing --cov-report=xml
 
+      - name: Generate strict CLI to MCP parity inventory
+        run: python -m fedleave.mcp --inventory > mcp-inventory.json
+
+      - name: Upload MCP parity inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcp-inventory-${{ runner.os }}
+          path: mcp-inventory.json
+
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
