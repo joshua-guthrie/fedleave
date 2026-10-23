@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from datetime import datetime as _datetime
 from pathlib import Path
 
@@ -473,6 +474,7 @@ def validate(
     """Validate leave year JSON files in the data directory.
 
     With `--apply` the command will write back normalized dates for transactions when safe.
+    Noninteractive input reports issues without prompting; use `--apply` to fix them.
     """
     from ..storage import write_json
 
@@ -508,8 +510,11 @@ def validate(
             console.print(f"{pj.name}: {len(issues)} issues found")
             for iss in issues:
                 console.print(f"  - {iss.get('path')}: {iss.get('message')}")
-        # interactive prompt: apply suggested fixes for this file?
-        should_apply = apply if json_output else apply or typer.confirm(f"Apply suggested fixes to {pj.name}?")
+        # Piped/stdin-closed callers (including MCP) explicitly select --apply.
+        # Preserve per-file confirmation for ordinary interactive CLI sessions.
+        should_apply = apply or (
+            not json_output and sys.stdin.isatty() and typer.confirm(f"Apply suggested fixes to {pj.name}?")
+        )
         if should_apply:
             fixed = apply_fixes_to_leave_year(ly, issues)
             try:

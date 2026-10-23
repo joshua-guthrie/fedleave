@@ -18,3 +18,10 @@ the source commit and version used to create the mirrored files.
 
 The release-asset URLs in the main README remain the preferred public download
 links. They do not consume the repository owner's Git LFS bandwidth allowance.
+
+Both packages include `fedleave-mcp` beside the CLI. Launching it without a
+policy now grants full CLI authority, including destructive operations, to the
+launching OS user. Existing restricted policy files retain their profiles;
+configure `read_only` explicitly to retain the former policy-free restriction.
+See [MCP setup](../docs/MCP.md) for Windows/Linux connection examples and optional
+restricted policies. Installer layout and the public download URLs are unchanged.

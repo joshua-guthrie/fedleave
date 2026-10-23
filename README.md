@@ -92,9 +92,10 @@ remain unchanged; committed-file URLs are listed in
 ## AI assistants and automation through MCP
 
 Both installers include **`fedleave-mcp`**, a local Model Context Protocol
-server. Compatible assistants, IDEs, and agents can discover every FedLeave CLI
-command, inspect balances and reports, enter leave, reconcile records, correct
-transactions, and use nested commands such as starting balances. The tools and
+server. It is a general-purpose interface to the full CLI for authorized
+autonomous agents, assistants, and IDEs. Agents can discover every FedLeave CLI
+command, inspect balances and reports, modify/delete records, import/export
+backups, apply rollover, and select alternate datastores. The tools and
 their typed arguments are generated from the CLI, so they follow CLI upgrades.
 All calculations and file updates still run through `fedleave`.
 
@@ -104,23 +105,27 @@ the executable is `C:\Program Files\FedLeave\fedleave-mcp.exe`; on Linux use
 no background service, network listener, separate Python installation, or
 OpenClaw dependency.
 
-The default policy permits reads and refuses writes. To authorize an unattended
-agent, create a local policy file outside your leave-data directory, for example
-`/home/alex/.config/fedleave/mcp-policy.json`:
+**Launching without a policy selects `full_access`: the full CLI authority of
+your OS user, including destructive operations, file access, and supported
+network calls. No MCP approvals or separate permission switches are required.**
+For example, a Linux client using `mcpServers` can connect with:
 
 ```json
 {
-  "mode": "unattended",
-  "data_dir": "/home/alex/.local/share/fedleave"
+  "mcpServers": {
+    "fedleave": {"command": "/usr/local/bin/fedleave-mcp", "args": []}
+  }
 }
 ```
 
-Then set the client's command to `/usr/local/bin/fedleave-mcp` and arguments to
-`["--config", "/home/alex/.config/fedleave/mcp-policy.json"]`, substituting your
-own paths. Authorized ordinary writes run immediately without confirmations.
-Imports, exports, network access, and high-impact operations have separate
-permissions; restricted tools remain discoverable and return explicit errors.
-Read-only requests also refuse implicit data migrations or accrual backfills.
+The ordinary CLI datastore default applies. Backups are available CLI/MCP
+operations and remain the user's or agent's responsibility. For less authority,
+use an optional local policy such as `{"mode":"read_only"}` and launch with
+`["--config", "/absolute/path/policy.json"]`. Existing restricted `read_only`,
+`unattended`, and `confirm_writes` policies retain their meanings, including
+read-only refusal of maintenance writes. Existing policy files without `mode`
+remain read-only; users who relied on the old policy-free read-only default
+must now configure it explicitly. MCP policy is not an OS sandbox.
 
 See **[MCP setup and integration](docs/MCP.md)** for complete Windows/Linux
 configuration examples, standard SDK and Inspector clients, permissions,

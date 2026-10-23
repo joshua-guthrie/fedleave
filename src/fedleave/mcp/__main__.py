@@ -20,7 +20,7 @@ def main():
         "--config",
         type=Path,
         default=os.environ.get("FEDLEAVE_MCP_CONFIG"),
-        help="Trusted administrator JSON policy file; never set by tools",
+        help="Optional trusted JSON policy file; omission grants full CLI access. Never set by tools",
     )
     parser.add_argument("--inventory", action="store_true", help="Print the strict CLI parity inventory and exit")
     args = parser.parse_args()
@@ -32,9 +32,6 @@ def main():
     try:
         if args.inventory:
             report = inventory()
-            unknown = [t["tool"] for t in report["tools"] if t["classification"]["kind"] == "unclassified"]
-            if unknown:
-                raise ValueError(f"Unclassified CLI commands: {unknown}")
             print(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
             return
         policy = Policy.load(args.config)

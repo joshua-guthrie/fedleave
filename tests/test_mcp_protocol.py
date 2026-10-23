@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from mcp import Client
 
 from fedleave.mcp.catalog import discover
@@ -16,16 +17,17 @@ from fedleave.mcp.server import create_server
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_official_sdk_subprocess_stdio_round_trip():
+@pytest.mark.parametrize("restricted", [False, True])
+def test_official_sdk_subprocess_stdio_round_trip(restricted):
     spec = importlib.util.spec_from_file_location("mcp_smoke", ROOT / "scripts/lib/common/mcp_smoke.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    asyncio.run(module.smoke(sys.executable, ["-m", "fedleave.mcp"], discover()))
+    asyncio.run(module.smoke(sys.executable, ["-m", "fedleave.mcp"], discover(), restricted=restricted))
 
 
 def test_sdk_read_only_full_catalog_and_typed_errors(tmp_path):
     async def run():
-        server = create_server(Policy(data_dir=tmp_path / "data"))
+        server = create_server(Policy(mode="read_only", data_dir=tmp_path / "data"))
         async with Client(server, raise_exceptions=True) as client:
             tools = await client.list_tools()
             assert {t.name for t in tools.tools} == set(discover())
@@ -79,5 +81,37 @@ def test_two_sdk_clients_retain_concurrent_transactions(tmp_path):
                 listed = await first.call_tool("fedleave_list", {"year": 2026})
                 descriptions = {t.get("description") for t in listed.structured_content["data"]["transactions"]}
                 assert {"agent-0", "agent-1"} <= descriptions
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("source", ["argument", "environment"])
+@pytest.mark.parametrize("content", [None, "{", '{"mode":"unknown"}', '{"mode":"full_access","denied_tools":[]}'])
+def test_invalid_explicit_configuration_fails_startup_without_escalation(tmp_path, source, content):
+    path = tmp_path / "policy.json"
+    if content is not None:
+        path.write_text(content)
+    env = {k: v for k, v in os.environ.items() if not k.startswith("FEDLEAVE_MCP_")}
+    args = [sys.executable, "-m", "fedleave.mcp"]
+    if source == "argument":
+        args.extend(["--config", str(path)])
+    else:
+        env["FEDLEAVE_MCP_CONFIG"] = str(path)
+    result = subprocess.run(args, env=env, input="", capture_output=True, text=True, timeout=20)
+    assert result.returncode == 2
+    assert result.stdout == "" and "startup failed" in result.stderr
+
+
+def test_tool_annotations_account_for_maintenance_and_conditional_writes(tmp_path):
+    async def run():
+        for policy in [Policy(), Policy(mode="read_only", data_dir=tmp_path)]:
+            async with Client(create_server(policy)) as client:
+                tools = {t.name: t for t in (await client.list_tools()).tools}
+                assert tools["fedleave_version"].annotations.read_only_hint
+                assert not tools["fedleave_add"].annotations.read_only_hint
+                assert tools["fedleave_balance"].annotations.read_only_hint == (policy.mode == "read_only")
+                assert tools["fedleave_rollover"].annotations.destructive_hint
+                assert tools["fedleave_validate"].annotations.destructive_hint
+                assert tools["fedleave_check_for_updates"].annotations.open_world_hint
 
     asyncio.run(run())

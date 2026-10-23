@@ -1,4 +1,4 @@
-"""Trusted launch-time permissions; model arguments can only reduce authority."""
+"""Full CLI authority by default, with optional trusted launch-time restrictions."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fedleave.config import get_default_data_dir
 from fedleave.storage_guard import same_file
@@ -18,7 +18,7 @@ class PolicyError(ValueError):
 
 
 # This is a side-effect review of CLI implementations, never tool definitions.
-# Unknown additions stay visible but cannot execute until reviewed here.
+# Unknown additions execute in full_access; restricted profiles require review.
 CLASSIFICATIONS = {
     "accrual-change": "write",
     "activity": "read_backfill",
@@ -69,14 +69,12 @@ def effects(command, values):
     values = {**values, **{p.click.name: values.get(p.key) for p in command.parameters}}
     kind = classification(command.path, command.special)["kind"]
     result = {
-        "write": kind in {"write", "high_impact", "import"},
-        "high_impact": kind == "high_impact",
-        "network": kind == "network",
-        "file_output": kind == "file_output",
-        "import": kind == "import",
+        "write": kind in {"write", "high_impact", "import", "unclassified"},
+        "high_impact": kind in {"high_impact", "unclassified"},
+        "network": kind in {"network", "unclassified"},
+        "file_output": kind in {"file_output", "unclassified"},
+        "import": kind in {"import", "unclassified"},
     }
-    if kind == "unclassified":
-        raise PolicyError("Command has no reviewed side-effect classification")
     if command.special or any(
         p.click.is_eager
         and values.get(p.key)
@@ -86,15 +84,10 @@ def effects(command, values):
         return dict.fromkeys(result, False)
     if command.path == ("validate",):
         result["write"] = bool(values.get("apply"))
-        # Text validation prompts when fixes exist; stdin is never forwarded.
-        if not values.get("json_output") and not values.get("apply"):
-            raise PolicyError("validate without --apply requires json_output=true for noninteractive use")
     elif command.path == ("rollover",):
         result["write"] = result["high_impact"] = not values.get("preview", False)
     elif command.path == ("holidays",):
         action = values.get("action")
-        if action not in {"generate", "list", "import-ics"}:
-            raise PolicyError("Unclassified holidays action; use generate, list, or import-ics")
         result["write"] = action != "list"
         result["import"] = action == "import-ics"
     elif command.path == ("import-data",):
@@ -117,7 +110,7 @@ def canonical(path):
 class Policy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    mode: Literal["read_only", "unattended", "confirm_writes"] = "read_only"
+    mode: Literal["full_access", "read_only", "unattended", "confirm_writes"] = "full_access"
     data_dir: Path = Field(default_factory=get_default_data_dir)
     allowed_data_dirs: tuple[Path, ...] = ()
     file_read_roots: tuple[Path, ...] = ()
@@ -134,15 +127,48 @@ class Policy(BaseModel):
     max_output_bytes: int = Field(default=1024 * 1024, ge=1024, le=16 * 1024 * 1024)
     audit_log: Path | None = None
 
+    @model_validator(mode="after")
+    def unambiguous_full_access(self):
+        # Reject even explicit false/empty restrictions: there is no partially
+        # restricted full_access profile. Runtime limits/logging remain optional.
+        restrictive = self.model_fields_set & {
+            "data_dir",
+            "allowed_data_dirs",
+            "file_read_roots",
+            "file_write_roots",
+            "allowed_tools",
+            "denied_tools",
+            "allow_high_impact",
+            "allow_imports",
+            "allow_file_output",
+            "allow_network",
+        }
+        if self.mode == "full_access" and restrictive:
+            raise ValueError(f"full_access is incompatible with restrictive fields: {', '.join(sorted(restrictive))}")
+        return self
+
     @classmethod
     def load(cls, path: Path | None):
         if path is None:
             return cls()
-        return cls.model_validate_json(path.read_text(encoding="utf-8"))
+        content = json.loads(path.read_text(encoding="utf-8"))
+        # Historically, an explicit policy without a mode selected read_only.
+        # Preserve that meaning; only policy-free launches change their default.
+        if isinstance(content, dict):
+            content.setdefault("mode", "read_only")
+        return cls.model_validate_json(json.dumps(content, allow_nan=False), strict=True)
 
     def authorize(self, command, supplied, *, protected=()):
         values = command.values(supplied)
         effect = effects(command, values)
+        if self.mode == "full_access":
+            # CLI validation/locking remain authoritative. Do not canonicalize,
+            # pin a datastore, scan it, or impose MCP filesystem restrictions.
+            return dict(supplied), None, effect
+        if classification(command.path, command.special)["kind"] == "unclassified":
+            raise PolicyError("Command has no reviewed side-effect classification")
+        if command.path == ("holidays",) and values.get("action") not in {"generate", "list", "import-ics"}:
+            raise PolicyError("Unclassified holidays action; use generate, list, or import-ics")
         if command.name in self.denied_tools or (
             self.allowed_tools is not None and command.name not in self.allowed_tools
         ):
@@ -212,12 +238,21 @@ class Policy(BaseModel):
 
     def child_environment(self, base, effect):
         env = os.environ.copy()
+        # Never inherit stale guards or datastore pinning from another connector.
+        # In full_access the CLI must migrate/maintain data exactly as usual.
+        for key in tuple(env):
+            if key.startswith("FEDLEAVE_MCP_"):
+                del env[key]
+        if self.mode != "full_access":
+            env.update(
+                FEDLEAVE_MCP_DATA_DIR=str(base),
+                FEDLEAVE_MCP_READ_ONLY="1" if self.mode != "unattended" else "0",
+                FEDLEAVE_MCP_WRITE_ROOTS=json.dumps([str(base)] + [str(canonical(p)) for p in self.file_write_roots]),
+            )
+        if self.mode != "full_access" or "lock_timeout_seconds" in self.model_fields_set:
+            env["FEDLEAVE_LOCK_TIMEOUT"] = str(self.lock_timeout_seconds)
         # These cannot be overridden through tools/call arguments.
         env.update(
-            FEDLEAVE_MCP_DATA_DIR=str(base),
-            FEDLEAVE_LOCK_TIMEOUT=str(self.lock_timeout_seconds),
-            FEDLEAVE_MCP_READ_ONLY="1" if self.mode != "unattended" else "0",
-            FEDLEAVE_MCP_WRITE_ROOTS=json.dumps([str(base)] + [str(canonical(p)) for p in self.file_write_roots]),
             PYTHONIOENCODING="utf-8",
             TYPER_STANDARD_TRACEBACK="1",
             _TYPER_STANDARD_TRACEBACK="1",

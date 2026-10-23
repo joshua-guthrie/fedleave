@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from typer.main import get_command
 
 from fedleave.cli import app
 from fedleave.mcp.catalog import CatalogError, discover, inventory
+from fedleave.mcp.execution import Executor
+from fedleave.mcp.policy import Policy
 
 GOLDEN_NAMES = """accrual_change activity add balance check_for_updates compare_leave_balances correct
 expiration_extend expirations export_data force_balance help holidays import_data import_wms_http init list
@@ -49,9 +52,8 @@ def test_complete_registry_and_parameter_parity():
             assert exposed.click.required == p.required
             assert exposed.key in tool.schema["properties"]
     report = inventory(catalog)
-    assert all(c["classification"]["kind"] != "unclassified" for c in report["tools"])
     # Reviewed schema fingerprint: a CLI change still generates tools automatically,
-    # but CI requires a deliberate review of its new semantics and permissions.
+    # but CI requires a deliberate review of metadata and restricted permissions.
     expected = json.loads((Path(__file__).parent / "fixtures" / "mcp-parity.json").read_text())
     assert {k: report[k] for k in expected} == expected
 
@@ -208,3 +210,35 @@ def test_eager_help_and_version_do_not_require_leaf_values():
     tool = discover()["fedleave_add"]
     assert tool.argv({"version": True}) == ["--version", "add"]
     assert tool.argv({"add__help": True}) == ["add", "--help"]
+
+
+def test_unclassified_typer_command_executes_only_with_full_access(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    sample = typer.Typer()
+    sample.callback()(lambda: None)
+
+    @sample.command()
+    def future(value: str, enabled: bool = typer.Option(True, "--enabled/--disabled")):
+        typer.echo(json.dumps({"value": value, "enabled": enabled}))
+
+    catalog = discover(get_command(sample))
+    tool = catalog["fedleave_future"]
+    invocations = []
+
+    async def registered_cli(executable, argv, env, timeout, max_output):
+        invocations.append(argv)
+        result = CliRunner().invoke(sample, argv)
+        return {"ok": result.exit_code == 0, "exit_code": result.exit_code, "stdout": result.stdout, "stderr": ""}
+
+    monkeypatch.setattr("fedleave.mcp.execution.run_cli", registered_cli)
+    arguments = {"value": "--literal ; $(ignored)", "enabled": False}
+    executor = Executor(catalog, Policy())
+    result = asyncio.run(executor.call(tool.name, arguments))
+    assert result["ok"], result
+    assert json.loads(result["stdout"]) == {"value": arguments["value"], "enabled": False}
+    assert "--" in invocations[0] and "--disabled" in invocations[0]
+    executor.policy = Policy(mode="unattended", data_dir=tmp_path)
+    denied = asyncio.run(executor.call(tool.name, arguments))
+    assert denied["error"] == "permission_denied" and "classification" in denied["message"]
+    assert len(invocations) == 1

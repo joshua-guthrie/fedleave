@@ -1,7 +1,18 @@
 # FedLeave MCP integration
 
-`fedleave-mcp` exposes the installed FedLeave CLI to compatible assistants,
-IDEs, automation programs, and agents through the Model Context Protocol.
+`fedleave-mcp` is an efficient, typed, discoverable interface to the **full
+FedLeave CLI** for authorized autonomous agents, assistants, IDEs, and automation
+programs. The CLI remains authoritative for application behavior. MCP adapts
+that interface; it does not add a separate application approval authority.
+
+**No policy file is required. A policy-free launch selects `full_access`: the
+same CLI authority as the launching OS user, including modifying/deleting data,
+force-balance, rollover application, import overwrite, file inputs/exports,
+network operations, and alternate datastores. There are no MCP approval prompts,
+opt-in permission switches, or mandatory backups in this mode.** Optional
+restricted profiles are described below. Full access grants neither OS
+administrative privileges nor arbitrary shell execution.
+
 It uses the official Python MCP SDK **2.3.0**, pinned in `pyproject.toml`.
 The SDK negotiates MCP 2026-07-28 and its supported legacy protocol versions.
 The server advertises tools only; it adds no custom resources, prompts, approval
@@ -27,13 +38,13 @@ The server is a sibling of `fedleave`:
 
 Linux command links point through `/opt/fedleave/current` to the active release.
 Run the connector under the leave-data owner's normal user account. It needs
-no administrator account or service identity. Absolute command and policy paths
+no administrator account or service identity. Absolute executable paths
 allow it to run from any working directory.
 
-The following are **conceptual, client-neutral configuration illustrations**;
-each client chooses its own surrounding configuration format. Substitute your
-username and real paths. The same `mcpServers` shape is also usable with the
-Inspector example below.
+These minimal configurations work with clients that accept `mcpServers`,
+including the Inspector example below. Other clients may use a different
+surrounding format; the command and empty argument list stay the same.
+Do not set `FEDLEAVE_MCP_CONFIG` for a policy-free launch.
 
 Linux:
 
@@ -42,9 +53,7 @@ Linux:
   "mcpServers": {
     "fedleave": {
       "command": "/usr/local/bin/fedleave-mcp",
-      "args": ["--config", "/home/alex/.config/fedleave/mcp-policy.json"],
-      "env": {},
-      "cwd": "/home/alex"
+      "args": []
     }
   }
 }
@@ -57,24 +66,43 @@ Windows:
   "mcpServers": {
     "fedleave": {
       "command": "C:\\Program Files\\FedLeave\\fedleave-mcp.exe",
-      "args": ["--config", "C:\\Users\\Alex\\AppData\\Local\\FedLeaveMCP\\policy.json"],
-      "env": {},
-      "cwd": "C:\\Users\\Alex"
+      "args": []
     }
   }
 }
 ```
 
-Alternatively, configure the trusted launch environment variable
-`FEDLEAVE_MCP_CONFIG` with the policy file's absolute path and leave `args`
-empty. `--config` takes precedence. Missing/invalid policy files and unknown
-configuration keys fail startup; they do not enable a more permissive mode.
-Without either setting, the default is read-only access to the user's default
-datastore. `fedleave-mcp --version` prints the build version and exits;
+The ordinary CLI datastore default applies exactly, including platform
+environment variables. No MCP-only directory is selected. A tool's `data_dir`
+argument can select any datastore accepted by the CLI under the same OS account.
+The CLI's eager startup migration still uses its ordinary default datastore,
+even when a leaf command selects another store, just as with direct CLI use.
+
+For an optional policy, add `"args": ["--config", "/absolute/path/policy.json"]`
+(escape Windows backslashes in JSON), or configure the trusted launch environment
+variable `FEDLEAVE_MCP_CONFIG`. `--config` takes precedence. Explicitly supplied
+missing/invalid files, invalid field types, and unknown configuration keys fail
+startup on stderr; they never fall back to full access.
+`fedleave-mcp --version` prints the build version and exits;
 `fedleave-mcp --inventory` prints a strict parity report and exits. These are
 diagnostic invocations, separate from normal protocol traffic.
 
-## Trusted permissions and unattended agents
+## Full access and optional restricted profiles
+
+An explicit policy containing only `{"mode":"full_access"}` grants the same
+authority as no policy. Execution limits, an optional audit log, and a trusted
+executable override can be configured in this mode. Restrictive fields are
+incompatible and rejected, even when explicitly false or empty: `data_dir`,
+`allowed_data_dirs`, `file_read_roots`, `file_write_roots`, `allowed_tools`,
+`denied_tools`, `allow_high_impact`, `allow_imports`, `allow_file_output`, and
+`allow_network`. Select a restricted mode when you want those controls.
+
+Existing policy files retain their profiles: `read_only`, `unattended`, and
+`confirm_writes` do not become full access. **An explicit policy file with no
+`mode`, including `{}`, retains its historical `read_only` default.** Users who
+previously launched without a policy must add a read-only policy to retain that
+restriction after upgrading. `unattended` still means the restricted profile
+with independent permission switches; it is not an alias for full access.
 
 Keep the policy outside your leave-data directory and outside model-writable
 directories. Protect it using your operating system's file permissions. Tool
@@ -91,7 +119,7 @@ For a new read-only connector, a policy can be as small as:
 }
 ```
 
-To authorize ordinary agent writes indefinitely, make this **one local change**:
+For a restricted connector that authorizes ordinary writes:
 
 ```json
 {
@@ -105,7 +133,7 @@ accrual-change, and expiration-extension operations then run immediately.
 There are no per-call approvals, PINs, browser actions, or active human-session
 requirements. Unattended mode never falls back to requesting confirmation.
 
-Additional permissions are independent and default to false:
+In restricted modes, additional permissions are independent and default to false:
 
 | Setting | Authority it grants |
 | --- | --- |
@@ -147,7 +175,7 @@ authority. Use `unattended` for authorized autonomous work.
 
 ### Data directories and file access
 
-`data_dir` fixes the selected datastore. The CLI's `--data-dir` remains in each
+In restricted modes, `data_dir` fixes the selected datastore. The CLI's `--data-dir` remains in each
 applicable schema, but a caller can select only that directory or an exact
 canonical directory in `allowed_data_dirs`. Alternate spellings resolve to the
 same path. The selected directory also becomes the child CLI's startup default,
@@ -157,15 +185,22 @@ File inputs require a location under `file_read_roots`; exports require
 `file_write_roots` and `allow_file_output`. Empty root lists deny file access.
 For example, add `"file_write_roots": ["/home/alex/FedLeaveReports/exported"]`
 and `"allow_file_output": true` to permit archive exports. Existing output
-files can be replaced: use a dedicated export directory.
+files can be replaced: use a dedicated export directory. To permit a second
+datastore, add `"allowed_data_dirs": ["/home/alex/FedLeaveTestData"]`.
 
-Paths are expanded/resolved immediately before execution. Escaping symlinks,
+In these restricted profiles, paths are expanded/resolved immediately before execution. Escaping symlinks,
 datastores containing protected policy/executable/audit files, and export paths
 targeting those files are rejected. Exporting over files inside an authorized
 datastore is also denied. Do not authorize filesystem roots, your installation
 directory, or folders containing security configuration as report roots.
 Protected-file checks also compare file identity to reject hard-link aliases,
 including before creating backups.
+
+In `full_access`, none of those MCP filesystem authorization checks or child
+write guards apply. Inputs, outputs, backups, overwrite behavior, and datastore
+selection have ordinary CLI semantics under OS permissions. Existing CLI
+validation and storage protections still apply. File paths are passed as literal
+argv values rather than expanded or rewritten by an MCP sandbox.
 
 The storage layer checks write boundaries again in restricted CLI children.
 Path checks reduce traversal/symlink attacks but are not an OS sandbox: a
@@ -181,8 +216,10 @@ missing accruals. In read-only and confirm-writes modes, a storage write guard
 refuses those writes and reports that maintenance is required. It does not
 silently persist them or calculate balances using a second implementation.
 Perform the maintenance through the normal CLI or an authorized unattended
-connector, then retry the read. Unattended reads retain normal CLI maintenance
-behavior. Lock files/directories are coordination metadata, separate from
+connector, then retry the read. Full-access and unattended reads retain normal
+CLI maintenance behavior. Full-access children clear inherited `FEDLEAVE_MCP_*`
+datastore pins/write guards; restricted children receive their own trusted
+boundaries. Lock files/directories are coordination metadata, separate from
 leave-record writes.
 
 ### Remaining trust boundary
@@ -196,9 +233,27 @@ encoded as `--option=value`; positional values use Click's `--` separator.
 These protections prevent shell/option injection. They cannot determine why an
 LLM requested a permitted operation: prompt injection in an imported report can
 still persuade an agent to misuse authority it already has. Bound that authority
-with tool permissions, exact data stores, file roots, and separate high-impact
-permissions. Authentication and authorization for any remotely reachable agent
+with optional restricted tool permissions, exact data stores, file roots, and
+separate high-impact permissions when appropriate. Tool descriptions are also
+untrusted data, and annotations are guidance rather than authorization controls.
+Authentication and authorization for any remotely reachable agent
 belong to its external bridge; FedLeave opens no remote endpoint.
+
+An agent that can already execute `fedleave` directly under the same account
+can bypass MCP-only restrictions. A client without shell access may receive
+substantial authority solely through MCP, so optional profiles are meaningful
+for that deployment. The trusted boundary is the OS user/process configuration
+that launches the connector, never an LLM's arguments or statements of approval.
+A full-access agent or another OS tool may be able to overwrite policy, audit,
+or application files using the account's filesystem permissions; MCP policy is
+not an OS sandbox. Tools cannot supply a new policy or executable/environment
+override as command arguments.
+
+Backups remain the user's or agent's responsibility. `fedleave_export_data`
+creates a portable backup; `fedleave_import_data` restores/imports archives and
+single-year backups, including overwrite when requested. Consider exporting a
+backup before high-impact work. MCP never inserts an automatic backup, restore,
+or confirmation workflow; the CLI's existing storage backups remain unchanged.
 
 ## Discovery, arguments, and results
 
@@ -253,10 +308,37 @@ Example `tools/call` parameter objects (SDKs provide the protocol envelope):
 {"name":"fedleave_starting_balance_set","arguments":{"year":2026,"category":"annual","hours":120,"reason":"Opening balance"}}
 ```
 
+Full-access examples, without any permission switches or file roots:
+
+```json
+{"name":"fedleave_export_data","arguments":{"output":"/home/alex/Backups/leave backup.json"}}
+```
+
+```json
+{"name":"fedleave_import_data","arguments":{"input":"C:\\Users\\Alex\\Backups\\leave.json","overwrite":true,"data_dir":"C:\\Users\\Alex\\FedLeaveTest"}}
+```
+
+```json
+{"name":"fedleave_void","arguments":{"id":"20260701-001","reason":"Entered in error"}}
+```
+
+```json
+{"name":"fedleave_rollover","arguments":{"from_year":2026,"to_year":2027,"preview":false}}
+```
+
 For commands that register `--json`, omission of `json_output` automatically
-requests JSON. Explicit `json_output: false` preserves text output. Validation
-without `apply: true` requires JSON mode to avoid its interactive remediation
-prompt. Stdin is never forwarded and no prompt is automatically answered.
+requests JSON. Explicit `json_output: false` preserves text output. Noninteractive
+validation reports issues without prompting in either format; `apply: true`
+explicitly requests fixes. Interactive CLI terminals retain per-file confirmation.
+Stdin is never forwarded and no prompt is automatically answered. Validation
+retains CLI exit 2 when issues were found, even if requested fixes were applied.
+
+Annotations conservatively account for possible effects: reports may perform
+startup migration/backfill, and conditional tools such as rollover, correction,
+and validation can write. A static tool annotation cannot change per invocation;
+`preview: true` skips the primary write, while normal CLI maintenance can still
+occur. In restricted read-only profiles the child guard prevents maintenance
+writes as well.
 
 Results contain the same envelope in MCP text content and `structuredContent`:
 `ok`, `exit_code`, `stdout`, `stderr`, and `format`. JSON-capable responses also
@@ -278,7 +360,7 @@ from mcp import Client, StdioServerParameters
 async def main():
     parameters = StdioServerParameters(
         command="/usr/local/bin/fedleave-mcp",
-        args=["--config", "/home/alex/.config/fedleave/mcp-policy.json"],
+        args=[],  # No policy: full CLI authority for this OS user.
         cwd="/home/alex",
     )
     async with Client(parameters, read_timeout_seconds=90) as client:
@@ -294,7 +376,7 @@ async def main():
 asyncio.run(main())
 ```
 
-On Windows, substitute the executable and policy paths using Python raw strings.
+On Windows, substitute the executable path using a Python raw string.
 Downstream developers use the same lifecycle and standard methods; no agent
 framework or model provider is required. Refresh `tools/list` after upgrading
 FedLeave instead of caching schemas indefinitely.
@@ -314,8 +396,9 @@ npx -y @modelcontextprotocol/inspector@2.12.0 --cli \
   --tool-name fedleave_balance --tool-args-json '{"year":2026}'
 ```
 
-`client.json` is the Inspector's connection configuration. Its `args` points to
-the **separate FedLeave policy**. Inspector CLI mode connects over stdio and
+`client.json` is the Inspector's connection configuration. Its `args` can be
+empty for full access or point to an optional separate FedLeave policy.
+Inspector CLI mode connects over stdio and
 does not require opening its web UI. The Python SDK test client is mandatory in
 CI; Inspector is a separate interoperability check, not a server dependency.
 
@@ -355,7 +438,7 @@ encoding adds bounded overhead to that CLI capture budget.
 | Failure | Meaning and response |
 | --- | --- |
 | `datastore_busy`, CLI exit 75 | Lock wait expired; retry after the active command completes |
-| `permission_denied` | Change trusted local policy only if the operation should be authorized |
+| `permission_denied` | An optional restricted profile denied the call; change trusted local policy only if appropriate |
 | `invalid_arguments` | Correct types, required fields, aliases, or unknown inputs using the discovered schema |
 | `cli_error` | Inspect preserved CLI exit code/stdout/stderr; business validation remains authoritative |
 | `malformed_json` | CLI promised JSON but emitted invalid JSON; preserved streams help diagnose it |
@@ -363,8 +446,9 @@ encoding adds bounded overhead to that CLI capture budget.
 | `output_limit` | Output is incomplete and marked truncated; narrow the report or increase the configured budget |
 | `execution_error` | Check installation, filesystem permissions, or the administrator-set `executable` override |
 
-Timeouts and output limits can occur after a command committed a write; the
-server does not promise rollback. Client cancellation kills/reaps the child.
+Timeouts, output limits, and cancellation can occur after a command committed a
+write; inspect ledger state before retrying. The server neither retries writes
+automatically nor promises rollback. Client cancellation kills/reaps the child.
 Set client timeouts longer than the server's configured command timeout.
 For development, `executable` may specify an absolute CLI path in the trusted
 policy; tools cannot select one. Normal discovery prefers the sibling CLI and
@@ -385,7 +469,7 @@ files using local administration if needed.
 Discovery walks `typer.main.get_command(app)` recursively, including executable
 groups and inherited parameters. It does not scrape help or duplicate command
 signatures. `catalog.py` owns metadata/schema/argv conversion; `policy.py`
-layers reviewed side-effect classifications and launch-time authority over that
+layers optional side-effect restrictions and launch-time authority over that
 catalog; `execution.py` runs bounded subprocesses; `server.py` supplies the SDK
 list/call handlers. The CLI remains the only application behavior interface.
 
@@ -393,7 +477,10 @@ The machine-readable inventory includes command paths, tool names, aliases,
 types, defaults, arity, requiredness, callbacks, prompts, schemas, classifications,
 JSON capability, version/build identity, and a deterministic fingerprint. CI
 runs strict discovery and uploads `mcp-inventory.json` for both platforms.
-Unknown commands remain visible but fail execution until reviewed. Unsupported
+New registered commands execute automatically in full access without a manual
+classification. In restricted profiles, unknown commands remain visible but
+fail execution until reviewed. The inventory reports that classification;
+it does not prevent full-access startup or execution. Unsupported
 types stop discovery. A reviewed fingerprint in `tests/fixtures/mcp-parity.json`
 detects metadata drift; changing it requires reviewing CLI behavior and policy.
 Adding a command or parameter requires no new MCP tool functions.
@@ -409,8 +496,10 @@ python scripts/lib/common/mcp_smoke.py --server /absolute/path/to/fedleave-mcp
 
 The smoke client initializes a temporary store, checks complete discovery,
 reads balances, adds/reconciles/corrects leave, calls nested and set-day tools,
-checks concurrent writes from two independent stdio servers, verifies policy
-denials, and closes the connections. Distribution CI runs it
+checks concurrent writes from two independent stdio servers, and exercises
+policy-free deletion, force-balance, export/import overwrite, and rollover to an
+alternate datastore. A second run verifies restricted unattended behavior and
+policy denials. Both runs close the connections. Distribution CI runs them
 against the **installed** Windows and Linux executables before publication,
 alongside existing package integrity and user-data-preservation checks.
 Routine tests use local fixtures and need no network calls. Sandboxes that

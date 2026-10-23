@@ -42,7 +42,16 @@ def find_executable(explicit: Path | None = None) -> Path:
 
 
 def failure(code, message, **fields):
-    return {"ok": False, "error": code, "message": message, "exit_code": None, **fields}
+    return {
+        "ok": False,
+        "error": code,
+        "message": message,
+        "exit_code": None,
+        "stdout": "",
+        "stderr": "",
+        "format": "text",
+        **fields,
+    }
 
 
 async def run_cli(executable, argv, env, timeout, max_output):
@@ -102,7 +111,8 @@ async def run_cli(executable, argv, env, timeout, max_output):
     if exceeded:
         return failure(
             "output_limit",
-            "Incomplete output: CLI terminated at output limit; narrow the report or increase max_output_bytes locally.",
+            "Incomplete output: CLI terminated at output limit; inspect the ledger before retrying a write. "
+            "Narrow the report or increase max_output_bytes locally.",
             truncated=True,
             **output,
         )
@@ -125,7 +135,8 @@ class Executor:
             command.values(arguments)
             arguments = dict(arguments)
             # JSON is normalized only for commands that actually register --json.
-            # Explicit false is honored; validate rejects unsafe prompting below.
+            # Explicit false is honored; noninteractive validation reports issues
+            # without prompting, and --apply explicitly selects remediation.
             for p in command.parameters:
                 if "--json" in p.click.opts and p.key not in arguments:
                     arguments[p.key] = True
@@ -137,13 +148,14 @@ class Executor:
                 protected=(self.config_path, self.policy.audit_log, executable, Path(sys.executable)),
             )
             env = self.policy.child_environment(base, effect)
-            env["FEDLEAVE_MCP_PROTECTED_PATHS"] = json.dumps(
-                [
-                    str(canonical(p))
-                    for p in (self.config_path, self.policy.audit_log, executable, Path(sys.executable))
-                    if p is not None
-                ]
-            )
+            if self.policy.mode != "full_access":
+                env["FEDLEAVE_MCP_PROTECTED_PATHS"] = json.dumps(
+                    [
+                        str(canonical(p))
+                        for p in (self.config_path, self.policy.audit_log, executable, Path(sys.executable))
+                        if p is not None
+                    ]
+                )
             env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
             result = await run_cli(
                 executable, command.argv(arguments), env, self.policy.timeout_seconds, self.policy.max_output_bytes
@@ -176,7 +188,7 @@ class Executor:
             result = failure("execution_error", f"{type(exc).__name__}: {exc}")
             return result
         finally:
-            if effect is not None and (effect["write"] or self.policy.mode == "unattended"):
+            if effect is not None and (effect["write"] or self.policy.mode in {"unattended", "full_access"}):
                 self.audit(name, result)
 
     def audit(self, name, result):

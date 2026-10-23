@@ -40,7 +40,7 @@ def catalog():
     ],
 )
 def test_read_only_denies_modifying_invocations(catalog, tmp_path, tool, args):
-    policy = Policy(data_dir=tmp_path / "data")
+    policy = Policy(mode="read_only", data_dir=tmp_path / "data")
     with pytest.raises(PolicyError, match="read_only"):
         policy.authorize(catalog[f"fedleave_{tool}"], args)
 
@@ -55,9 +55,16 @@ def test_conditional_flags_high_impact_and_confirm_writes(catalog, tmp_path):
     assert policy.model_copy(update={"allow_high_impact": True}).authorize(rollover, {**preview, "preview": False})[2][
         "write"
     ]
-    assert Policy(data_dir=tmp_path).authorize(catalog["fedleave_validate"], {"json_output": True})[2]["write"] is False
     assert (
-        Policy(data_dir=tmp_path).authorize(catalog["fedleave_holidays"], {"action": "list", "year": 2026})[2]["write"]
+        Policy(mode="read_only", data_dir=tmp_path).authorize(catalog["fedleave_validate"], {"json_output": True})[2][
+            "write"
+        ]
+        is False
+    )
+    assert (
+        Policy(mode="read_only", data_dir=tmp_path).authorize(
+            catalog["fedleave_holidays"], {"action": "list", "year": 2026}
+        )[2]["write"]
         is False
     )
     with pytest.raises(PolicyError, match="confirm_writes"):
@@ -67,7 +74,7 @@ def test_conditional_flags_high_impact_and_confirm_writes(catalog, tmp_path):
 def test_read_only_uses_cli_but_refuses_implicit_migrations(tmp_path):
     writer = Executor(discover(), Policy(mode="unattended", data_dir=tmp_path / "data"))
     initialize(writer)
-    reader = Executor(writer.catalog, Policy(data_dir=writer.policy.data_dir))
+    reader = Executor(writer.catalog, Policy(mode="read_only", data_dir=writer.policy.data_dir))
     assert call(reader, "balance", {"year": 2026})["ok"]
     path = writer.policy.data_dir / "leave_years" / "2026.json"
     data = json.loads(path.read_text())
@@ -81,7 +88,7 @@ def test_read_only_uses_cli_but_refuses_implicit_migrations(tmp_path):
 
 
 def test_help_version_and_correction_previews_are_not_writes(catalog, tmp_path):
-    policy = Policy(data_dir=tmp_path / "data")
+    policy = Policy(mode="read_only", data_dir=tmp_path / "data")
     assert not policy.authorize(catalog["fedleave_add"], {"add__help": True})[2]["write"]
     assert not policy.authorize(catalog["fedleave_void"], {"version": True})[2]["high_impact"]
     assert not policy.authorize(catalog["fedleave_correct"], {"id": "x", "hours": 1, "reason": "r", "preview": True})[
@@ -190,7 +197,7 @@ def test_scoped_data_directories_cannot_bypass_fixed_store(tmp_path):
 
     command = discover(root)["fedleave_balance"]
     base = tmp_path / "data"
-    policy = Policy(data_dir=base)
+    policy = Policy(mode="read_only", data_dir=base)
     with pytest.raises(PolicyError, match="Conflicting"):
         policy.authorize(command, {"root__data_dir": str(tmp_path / "escape"), "balance__data_dir": str(base)})
     with pytest.raises(PolicyError, match="authorized datastore"):
@@ -227,3 +234,81 @@ def test_protected_configuration_hardlinks_are_denied(catalog, tmp_path, monkeyp
     with pytest.raises(RestrictedWriteError, match="protected"):
         backup_file(alias)
     assert not (files / "backups").exists()
+
+
+def test_no_policy_and_explicit_full_access_preserve_legacy_file_defaults(tmp_path):
+    assert Policy().mode == Policy.load(None).mode == "full_access"
+    path = tmp_path / "policy.json"
+    for content, expected in [
+        ({"mode": "full_access"}, "full_access"),
+        ({}, "read_only"),
+        ({"data_dir": str(tmp_path / "legacy")}, "read_only"),
+        ({"mode": "unattended"}, "unattended"),
+        ({"mode": "confirm_writes"}, "confirm_writes"),
+    ]:
+        path.write_text(json.dumps(content))
+        assert Policy.load(path).mode == expected
+    with pytest.raises(FileNotFoundError):
+        Policy.load(tmp_path / "missing")
+    for content in ["{", "null", "[]", '{"mode":"unknown"}', '{"mode":"unattended","allow_network":"false"}']:
+        path.write_text(content)
+        with pytest.raises(ValueError):
+            Policy.load(path)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("data_dir", "data"),
+        ("allowed_data_dirs", []),
+        ("file_read_roots", []),
+        ("file_write_roots", []),
+        ("allowed_tools", None),
+        ("denied_tools", []),
+        ("allow_high_impact", False),
+        ("allow_imports", True),
+        ("allow_file_output", False),
+        ("allow_network", True),
+    ],
+)
+def test_full_access_rejects_ambiguous_restrictive_configuration(tmp_path, field, value):
+    path = tmp_path / "policy.json"
+    path.write_text(json.dumps({"mode": "full_access", field: value}))
+    with pytest.raises(ValueError, match="incompatible with restrictive fields"):
+        Policy.load(path)
+
+
+def test_full_access_forwards_paths_without_restricted_policy_checks(catalog, tmp_path):
+    arguments = {"output": "../a folder/policy.json", "data_dir": "../another store"}
+    policy = Policy()
+    assert policy.authorize(catalog["fedleave_export_data"], arguments, protected=(tmp_path,))[0] == arguments
+    # Even invalid business actions reach CLI validation in full_access.
+    policy.authorize(catalog["fedleave_holidays"], {"action": "invalid", "year": 2026})
+
+
+def test_child_environment_separates_full_access_and_restricted_guards(tmp_path, monkeypatch):
+    for name, value in {
+        "FEDLEAVE_MCP_DATA_DIR": "stale-store",
+        "FEDLEAVE_MCP_READ_ONLY": "1",
+        "FEDLEAVE_MCP_WRITE_ROOTS": "[]",
+        "FEDLEAVE_MCP_PROTECTED_PATHS": "[]",
+        "FEDLEAVE_MCP_CONFIG": "stale-policy",
+        "FEDLEAVE_LOCK_TIMEOUT": "4",
+    }.items():
+        monkeypatch.setenv(name, value)
+    env = Policy().child_environment(None, {})
+    assert not any(key.startswith("FEDLEAVE_MCP_") for key in env)
+    assert env["FEDLEAVE_LOCK_TIMEOUT"] == "4"
+    assert Policy(lock_timeout_seconds=2).child_environment(None, {})["FEDLEAVE_LOCK_TIMEOUT"] == "2.0"
+    for mode, read_only in [("read_only", "1"), ("confirm_writes", "1"), ("unattended", "0")]:
+        env = Policy(mode=mode, data_dir=tmp_path).child_environment(tmp_path, {})
+        assert env["FEDLEAVE_MCP_READ_ONLY"] == read_only
+        assert env["FEDLEAVE_MCP_DATA_DIR"] == str(tmp_path)
+        assert json.loads(env["FEDLEAVE_MCP_WRITE_ROOTS"]) == [str(tmp_path)]
+
+
+def test_restricted_tool_allowlist(catalog, tmp_path):
+    policy = Policy(mode="unattended", data_dir=tmp_path, allowed_tools=("fedleave_version",))
+    policy.authorize(catalog["fedleave_version"], {})
+    with pytest.raises(PolicyError, match="denied"):
+        policy.authorize(catalog["fedleave_years"], {})

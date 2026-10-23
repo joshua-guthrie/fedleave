@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Default policy-free MCP launches to full CLI access for authorized agents, including destructive operations, imports/exports, network calls, and alternate datastores. Keep existing restricted policy files and add explicit `full_access` configuration.
+- Execute newly registered CLI commands automatically in full-access MCP sessions while retaining typed arguments, subprocess limits, locking, and optional restricted permissions.
+- Report validation issues without prompting on noninteractive CLI/MCP input; `--apply` explicitly requests fixes.
+
 ## 0.2.1 - 2026-07-27
 
 - Guide first-time GUI users into the new-leave-year workflow instead of showing a missing-year backend error.
