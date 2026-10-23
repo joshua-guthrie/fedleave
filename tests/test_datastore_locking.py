@@ -10,11 +10,24 @@ import time
 from pathlib import Path
 
 import pytest
+from typer.main import get_command
 
+from fedleave.cli import app
 from fedleave.config import init_config
-from fedleave.locking import datastore_lock
+from fedleave.locking import LockedCommand, datastore_lock
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_every_registered_cli_leaf_uses_the_transaction_lock():
+    def walk(command):
+        children = getattr(command, "commands", {})
+        if not children:
+            assert isinstance(command, LockedCommand), command.name
+        for child in children.values():
+            walk(child)
+
+    walk(get_command(app))
 
 
 def environment(base):

@@ -61,6 +61,7 @@ def atomic_write_json(path: Path, data: dict, overwrite: bool = True) -> None:
 
 def backup_file(path: Path) -> Path:
     """Copy a data file into its store's backup directory under a unique name."""
+    check_write(path)
     if not path.exists():
         raise FileNotFoundError(path)
     if path.parent.name in {"leave_years", "holiday_cache"}:

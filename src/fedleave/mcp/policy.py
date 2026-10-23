@@ -10,6 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from fedleave.config import get_default_data_dir
+from fedleave.storage_guard import same_file
 
 
 class PolicyError(ValueError):
@@ -179,7 +180,7 @@ class Policy(BaseModel):
                 path = Path(folder) / name
                 if not within(path.resolve(), base):
                     raise PolicyError("Datastore contains a path escaping its authorized directory")
-                if any(path.resolve() == p for p in protected_paths):
+                if any(same_file(path.resolve(), p) for p in protected_paths):
                     raise PolicyError("Datastore aliases a protected file")
         result = dict(supplied)
         for p in data_parameters:
@@ -200,7 +201,7 @@ class Policy(BaseModel):
                 path = canonical(value)
                 if not roots or not any(within(path, canonical(root)) for root in roots):
                     raise PolicyError(f"{p.key} is outside authorized file roots")
-                if any(path == item or within(item, path) for item in protected_paths):
+                if any(same_file(path, item) or within(item, path) for item in protected_paths):
                     raise PolicyError("File access targets protected configuration or executables")
                 if c.name == "output" and any(within(path, store) for store in allowed):
                     raise PolicyError("Export cannot overwrite a datastore; use a separate export directory")

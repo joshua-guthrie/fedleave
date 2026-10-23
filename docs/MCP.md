@@ -164,6 +164,8 @@ datastores containing protected policy/executable/audit files, and export paths
 targeting those files are rejected. Exporting over files inside an authorized
 datastore is also denied. Do not authorize filesystem roots, your installation
 directory, or folders containing security configuration as report roots.
+Protected-file checks also compare file identity to reject hard-link aliases,
+including before creating backups.
 
 The storage layer checks write boundaries again in restricted CLI children.
 Path checks reduce traversal/symlink attacks but are not an OS sandbox: a
@@ -407,7 +409,8 @@ python scripts/lib/common/mcp_smoke.py --server /absolute/path/to/fedleave-mcp
 
 The smoke client initializes a temporary store, checks complete discovery,
 reads balances, adds/reconciles/corrects leave, calls nested and set-day tools,
-verifies policy denials, and closes the connection. Distribution CI runs it
+checks concurrent writes from two independent stdio servers, verifies policy
+denials, and closes the connections. Distribution CI runs it
 against the **installed** Windows and Linux executables before publication,
 alongside existing package integrity and user-data-preservation checks.
 Routine tests use local fixtures and need no network calls. Sandboxes that

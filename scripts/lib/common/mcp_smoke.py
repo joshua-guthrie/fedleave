@@ -72,6 +72,27 @@ async def smoke(command: str, args: list[str], expected_names=None):
                 "fedleave_set_day", {"date": "2026-07-02", "authoritative": True, "sick": -2, "sick_comment": "smoke"}
             )
             await call("fedleave_holidays", {"action": "list", "year": 2026})
+            # Two independent stdio server processes must coordinate through
+            # their installed CLI children, including in the frozen packages.
+            async with Client(params, read_timeout_seconds=60) as second:
+                results = await asyncio.gather(
+                    *[
+                        connection.call_tool(
+                            "fedleave_add",
+                            {
+                                "date": "2026-07-03",
+                                "category": "annual",
+                                "used": 1,
+                                "description": f"packaged-agent-{i}",
+                            },
+                        )
+                        for i, connection in enumerate((client, second))
+                    ]
+                )
+                assert all(not result.is_error for result in results), results
+            listed = await call("fedleave_list", {"year": 2026})
+            descriptions = {t.get("description") for t in listed["data"]["transactions"]}
+            assert {"packaged-agent-0", "packaged-agent-1"} <= descriptions
             denied = await client.call_tool("fedleave_void", {"id": transaction_id})
             assert denied.is_error and denied.structured_content["error"] == "permission_denied"
             unknown = await client.call_tool("arbitrary_shell", {"command": "echo unsafe"})

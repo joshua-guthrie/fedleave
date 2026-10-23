@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 
 import click
 import pytest
@@ -196,3 +197,33 @@ def test_scoped_data_directories_cannot_bypass_fixed_store(tmp_path):
         policy.authorize(command, {"root__data_dir": str(tmp_path / "escape")})
     args, selected, _ = policy.authorize(command, {"root__data_dir": str(base)})
     assert selected == base and args["balance__data_dir"] == str(base)
+
+
+def test_protected_configuration_hardlinks_are_denied(catalog, tmp_path, monkeypatch):
+    from fedleave.storage import backup_file
+    from fedleave.storage_guard import RestrictedWriteError
+
+    files = tmp_path / "reports"
+    files.mkdir()
+    protected = tmp_path / "policy.json"
+    protected.write_text('{"mode":"unattended"}')
+    alias = files / "alias.json"
+    try:
+        os.link(protected, alias)
+    except OSError:
+        pytest.skip("Filesystem does not support hard links")
+    policy = Policy(
+        mode="unattended",
+        data_dir=tmp_path / "data",
+        file_read_roots=(files,),
+        file_write_roots=(files,),
+        allow_imports=True,
+        allow_file_output=True,
+    )
+    for name, arguments in [("import_data", {"input": str(alias)}), ("export_data", {"output": str(alias)})]:
+        with pytest.raises(PolicyError, match="protected"):
+            policy.authorize(catalog[f"fedleave_{name}"], arguments, protected=(protected,))
+    monkeypatch.setenv("FEDLEAVE_MCP_PROTECTED_PATHS", json.dumps([str(protected)]))
+    with pytest.raises(RestrictedWriteError, match="protected"):
+        backup_file(alias)
+    assert not (files / "backups").exists()

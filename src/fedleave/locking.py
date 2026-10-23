@@ -12,13 +12,14 @@ from typer.core import TyperCommand
 
 
 @contextmanager
-def datastore_lock(data_dir: Path, timeout: float | None = None):
+def datastore_lock(data_dir: Path | str, timeout: float | None = None):
     """Hold an advisory OS lock for a complete read/modify/write operation.
 
     Never unlink the lock file: replacing its inode could let two writers lock
     different files. The OS releases ownership when a process exits or crashes.
     """
-    data_dir = data_dir.resolve()
+    # Typer may defer Path conversion until its callback wrapper, after invoke.
+    data_dir = Path(data_dir).resolve()
     data_dir.mkdir(parents=True, exist_ok=True)
     if (data_dir / ".fedleave.lock").is_symlink():
         raise RuntimeError("Datastore lock must not be a symbolic link")
@@ -44,7 +45,9 @@ class LockedCommand(TyperCommand):
 def coordinate_commands(application) -> None:
     """Apply the same lock to all registered and nested CLI commands."""
     for command in application.registered_commands:
-        if command.cls is None:
+        # Newer Typer versions store their default class explicitly rather
+        # than leaving it unset. Both forms must receive the transaction lock.
+        if command.cls is None or command.cls is TyperCommand:
             command.cls = LockedCommand
     for group in application.registered_groups:
         coordinate_commands(group.typer_instance)
