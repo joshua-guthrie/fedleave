@@ -150,3 +150,12 @@ def test_audit_contains_outcome_not_leave_details(executor, tmp_path):
     text = audit.read_text()
     assert "sensitive appointment" not in text
     assert json.loads(text.splitlines()[-1])["tool"] == "fedleave_add"
+    result = call(
+        executor,
+        "set_day",
+        {"date": "2026-07-02", "authoritative": True, "annual": -2, "annual_comment": "private leave details"},
+    )
+    assert result["ok"], result
+    record = json.loads(audit.read_text().splitlines()[-1])
+    assert record["record_ids"] == result["data"]["created_transaction_ids"]
+    assert "private leave details" not in audit.read_text()

@@ -191,7 +191,13 @@ class Executor:
         }
         data = result.get("data") if result else None
         if isinstance(data, dict):
-            record["record_ids"] = [data[key] for key in ("transaction_id",) if isinstance(data.get(key), str)]
+            record_ids = []
+            for key, value in data.items():
+                if key == "transaction_id" and isinstance(value, str):
+                    record_ids.append(value)
+                elif key.endswith("_transaction_ids") and isinstance(value, list):
+                    record_ids.extend(item for item in value if isinstance(item, str))
+            record["record_ids"] = list(dict.fromkeys(record_ids))
         logger.info("CLI tool outcome: %s", json.dumps(record))
         if self.policy.audit_log is not None:
             try:
