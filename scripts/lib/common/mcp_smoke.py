@@ -128,6 +128,23 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
                     },
                 )
                 assert (other / "leave_years" / "2027.json").exists()
+            # Exercise noninteractive text validation with an actual fixable
+            # issue in installed/frozen children too. Windows NUL previously
+            # appeared interactive, so a clean-store validation would miss it.
+            base = root / "data" if restricted else root / ("local" if os.name == "nt" else "xdg") / "fedleave"
+            year_path = base / "leave_years" / "2026.json"
+            year = json.loads(year_path.read_text(encoding="utf-8"))
+            original_date = year["transactions"][0]["date"]
+            yyyy, mm, dd = original_date.split("-")
+            year["transactions"][0]["date"] = f"{yyyy}-{int(mm)}-{int(dd)}"
+            assert year["transactions"][0]["date"] != original_date
+            year_path.write_text(json.dumps(year), encoding="utf-8")
+            validation = await client.call_tool("fedleave_validate", {"json_output": False})
+            assert validation.is_error and validation.structured_content["exit_code"] == 2, validation
+            assert "Apply suggested fixes" not in validation.structured_content["stdout"]
+            applied = await client.call_tool("fedleave_validate", {"json_output": False, "apply": True})
+            assert applied.is_error and applied.structured_content["exit_code"] == 2, applied
+            assert json.loads(year_path.read_text(encoding="utf-8"))["transactions"][0]["date"] == original_date
             unknown = await client.call_tool("arbitrary_shell", {"command": "echo unsafe"})
             assert unknown.is_error
         print(

@@ -58,12 +58,15 @@ async def run_cli(executable, argv, env, timeout, max_output):
     process = await asyncio.create_subprocess_exec(
         str(executable),
         *argv,
-        stdin=asyncio.subprocess.DEVNULL,
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=env,
         **({"creationflags": 0x08000000} if os.name == "nt" else {}),
     )
+    # A closed pipe reliably supplies noninteractive EOF on both platforms.
+    # Windows NUL can report isatty() == True and provoke CLI prompts.
+    process.stdin.close()
     chunks = {"stdout": bytearray(), "stderr": bytearray()}
     size = 0
     exceeded = False

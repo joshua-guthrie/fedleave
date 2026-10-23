@@ -330,6 +330,7 @@ For commands that register `--json`, omission of `json_output` automatically
 requests JSON. Explicit `json_output: false` preserves text output. Noninteractive
 validation reports issues without prompting in either format; `apply: true`
 explicitly requests fixes. Interactive CLI terminals retain per-file confirmation.
+CLI stdin is a closed pipe, providing noninteractive EOF on Windows and Linux.
 Stdin is never forwarded and no prompt is automatically answered. Validation
 retains CLI exit 2 when issues were found, even if requested fixes were applied.
 
@@ -499,7 +500,8 @@ reads balances, adds/reconciles/corrects leave, calls nested and set-day tools,
 checks concurrent writes from two independent stdio servers, and exercises
 policy-free deletion, force-balance, export/import overwrite, and rollover to an
 alternate datastore. A second run verifies restricted unattended behavior and
-policy denials. Both runs close the connections. Distribution CI runs them
+policy denials. Both runs check noninteractive text validation and explicit fixes
+on a temporary malformed date, then close the connections. Distribution CI runs them
 against the **installed** Windows and Linux executables before publication,
 alongside existing package integrity and user-data-preservation checks.
 Routine tests use local fixtures and need no network calls. Sandboxes that

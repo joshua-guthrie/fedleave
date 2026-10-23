@@ -132,6 +132,20 @@ def test_timeout_output_limit_and_cancellation_reap_children(tmp_path):
     asyncio.run(cancelled())
 
 
+def test_child_stdin_is_noninteractive_and_immediately_at_eof():
+    result = asyncio.run(
+        run_cli(
+            sys.executable,
+            ["-c", "import json, sys; print(json.dumps({'tty': sys.stdin.isatty(), 'input': sys.stdin.read()}))"],
+            os.environ.copy(),
+            10,
+            1024,
+        )
+    )
+    assert result["ok"], result
+    assert json.loads(result["stdout"]) == {"tty": False, "input": ""}
+
+
 @pytest.mark.parametrize("output", ["not json", '{"hours": NaN}', '{"hours": Infinity}'])
 def test_malformed_json_and_nonzero_stderr_are_not_success(executor, monkeypatch, output):
     async def fake(*args):
