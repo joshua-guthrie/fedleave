@@ -281,6 +281,7 @@ install_release() {
   log "Verified the installed CLI before activation."
 
   local -a optional_commands=(
+    fedleave-mcp
     FedLeaveCalendar FedLeaveAnalytics
     AnnualLeaveChartForTheYear SickLeaveChartForTheYear
     CreditHoursChartForTheYear CompTimeChartForTheYear
