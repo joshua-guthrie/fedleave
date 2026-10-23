@@ -1,7 +1,7 @@
 """Qt control flow and real selected-CLI preview/apply integration."""
 
 import os
-import sys
+import sysconfig
 import threading
 from pathlib import Path
 
@@ -179,12 +179,14 @@ def test_GUI_018_019_020_close_and_mode_change_during_slow_preview(qtbot):
 
 def test_GUI_021_INT_001_selected_real_backend_preview_apply(qtbot, tmp_path):
     store(tmp_path, balances={"annual": 280, "credit": 30, "sick": 600})
-    executable = Path(sys.executable).with_name("fedleave.exe" if os.name == "nt" else "fedleave")
+    executable = Path(sysconfig.get_path("scripts")) / ("fedleave.exe" if os.name == "nt" else "fedleave")
+    assert executable.is_file(), f"Installed test CLI missing: {executable}"
     backend = FedleaveBackend(BackendOptions(fedleave_path=str(executable), data_dir=str(tmp_path)))
     before = tree(tmp_path)
     dialog = ready_carryover(qtbot, backend)
     assert tree(tmp_path) == before
     preview = dialog.preview_payload
+    assert preview is not None, dialog.preview_text.toPlainText()
     assert preview["opening_balances"]["annual"] == 240
     assert preview["opening_balances"]["credit"] == 24
     created = backend.create_carryover_year(

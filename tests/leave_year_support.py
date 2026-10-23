@@ -53,6 +53,6 @@ def save(base, year, ledger):
 
 def tree(base):
     return {
-        str(p.relative_to(base)): hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "directory"
+        p.relative_to(base).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "directory"
         for p in sorted(base.rglob("*"))
     }
