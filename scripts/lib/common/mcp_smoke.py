@@ -12,10 +12,16 @@ import hashlib
 import json
 import os
 import subprocess
+import sysconfig
 import tempfile
 from pathlib import Path
 
 from mcp import Client, StdioServerParameters
+
+
+def application_directory(command: str, args: list[str]) -> Path:
+    """Source Python launchers use Scripts; installed bundles use siblings."""
+    return Path(sysconfig.get_path("scripts")) if args else Path(command).parent
 
 
 async def smoke(command: str, args: list[str], expected_names=None, *, restricted=False):
@@ -156,7 +162,7 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
             # The existing packaged Analytics executable must actually render
             # Seasonality's two selectors against this exact CLI/datastore.
             suffix = ".exe" if os.name == "nt" else ""
-            sibling = Path(command).parent
+            sibling = application_directory(command, args)
             before_gui = {
                 str(path.relative_to(base)): hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in base.rglob("*")

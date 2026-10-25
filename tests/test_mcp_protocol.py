@@ -25,6 +25,18 @@ def test_official_sdk_subprocess_stdio_round_trip(restricted):
     asyncio.run(module.smoke(sys.executable, ["-m", "fedleave.mcp"], discover(), restricted=restricted))
 
 
+def test_analytics_smoke_resolves_source_scripts_and_installed_siblings(tmp_path, monkeypatch):
+    spec = importlib.util.spec_from_file_location("mcp_smoke", ROOT / "scripts/lib/common/mcp_smoke.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    scripts = tmp_path / "Python" / "Scripts"
+    scripts.mkdir(parents=True)
+    monkeypatch.setattr(module.sysconfig, "get_path", lambda name: str(scripts))
+    assert module.application_directory(str(tmp_path / "Python/python.exe"), ["-m", "fedleave.mcp"]) == scripts
+    installed = tmp_path / "Installed FedLeave"
+    assert module.application_directory(str(installed / "fedleave-mcp.exe"), []) == installed
+
+
 def test_sdk_read_only_full_catalog_and_typed_errors(tmp_path):
     async def run():
         server = create_server(Policy(mode="read_only", data_dir=tmp_path / "data"))
