@@ -76,6 +76,26 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
             await call(
                 "fedleave_set_day", {"date": "2026-07-02", "authoritative": True, "sick": -2, "sick_comment": "smoke"}
             )
+            # Exercise parental rules in the installed/frozen sibling CLI on
+            # both platforms, rather than only checking package file presence.
+            await call("fedleave_add", {"date": "2026-09-01", "category": "ppl", "earned": 480})
+            used = await call("fedleave_add", {"date": "2026-10-01", "category": "ppl", "used": 8})
+            await call("fedleave_add", {"date": "2026-10-02", "category": "fmla", "used": 4})
+            parental = (await call("fedleave_balance", {"year": 2026, "as_of": "2026-10-02"}))["data"]
+            assert parental["balances"]["ppl"] == 472 and parental["balances"]["fmla"] == -12
+            assert parental["parental"]["fmla"]["ppl_derived_hours"] == 8
+            assert parental["parental"]["fmla"]["remaining_hours"] is None  # History not confirmed.
+            assert any(
+                row["transaction_id"] == used["data"]["transaction_id"] and row["derived"]
+                for row in parental["parental"]["fmla"]["contributions"]
+            )
+            invalid = await client.call_tool("fedleave_add", {"date": "2026-10-02", "category": "fmla", "earned": 480})
+            assert invalid.is_error
+            expiry = (await call("fedleave_expirations", {"year": 2026, "category": "ppl", "as_of": "2026-10-02"}))[
+                "data"
+            ]
+            assert expiry["lots"][0]["last_eligible_usage_date"] == "2027-08-31"
+            assert expiry["lots"][0]["expiration_effective_date"] == "2027-09-01"
             await call("fedleave_holidays", {"action": "list", "year": 2026})
             # Two independent stdio server processes must coordinate through
             # their installed CLI children, including in the frozen packages.

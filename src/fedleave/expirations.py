@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import date, timedelta
-from math import ceil
+from math import ceil, isfinite
 from typing import Any
 
 from .categories import CATEGORY_POLICIES
@@ -30,12 +30,27 @@ def expiration_rules(config: dict[str, Any] | None) -> dict[str, dict[str, Any]]
         if not isinstance(candidate, dict):
             raise ValueError(f"UNSUPPORTED_CATEGORY_POLICY: {category}")
         result[category] = {**defaults.get(category, {}), **candidate}
+        if category == "ppl":
+            if candidate.get("allow_extension") or candidate.get("expires") is False:
+                raise ValueError("INVALID_PARENTAL_POLICY: PPL expires after 12 months and cannot be extended")
+            result[category].update(expires=True, allow_extension=False)
+            if result[category].get("expiration_action") != "expire":
+                raise ValueError("INVALID_PARENTAL_POLICY: unused PPL expires without payout or conversion")
     return result
 
 
 def _expiration_for(transaction: dict, rule: dict, leave_year: dict) -> tuple[str, int | None]:
     earned = date.fromisoformat(str(transaction.get("original_earned_date") or transaction["date"]))
     category = transaction["category"]
+    if category == "ppl":
+        from .parental import anniversary
+
+        if not transaction.get("carryover_generated") and transaction.get("source") != "expiration-rollover":
+            earned = date.fromisoformat(transaction["date"])
+            if transaction.get("original_earned_date") and transaction["original_earned_date"] != transaction["date"]:
+                raise ValueError("INVALID_PPL_ANCHOR: the entered earned date is the event-window anchor")
+
+        return (anniversary(earned) - timedelta(days=1)).isoformat(), None
     if category in {"comp", "travel_comp"}:
         periods = int(rule.get("expiration_pay_periods_after_earned", 26))
         if not 1 <= periods <= 2600:
@@ -103,6 +118,7 @@ def synchronize_expirations(
     transactions = leave_year.setdefault("transactions", [])
     transactions[:] = [tx for tx in transactions if tx.get("source") != "expiration-engine"]
     for tx in transactions:
+        tx.pop("ppl_allocations", None)
         if tx.get("allocation_source") == "expiration-engine":
             # FIFO links are derived, unlike user/legacy explicit links. A
             # correction to earning dates, hours or extensions may change them.
@@ -114,6 +130,12 @@ def synchronize_expirations(
         if not rule or not _active(tx) or tx.get("direction") not in LOT_DIRECTIONS:
             continue
         if rule.get("expires"):
+            if tx.get("category") == "ppl":
+                deadline, _ = _expiration_for(tx, rule, leave_year)
+                if tx.get("expiration_date") and tx["expiration_date"] != deadline:
+                    raise ValueError(
+                        "EXPIRATION_OUTSIDE_POLICY: PPL deadline must match its original earned-date anniversary"
+                    )
             if not tx.get("expiration_date"):
                 tx["expiration_date"], tx["expiration_pay_period"] = _expiration_for(tx, rule, leave_year)
             if not tx.get("expiration_extension_reason"):
@@ -134,6 +156,18 @@ def synchronize_expirations(
         )
     )
     remaining = {str(tx["id"]): float(tx["hours"]) for tx in lots}
+    for tx in transactions:
+        if tx.get("category") in {"ppl", "fmla"} and "scheduled_weekly_hours" in tx:
+            tour = float(tx["scheduled_weekly_hours"])
+            if not isfinite(tour) or tour <= 0:
+                raise ValueError("INVALID_PARENTAL_POLICY: event weekly hours must be positive and finite")
+    if any(tx.get("category") == "ppl" for tx in transactions):
+        from .parental import weekly_hours
+
+        ppl_week = weekly_hours(config)
+        for lot in lots:
+            if lot["category"] == "ppl":
+                remaining[str(lot["id"])] *= ppl_week / float(lot.get("scheduled_weekly_hours", ppl_week))
     if len(remaining) != len(lots):
         raise ValueError("CONFLICTING_CARRYOVER: duplicate local lot IDs")
     existing_ids = [str(tx.get("id", "")) for tx in transactions]
@@ -166,6 +200,48 @@ def synchronize_expirations(
             )
             continue
         needed = float(use["hours"])
+        if category == "ppl" and use["direction"] == "used":
+            charged = needed * ppl_week / float(use.get("scheduled_weekly_hours", ppl_week))
+            active = [
+                lot
+                for lot in lots
+                if lot["category"] == "ppl" and str(lot["date"]) <= str(use["date"]) <= str(lot["expiration_date"])
+            ]
+            if not active or any(remaining[str(lot["id"])] + EPSILON < charged for lot in active):
+                warnings.append(
+                    {
+                        "code": "CONFLICTING_CARRYOVER",
+                        "category": "ppl",
+                        "transaction_id": use["id"],
+                        "message": "PPL usage exceeds an active event entitlement or lies outside its window",
+                    }
+                )
+                continue
+            if linked and linked not in {str(lot["id"]) for lot in active}:
+                warnings.append(
+                    {
+                        "code": "CONFLICTING_CARRYOVER",
+                        "category": "ppl",
+                        "transaction_id": use["id"],
+                        "message": "Explicit PPL link does not identify an active event",
+                    }
+                )
+                continue
+            use["ppl_allocations"] = [
+                {
+                    "transaction_id": lot["id"],
+                    "hours": charged
+                    * float(lot.get("origin_scheduled_weekly_hours", lot.get("scheduled_weekly_hours", ppl_week)))
+                    / ppl_week,
+                    "current_schedule_hours": charged,
+                    "origin_leave_year": lot.get("origin_leave_year", leave_year.get("leave_year")),
+                    "origin_transaction_id": lot.get("origin_transaction_id", lot["id"]),
+                }
+                for lot in active
+            ]
+            for lot in active:
+                remaining[str(lot["id"])] -= charged
+            continue
         eligible = [
             lot
             for lot in lots
@@ -324,7 +400,11 @@ def expiration_report(
                     "message": "Opening balance has no original earned date or deadline",
                 }
             )
+    from .parental import parental_report
+
+    parental = parental_report(leave_year, config, as_of=as_of)
     return {
+        "parental": parental,
         "as_of": as_of.isoformat(),
         "leave_year": leave_year.get("leave_year"),
         "lots": rows,
@@ -342,5 +422,7 @@ def expiration_report(
         ),
         "enabled_categories": [category for category, rule in state["rules"].items() if rule.get("expires")],
         "changed": state["changed"],
-        "warnings": warnings,
+        "warnings": [*warnings, *parental["warnings"]]
+        if parental["ppl_windows"] or parental["fmla"]["contributions"]
+        else warnings,
     }

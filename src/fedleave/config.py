@@ -156,6 +156,8 @@ class Config(BaseModel):
             "time_off_award": TimeOffAwardRules().model_dump(),
             "restored_annual": RestoredAnnualRules().model_dump(),
             "religious_comp": ReligiousCompRules().model_dump(),
+            "ppl": {"expires": True, "expiration_action": "expire", "allow_extension": False},
+            "fmla": {"carryover_mode": "usage_tracking", "weekly_hours": None, "history_complete_from": None},
         }
     )
 

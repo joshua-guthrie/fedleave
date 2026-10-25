@@ -130,6 +130,9 @@ def remove_legacy_transaction_history(data: dict) -> bool:
 
 def write_json(path: Path, data: dict, backup: bool = True) -> None:
     """Optionally back up an existing file, then replace it atomically."""
+    from .parental import validate_write
+
+    validate_write(path, data)
     if backup and path.exists():
         backup_file(path)
     atomic_write_json(path, data, overwrite=True)

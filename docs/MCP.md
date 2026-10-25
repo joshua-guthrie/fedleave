@@ -257,7 +257,7 @@ or confirmation workflow; the CLI's existing storage backups remain unchanged.
 
 `tools/list` is generated from the real Typer/Click registry at startup.
 There is one stable tool per executable command path, plus `fedleave_version`.
-The current inventory has **33 tools and 298 parameter entries**, including
+The current inventory has **33 tools and 306 parameter entries**, including
 inherited parameters and automatically registered help options. The 32 CLI
 command paths include the compatibility alias `use-or-loose`.
 

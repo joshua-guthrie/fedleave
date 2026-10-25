@@ -19,6 +19,8 @@ CATEGORY_POLICIES = {
     "travel_comp": CategoryPolicy("lot_carryover"),
     "restored_annual": CategoryPolicy("lot_carryover"),
     "time_off_award": CategoryPolicy("lot_carryover"),
+    "ppl": CategoryPolicy("lot_carryover"),
+    "fmla": CategoryPolicy("usage_tracking"),
     "religious_comp": CategoryPolicy("balance_carryover", requires_policy=True),
     **{
         name: CategoryPolicy("usage_tracking")
@@ -34,6 +36,8 @@ def category_policy(category: str, rules: dict[str, Any]) -> CategoryPolicy:
     if not isinstance(rule, dict):
         raise ValueError(f"UNSUPPORTED_CATEGORY_POLICY: malformed rules for {category}")
     mode = rule.get("carryover_mode")
+    if category in {"ppl", "fmla"} and mode is not None and mode != default.mode:
+        raise ValueError(f"UNSUPPORTED_CATEGORY_POLICY: {category} requires {default.mode}")
     if default is None and mode is None:
         raise ValueError(f"UNSUPPORTED_CATEGORY_POLICY: {category}")
     if mode is not None and mode not in {"balance_carryover", "lot_carryover", "usage_tracking", "noncarryable"}:

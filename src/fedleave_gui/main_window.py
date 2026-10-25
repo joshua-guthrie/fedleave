@@ -77,6 +77,8 @@ CATEGORY_LABELS = {
     "flex": ("Flex", "Flex"),
     "other": ("Other", "Other"),
     "restored_annual": ("RA", "Restored Annual"),
+    "ppl": ("PPL", "Paid Parental Leave (PPL)"),
+    "fmla": ("FMLA", "Family and Medical Leave Act (FMLA)"),
 }
 
 EDITABLE_CATEGORIES = list(CATEGORY_LABELS)
@@ -173,6 +175,12 @@ def _day_values_by_category(day: dict[str, Any]) -> dict[str, float]:
     for entry in day.get("entries", []):
         value = _entry_value(entry)
         if value is None:
+            continue
+        if (
+            value.category == "ppl"
+            and entry.get("direction") == "earned"
+            and any(row.get("category") == "ppl" and row.get("direction") == "used" for row in day.get("entries", []))
+        ):
             continue
         values[value.category] = values.get(value.category, 0.0) + value.value
     return values
@@ -327,6 +335,11 @@ class DayEditDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Choose Use or Earn for each leave type, then enter positive hours."))
+        parental_help = QLabel(
+            "PPL earned date is treated as the start of the 12-month use window. Enter the actual qualifying date. PPL use consumes FMLA automatically. Manual FMLA is additional non-PPL tracking only; it adds no absence hours. A new Earn suggestion of 480 h is an editable standard full-time example."
+        )
+        parental_help.setWordWrap(True)
+        layout.addWidget(parental_help)
         form = QFormLayout()
         for category, (_, label) in CATEGORY_LABELS.items():
             current = values.get(category, 0.0)
@@ -361,10 +374,24 @@ class DayEditDialog(QDialog):
     def _input_row(self, category: str, value: float = 0.0, comment: str = "") -> QWidget:
         direction = QComboBox()
         direction.addItem("Use", "use")
-        direction.addItem("Earn", "earn")
+        if category != "fmla":
+            direction.addItem("Earn", "earn")
         if value > 0:
             direction.setCurrentIndex(direction.findData("earn"))
         spinner = self._spinner(value)
+        if category == "ppl":
+            spinner.setMaximum(10000)
+            spinner.setValue(abs(value))
+            if value == 0:
+
+                def suggest_grant(_index):
+                    if direction.currentData() == "earn" and spinner.value() == 0:
+                        spinner.setValue(480)
+
+                direction.currentIndexChanged.connect(suggest_grant)
+        elif abs(value) > spinner.maximum():
+            spinner.setMaximum(abs(value))
+            spinner.setValue(abs(value))
         self.directions[category] = direction
         self.inputs[category] = spinner
 
@@ -1030,7 +1057,7 @@ class ForceBalanceDialog(QDialog):
         self.date_input.setDisplayFormat("yyyy-MM-dd")
         self.category_input = QComboBox()
         for category, (_short, label) in CATEGORY_LABELS.items():
-            if category != "overtime":
+            if category not in {"overtime", "ppl", "fmla"}:
                 self.category_input.addItem(label, category)
         self.hours_input = QDoubleSpinBox()
         self.hours_input.setRange(0.0, 10000.0)
@@ -1081,6 +1108,12 @@ class ExpirationStatusDialog(QDialog):
         layout.addWidget(
             QLabel("Expiration dates are inclusive last eligible usage dates; use is disallowed the following day.")
         )
+        for window in (payload.get("parental") or {}).get("ppl_windows", []):
+            label = QLabel(
+                f"PPL source {window.get('source_leave_year') or '?'} / {window['transaction_id']}: last use {window['last_eligible_usage_date']}; first ineligible {window['expiration_effective_date']}. Scheduled {window['scheduled_used_hours']:.2f} h; protected {window['protected_scheduled_hours']:.2f} h; potential unused loss {window['potential_unused_loss_hours']:.2f} h; expired unused {window['expired_unused_hours']:.2f} h."
+            )
+            label.setWordWrap(True)
+            layout.addWidget(label)
         lots = [row for row in payload.get("lots", []) if float(row.get("remaining_hours", 0.0)) > 0]
         summary = []
         for threshold in reminders:
@@ -1716,6 +1749,22 @@ class MainWindow(QMainWindow):
         )
         warnings = snapshot.get("warnings", [])
         message = "; ".join(f"{row['code']}: {row.get('message', '')}" for row in warnings)
+        parental = snapshot.get("parental")
+        if parental:
+            fmla = parental["fmla"]
+            period = fmla.get("period")
+            message += (
+                ("; " if message else "")
+                + f"PPL available {_fmt(parental['ppl_available_hours'])} h; usable with FMLA {_fmt(parental['ppl_usable_hours']) or 'N/A'} h. FMLA used {_fmt(fmla['used_hours'])} h, remaining {_fmt(fmla['remaining_hours']) or 'N/A'} h"
+            )
+            if period:
+                message += f" ({period['start_date']} through {period['last_eligible_usage_date']})"
+                if period.get("provisional"):
+                    message += " [Provisional: scheduled or unresolved usage]"
+            for row in parental.get("warnings", []):
+                message += "; " + row["message"]
+            for window in parental.get("ppl_windows", []):
+                message += f"; PPL {window['earned_date']}: last use {window['last_eligible_usage_date']}, unavailable {window['expiration_effective_date']}; scheduled {_fmt(window['scheduled_used_hours'])} h, expired unused {_fmt(window['expired_unused_hours'])} h"
         self.statusBar().showMessage(message)
         self.balance_button.setToolTip(message)
         balance = snapshot.get("balances") or {}
@@ -1755,8 +1804,22 @@ class MainWindow(QMainWindow):
         preview = SaveDayPreviewDialog(day, _day_values_by_category(day), values, self)
         if preview.exec() != QDialog.Accepted:
             return
+        overlap = values.get("ppl", 0) < 0 and values.get("fmla", 0) < 0
+        if (
+            overlap
+            and QMessageBox.question(
+                self,
+                "Check FMLA Tracking",
+                "PPL automatically consumes FMLA. Confirm these manual FMLA hours represent additional non-PPL usage on this date.",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            != QMessageBox.Yes
+        ):
+            return
         try:
-            self.backend.set_day(str(day["date"]), values, comments=dialog.comments())
+            kwargs = {"acknowledge_fmla_overlap": True} if overlap else {}
+            self.backend.set_day(str(day["date"]), values, comments=dialog.comments(), **kwargs)
         except BackendError as exc:
             QMessageBox.warning(self, "Save Failed", str(exc))
             return

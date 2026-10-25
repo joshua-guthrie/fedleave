@@ -79,9 +79,12 @@ def test_all_set_day_fields_and_legacy_aliases():
         "flex",
         "other",
         "restored_annual",
+        "ppl",
+        "fmla",
     ]:
         assert name in props
         assert f"{name}_comment" in props
+    assert "acknowledge_fmla_overlap" in props
     command = catalog["fedleave_add"]
     arguments = {
         "date": "2026-07-01",

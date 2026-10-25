@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add Paid Parental Leave earned/use windows and usage-only FMLA tracking, with one derived FMLA contribution per PPL use and no duplicate physical absence.
+- Preserve source grant identity, overlapping event limits, schedule conversions and first-use FMLA periods across existing leave-year files, including source corrections after successor creation.
+- Add Calendar PPL Earn/Use with an editable 480-hour suggestion, FMLA Use only, expiration/coverage diagnostics and explicit acknowledgement of potential duplicate same-day tracking.
+- Report provisional scheduled usage, confirmed periods and unknown history capacity; reject PPL payout/extension and FMLA grant/force-balance bypasses.
+
 - Support independent manual creation and explicit CLI-previewed prior-year carryover in CLI and Calendar, with create-only destinations and GUI-only manual confirmation.
 - Correct adjacent 26/27-period boundaries, single-count openings, credit caps, nonexpiring award carryover, stable lot origins and inclusive expiration deadlines.
 - Resolve reports/charts on read-only linked snapshots; legacy migrations and missing accruals are computed in memory during queries.

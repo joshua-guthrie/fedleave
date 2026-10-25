@@ -21,6 +21,10 @@ def starting_balance_set(
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
 ) -> None:
     """Set one starting balance, retaining only the final value."""
+    if category in {"ppl", "fmla"} and hours != 0:
+        raise ValueError(
+            "PPL/FMLA have no undated starting credit; record a dated PPL earned entitlement or FMLA usage"
+        )
     if category not in TRANSACTION_CATEGORIES:
         console.print(
             f"[red]ERROR:[/red] Invalid category: {category}. Valid categories: {', '.join(TRANSACTION_CATEGORIES)}."

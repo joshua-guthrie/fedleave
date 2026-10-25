@@ -42,6 +42,7 @@ def test_CLI_001_002_003_004_005_006_019_full_round_trip(tmp_path):
         "travel_comp": 24,
         "time_off_award": 0,
         "restored_annual": 0,
+        "ppl": 0,
     }
     assert preview["source_start"] == "2026-01-11" and preview["source_end"] == "2027-01-09"
     assert [(row["category"], row["hours"]) for row in preview["adjustments"]] == [("annual", 40), ("credit", 6)]

@@ -28,6 +28,31 @@ no fictitious earning date or renewed entitlement is created.</p>
 Use <strong>Tools &gt; Reconcile Carryover</strong> to preview and explicitly apply the full chain, or use <code>fedleave carryover-reconcile --year YEAR --preview --json</code>, review
 all affected years, then explicitly apply. Genuine destination activity is preserved.
 Interrupted reconciliation requires <code>--recover</code>. Manual years remain independent.</p>
+<h2>Paid Parental Leave (PPL) and FMLA</h2>
+<p>In the day editor add <strong>Paid Parental Leave (PPL)</strong> and choose
+<strong>Earn</strong>. New Earn entries suggest an editable 480-hour standard
+full-time example; existing values are retained. The earned date is treated as
+the start of the 12-month use window. Enter the actual qualifying date. There
+is no separate event field. PPL cannot be paid out or extended.</p>
+<p>PPL <strong>Use</strong> automatically consumes FMLA exactly once. Manual
+<strong>Family and Medical Leave Act (FMLA)</strong> offers Use only and means
+additional non-PPL FMLA usage. It adds no physical absence. Same-day combinations
+require clarification; never mirror PPL hours as manual FMLA.</p>
+<p>The balance status and expiration dialog show source IDs, last eligible and
+first ineligible dates, scheduled/protected use and potential or expired loss.
+FMLA is a negative within-period usage tracker, not paid leave or a spendable
+bank. Its period begins with first actual use, independently of PPL's earned
+date or the federal leave year. Future or unresolved use is provisional.</p>
+<p>Capacity is N/A until relevant history is reviewed and
+<code>rules.fmla.history_complete_from</code> is supplied in config.json.
+Missing historical tours are explicitly unverified. The limit is twelve
+administrative workweeks; the configured schedule or agency-confirmed
+<code>rules.fmla.weekly_hours</code> determines its hour equivalent. Existing
+linked successor years reflect source corrections immediately. Manual years
+remain independent. These results do not determine agency eligibility or approval.</p>
+<p>Policy guidance:
+<a href="https://www.opm.gov/policy-data-oversight/pay-leave/leave-administration/fact-sheets/paid-parental-leave/">OPM PPL</a> and
+<a href="https://www.opm.gov/policy-data-oversight/pay-leave/leave-administration/fact-sheets/family-and-medical-leave/">OPM FMLA</a>.</p>
 <h2>Calendar Layout</h2>
 <p>The main window shows month navigation, a calendar grid, pay periods touching the displayed month, and balances as of today. Each pay period has its own Type, Earned, Used, and Balance table.</p>
 <h2>Day Cells</h2>
@@ -36,6 +61,8 @@ Interrupted reconciliation requires <code>--recover</code>. Manual years remain 
 <table border="1" cellspacing="0" cellpadding="4">
 <thead><tr><th>Abbreviation</th><th>Leave Type</th></tr></thead>
 <tbody>
+<tr><td>PPL</td><td>Paid Parental Leave (PPL)</td></tr>
+<tr><td>FMLA</td><td>Family and Medical Leave Act (FMLA)</td></tr>
 <tr><td>A</td><td>Annual Leave</td></tr>
 <tr><td>S</td><td>Sick Leave</td></tr>
 <tr><td>OT</td><td>Overtime</td></tr>

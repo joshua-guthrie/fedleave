@@ -464,6 +464,9 @@ def import_data(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
+    from ..parental import validate_imports
+
+    validate_imports(base, write_items)
     ensure_data_dir(base)
 
     try:
@@ -583,8 +586,20 @@ def validate(
     for pj in sorted(year_dir.iterdir()):
         if pj.suffix != ".json":
             continue
-        ly = load_leave_year(int(pj.stem), data_dir)
+        ly = load_json(pj)
         issues = validate_leave_year(ly)
+        if not issues and (
+            any(row.get("category") in {"ppl", "fmla"} for row in ly.get("transactions", []))
+            or any(ly.get("starting_balances", {}).get(category) for category in ("ppl", "fmla"))
+        ):
+            from ..cross_year import resolve_snapshot
+            from ..parental import validate_parental_state
+
+            try:
+                resolved = resolve_snapshot(base, int(pj.stem))
+                validate_parental_state(resolved, resolved.config)
+            except (ValueError, FileNotFoundError) as exc:
+                issues.append({"type": "parental", "path": "transactions", "message": str(exc)})
         if not issues:
             results.append({"file": pj.name, "year": int(pj.stem), "ok": True, "issues": [], "applied": False})
             if not json_output:
@@ -641,6 +656,7 @@ def snapshot_command(
         result = dict(snapshot)
         result["snapshot_rules"] = snapshot.config
         result["accounting_warnings"] = snapshot.warnings
+        result["entitlement_history"] = snapshot.entitlement_history
     except (ValueError, OSError, TypeError, KeyError) as exc:
         report_error(exc, json_output)
     if json_output:

@@ -65,6 +65,15 @@ def transaction_is_effective(transaction: Mapping[str, Any]) -> bool:
     return status not in INEFFECTIVE_STATUSES
 
 
+def transaction_is_physical_absence(transaction: Mapping[str, Any]) -> bool:
+    """FMLA tracks entitlement only; PPL records one physical paid absence."""
+    return (
+        transaction.get("direction") == "used"
+        and transaction.get("category") != "fmla"
+        and transaction_is_effective(transaction)
+    )
+
+
 def direction_effect(direction: object) -> BalanceEffect:
     """Return the explicit effect for a direction, rejecting unknown values."""
     if direction in INCREASE_DIRECTIONS:

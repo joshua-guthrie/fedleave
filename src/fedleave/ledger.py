@@ -13,7 +13,7 @@ from datetime import date, datetime
 from math import isfinite
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from .categories import CATEGORY_POLICIES
 from .transaction_effects import (
@@ -59,6 +59,15 @@ class Transaction(BaseModel):
     earned_transaction_id: str | None = None
     expiration_extension_reason: str | None = None
     expiration_extended_at: str | None = None
+
+    @model_validator(mode="after")
+    def validate_parental_direction(self):
+        if self.category == "fmla" and self.direction != "used":
+            raise ValueError("FMLA_USAGE_ONLY: FMLA has used transactions only")
+        if self.category == "ppl" and self.direction not in {"earned", "used"}:
+            if not (self.direction == "expired" and self.source == "expiration-engine"):
+                raise ValueError("INVALID_PPL_DIRECTION: PPL accepts earned and used transactions only")
+        return self
 
     @field_validator("category")
     def validate_category(cls, value: str) -> str:
@@ -202,6 +211,10 @@ def calculate_balances(
         )
     totals: dict[str, float] = {category: 0.0 for category in TRANSACTION_CATEGORIES}
     starting_balances = leave_year.get("starting_balances", {})
+    if float(starting_balances.get("fmla", 0)):
+        raise ValueError("FMLA_USAGE_ONLY: FMLA cannot have an opening credit")
+    if float(starting_balances.get("ppl", 0)):
+        raise ValueError("INVALID_PARENTAL_OPENING: record a dated PPL earned entitlement")
     for category, amount in starting_balances.items():
         totals[category] = float(amount)
 
@@ -268,6 +281,22 @@ def calculate_balances(
                 # Warn-only policy removes availability without inventing a
                 # forfeiture/payout transaction in the canonical ledger.
                 totals[lot["category"]] -= expiration_state["remaining"].get(str(lot["id"]), 0.0)
+    if any(tx.get("category") in {"ppl", "fmla"} for tx in leave_year.get("transactions", [])) or getattr(
+        leave_year, "entitlement_history", leave_year.get("entitlement_history")
+    ):
+        from .parental import parental_report
+
+        parental = parental_report(
+            leave_year,
+            getattr(leave_year, "config", leave_year.get("snapshot_rules")),
+            as_of=_parse_iso_date(
+                (project_until if include_projected else None) or until_date or leave_year.get("leave_year_end")
+            )
+            if project_until or until_date or leave_year.get("leave_year_end")
+            else date.today(),
+        )
+        totals["ppl"] = parental["ppl_available_hours"]
+        totals["fmla"] = parental["fmla"]["balance"]
     return totals
 
 
@@ -321,6 +350,10 @@ def calculate_daily_activity(leave_year: dict[str, Any], day: str) -> dict[str, 
             used[category] += hours
             net[category] -= hours
 
+    ppl_use = used.get("ppl", 0.0)
+    if ppl_use:
+        used["fmla"] = used.get("fmla", 0.0) + ppl_use
+        net["fmla"] = net.get("fmla", 0.0) - ppl_use
     return {"earned": earned, "used": used, "net": net}
 
 
@@ -509,6 +542,9 @@ def calculate_pay_period_activity(leave_year: dict[str, Any], day: str) -> dict[
             used[category] += hours
             net[category] -= hours
 
+    if used.get("ppl", 0.0):
+        used["fmla"] = used.get("fmla", 0.0) + used["ppl"]
+        net["fmla"] = net.get("fmla", 0.0) - used["ppl"]
     return {
         "pay_period": pay_period,
         "earned": earned,
@@ -580,6 +616,18 @@ def validate_leave_year(leave_year: dict[str, Any]) -> list[dict[str, Any]]:
         dirn = tx.get("direction")
         if dirn not in TRANSACTION_DIRECTIONS:
             issues.append({"type": "direction", "path": path + ".direction", "message": f"Invalid direction: {dirn}"})
+        if cat == "fmla" and dirn != "used":
+            issues.append(
+                {"type": "direction", "path": path + ".direction", "message": "FMLA_USAGE_ONLY: record used hours only"}
+            )
+        if cat == "ppl" and dirn not in {"earned", "used"} and tx.get("source") != "expiration-engine":
+            issues.append(
+                {
+                    "type": "direction",
+                    "path": path + ".direction",
+                    "message": "PPL supports dated earned entitlements and usage only",
+                }
+            )
 
         # status
         st = tx.get("status")

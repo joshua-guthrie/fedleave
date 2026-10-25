@@ -38,7 +38,7 @@ Primary commands:
                 Force one leave balance as of a date with an auditable adjustment
     check-for-updates
                 Check for a newer FedLeave release
-    expirations Show expiring comp, travel comp, restored annual, and optional award leave lots
+    expirations Show expiring comp, travel comp, restored annual, PPL and optional award leave lots
     expiration-extend
                 Extend one eligible earned lot with a recorded reason
     reconcile   Add or update one reconciled transaction by date/category/direction
@@ -99,16 +99,25 @@ Command details and examples:
         --authoritative removes transactions with the same date, category, and direction before adding the new transaction.
         --json emits the created transaction ID and any replaced transaction IDs.
         Transaction IDs are hidden by default in human-readable output. Use --show-transaction-ids when needed.
-        Valid categories: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual
+        Valid categories: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual, ppl, fmla
+        Paid Parental Leave (ppl): dated earned entitlement and used hours; no automatic awards.
+        Family and Medical Leave Act (fmla): used only; PPL use consumes FMLA automatically, once.
+        PPL earned date starts its fixed 12-calendar-month window. Standard full-time example: --earned 480.
+        Same-day manual FMLA and PPL require --acknowledge-fmla-overlap to confirm additional non-PPL use.
 
     Examples:
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
         fedleave add --year 2026 --date 2026-03-10 --category annual --used 3 --status reconciled --authoritative
         fedleave add --year 2026 --date 2026-03-12 --category overtime --worked 3
+        fedleave add --year 2026 --date 2026-09-01 --category ppl --earned 480
+        fedleave add --year 2026 --date 2026-10-01 --category ppl --used 8
+        fedleave add --year 2026 --date 2026-10-15 --category fmla --used 8
 
     fedleave set-day --date YYYY-MM-DD|today --authoritative --json [--annual HOURS] [--sick HOURS] [--credit HOURS] [--comp HOURS] [--travel-comp HOURS] [--overtime HOURS] [--data-dir PATH]
         Authoritatively replace active transactions for the supplied categories on a date.
         Positive values are earned or worked; negative values are used; zero clears active values for that category.
+        --ppl supports positive earned/negative used; zero clears PPL use while retaining the earned entitlement.
+        --fmla accepts negative usage only. --acknowledge-fmla-overlap confirms additional same-day non-PPL FMLA.
 
     fedleave accrual-change [--year YEAR] --as-of YYYY-MM-DD|today --category annual|sick --hours HOURS [--reason TEXT] [--json] [--data-dir PATH]
         Change automatic annual or sick leave accrual hours per pay period from the effective date forward.

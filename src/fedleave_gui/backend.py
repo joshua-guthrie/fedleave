@@ -233,8 +233,17 @@ class FedleaveBackend:
             raise BackendError("fedleave returned an unexpected transaction list payload.")
         return [item for item in transactions if isinstance(item, dict)]
 
-    def set_day(self, day: str, values: dict[str, float], comments: dict[str, str] | None = None) -> dict[str, Any]:
+    def set_day(
+        self,
+        day: str,
+        values: dict[str, float],
+        comments: dict[str, str] | None = None,
+        *,
+        acknowledge_fmla_overlap: bool = False,
+    ) -> dict[str, Any]:
         args = ["set-day", "--date", day, "--authoritative", "--json"]
+        if acknowledge_fmla_overlap:
+            args.append("--acknowledge-fmla-overlap")
         for category, value in values.items():
             option = f"--{category.replace('_', '-')}"
             args.extend([option, _format_number(value)])

@@ -23,7 +23,7 @@ from ..ledger import (
 )
 from ..payperiods import normalize_pay_period, pay_period_pay_date
 from ..storage import load_json
-from ..transaction_effects import signed_balance_effect, transaction_is_effective
+from ..transaction_effects import signed_balance_effect, transaction_is_effective, transaction_is_physical_absence
 
 _DISPLAY_CATEGORY_LABELS = {
     "annual": "A",
@@ -43,7 +43,29 @@ _DISPLAY_CATEGORY_LABELS = {
     "flex": "Flex",
     "other": "Other",
     "restored_annual": "RA",
+    "ppl": "PPL",
+    "fmla": "FMLA",
 }
+
+
+def _physical_absence_hours(ledger: dict, start: str, end: str) -> float:
+    return sum(
+        float(row["hours"])
+        for row in ledger.get("transactions", [])
+        if start <= row["date"] <= end and transaction_is_physical_absence(row)
+    )
+
+
+def _parental_payload(ledger: dict, as_of: str | None = None) -> dict | None:
+    from ..parental import parental_report
+
+    if not any(tx.get("category") in {"ppl", "fmla"} for tx in ledger.get("transactions", [])) and not getattr(
+        ledger, "entitlement_history", []
+    ):
+        return None
+    return parental_report(
+        ledger, getattr(ledger, "config", None), as_of=parse_iso_date(as_of) if as_of else _date.today()
+    )
 
 
 def _show_accounting_warnings(leave_year: dict, json_output: bool) -> None:
@@ -151,6 +173,9 @@ def _pay_periods_for_range(
                 "start": period_start.isoformat(),
                 "end": period_end.isoformat(),
                 "pay_date": pay_period_pay_date(pay_period),
+                "physical_absence_hours": _physical_absence_hours(
+                    leave_year, period_start.isoformat(), period_end.isoformat()
+                ),
                 "touches_display_month": not (period_end < month_start or period_start > month_end),
                 "totals": totals,
                 "ending_balances": dict(
@@ -270,10 +295,14 @@ def balance(
             cfg = None
         use_or_lose_data = calculate_use_or_lose(leave_year, balances, cfg)
 
+    parental = _parental_payload(
+        leave_year, (project_to or leave_year.get("leave_year_end")) if include_projected else as_of
+    )
     if json_output:
         _print_json(
             {
-                "warnings": getattr(leave_year, "warnings", []),
+                "warnings": [*getattr(leave_year, "warnings", []), *((parental or {}).get("warnings", []))],
+                "parental": parental,
                 "year": year,
                 "as_of": as_of,
                 "projected": include_projected,
@@ -292,7 +321,21 @@ def balance(
         console.print(f"Balances for {year} as of {as_of}:")
 
     for category, amount in sorted(balances.items()):
-        console.print(f"  {category}: {amount:.2f}")
+        console.print(
+            f"  {category}: {amount:.2f}" if amount is not None else f"  {category}: N/A (history requires review)"
+        )
+    if parental:
+        for warning in parental["warnings"]:
+            console.print(f"{warning['code']}: {warning['message']}")
+        fmla = parental["fmla"]
+        remaining = "N/A" if fmla["remaining_hours"] is None else f"{fmla['remaining_hours']:.2f} h"
+        console.print(f"FMLA recorded usage: {fmla['used_hours']:.2f} h; remaining capacity: {remaining}")
+        if fmla["period"]:
+            period = fmla["period"]
+            console.print(
+                f"FMLA period: {period['start_date']} through {period['last_eligible_usage_date']}"
+                + (" (provisional)" if period["provisional"] else "")
+            )
 
     if added_accruals:
         console.print(
@@ -382,6 +425,10 @@ def pay_period_summary(
                 "activity": activity_output,
                 "daily_activity": daily_activity_rows if daily else None,
                 "ending_balances": dict(sorted(ending_balances.items())),
+                "parental": _parental_payload(leave_year, pay_period["end_date"]),
+                "physical_absence_hours": _physical_absence_hours(
+                    leave_year, pay_period["start_date"], pay_period["end_date"]
+                ),
                 "automatic_accruals_posted": added_accruals,
                 "automatic_accruals_posted_through": accrual_through,
             }
@@ -631,12 +678,15 @@ def month(
         "pay_dates": sorted(pay_dates),
         "pay_period_end_dates": sorted(pay_period_end_dates),
         "warnings": getattr(leave_year, "warnings", []),
+        "parental": _parental_payload(leave_year),
         "balance_as_of_today": {
+            "parental": _parental_payload(leave_year),
             "warnings": getattr(leave_year, "warnings", []),
             "as_of": today.isoformat(),
             "balances": dict(sorted(today_balance.items())),
         },
         "projected_balance": {
+            "parental": _parental_payload(leave_year, leave_year.get("leave_year_end")),
             "project_to": leave_year.get("leave_year_end"),
             "balances": dict(sorted(projected_balances.items())),
             "use_or_lose": use_or_lose,
@@ -705,13 +755,31 @@ def daily_activity(
     activity = calculate_daily_activity(leave_year, date)
     if not any(activity.values()):
         if json_output:
-            _print_json({"year": year, "date": date, "activity": activity, "has_activity": False})
+            _print_json(
+                {
+                    "year": year,
+                    "date": date,
+                    "activity": activity,
+                    "has_activity": False,
+                    "physical_absence_hours": 0.0,
+                    "parental": _parental_payload(leave_year, date),
+                }
+            )
             return
         console.print(f"No leave activity recorded on {date} for {year}.")
         raise typer.Exit(code=0)
 
     if json_output:
-        _print_json({"year": year, "date": date, "activity": activity, "has_activity": True})
+        _print_json(
+            {
+                "year": year,
+                "date": date,
+                "activity": activity,
+                "has_activity": True,
+                "physical_absence_hours": _physical_absence_hours(leave_year, date, date),
+                "parental": _parental_payload(leave_year, date),
+            }
+        )
         return
 
     console.print(f"Leave activity for {date} ({year}):")

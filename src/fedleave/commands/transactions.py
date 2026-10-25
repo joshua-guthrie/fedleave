@@ -47,10 +47,16 @@ _SET_DAY_CATEGORIES = [
     "flex",
     "other",
     "restored_annual",
+    "ppl",
+    "fmla",
 ]
 
 
 def _direction_for_signed_day_value(category: str, value: float) -> tuple[str, float]:
+    if category == "fmla":
+        if value > 0:
+            raise ValueError("FMLA_USAGE_ONLY: enter FMLA usage as a negative value")
+        return "used", abs(value)
     if value < 0:
         return "used", abs(value)
     if category == "overtime":
@@ -65,6 +71,7 @@ def _set_day_values(
     comments: dict[str, str | None],
     authoritative: bool,
     data_dir: Path | None,
+    acknowledge_fmla_overlap: bool = False,
 ) -> dict:
     if not authoritative:
         raise ValueError("--authoritative is required for set-day.")
@@ -91,6 +98,7 @@ def _set_day_values(
             and transaction.get("category") == category
             and not transaction.get("carryover_generated")
             and transaction.get("source") != "expiration-rollover"
+            and (category != "ppl" or transaction.get("direction") == ("earned" if value > 0 else "used"))
         ]
         existing_comment = next(
             (
@@ -137,6 +145,7 @@ def _set_day_values(
             }
         )
 
+    leave_year["_fmla_overlap_acknowledged"] = acknowledge_fmla_overlap is True
     write_json(get_leave_year_path(year, data_dir), leave_year)
     return {
         "action": "set-day",
@@ -172,6 +181,9 @@ def add(
         help="Show transaction IDs in human-readable output.",
     ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    acknowledge_fmla_overlap: bool = typer.Option(
+        False, help="Confirm same-day manual FMLA is additional non-PPL use."
+    ),
 ) -> None:
     if isinstance(status, OptionInfo):
         status = "planned"
@@ -247,12 +259,13 @@ def add(
         leave_year["transactions"] = retained
 
     add_transaction_to_leave_year(leave_year, transaction)
+    leave_year["_fmla_overlap_acknowledged"] = acknowledge_fmla_overlap is True
     write_json(get_leave_year_path(year, data_dir), leave_year)
     result = {
         "action": "added",
         "year": year,
         "transaction_id": transaction.id,
-        "transaction": transaction.model_dump(),
+        "transaction": next(row for row in leave_year["transactions"] if row["id"] == transaction.id),
         "replaced_transaction_ids": replaced_ids,
         "automatic_accruals_posted": 0,
     }
@@ -312,7 +325,14 @@ def set_day(
     restored_annual_comment: str | None = typer.Option(
         None, "--restored-annual-comment", help="Restored annual leave comment."
     ),
+    ppl: float | None = typer.Option(None, help="Paid Parental Leave: positive dated entitlement, negative usage."),
+    ppl_comment: str | None = typer.Option(None, help="Paid Parental Leave comment."),
+    fmla: float | None = typer.Option(None, help="FMLA usage only, entered as negative hours."),
+    fmla_comment: str | None = typer.Option(None, help="FMLA tracker comment; PPL contributes automatically."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    acknowledge_fmla_overlap: bool = typer.Option(
+        False, help="Confirm same-day manual FMLA is additional non-PPL use."
+    ),
 ) -> None:
     if not isinstance(authoritative, bool):
         authoritative = False
@@ -355,7 +375,13 @@ def set_day(
     if isinstance(restored_annual_comment, OptionInfo):
         restored_annual_comment = None
 
+    if isinstance(ppl_comment, OptionInfo):
+        ppl_comment = None
+    if isinstance(fmla_comment, OptionInfo):
+        fmla_comment = None
     values = {
+        "ppl": ppl,
+        "fmla": fmla,
         "annual": annual,
         "sick": sick,
         "credit": credit,
@@ -375,6 +401,8 @@ def set_day(
         "restored_annual": restored_annual,
     }
     comments = {
+        "ppl": ppl_comment,
+        "fmla": fmla_comment,
         "annual": annual_comment,
         "sick": sick_comment,
         "credit": credit_comment,
@@ -405,6 +433,7 @@ def set_day(
             comments=comments,
             authoritative=authoritative,
             data_dir=data_dir,
+            acknowledge_fmla_overlap=acknowledge_fmla_overlap is True,
         )
     except FileNotFoundError as exc:
         console.print(f"[red]ERROR:[/red] {exc}")
@@ -435,6 +464,9 @@ def reconcile(
     id: str | None = typer.Option(None, help="Transaction ID to update when multiple active matches exist."),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    acknowledge_fmla_overlap: bool = typer.Option(
+        False, help="Confirm same-day manual FMLA is additional non-PPL use."
+    ),
 ) -> None:
     """Add or update one transaction using payroll reconciliation semantics."""
     if isinstance(id, OptionInfo):
@@ -548,6 +580,7 @@ def reconcile(
         action = "added"
         transaction_id = new_transaction.id
 
+    leave_year["_fmla_overlap_acknowledged"] = acknowledge_fmla_overlap is True
     write_json(get_leave_year_path(year, data_dir), leave_year)
 
     result = {
@@ -588,6 +621,9 @@ def correct(
         help="Show transaction IDs in human-readable output.",
     ),
     data_dir: Path | None = typer.Option(None, help="Data directory override."),
+    acknowledge_fmla_overlap: bool = typer.Option(
+        False, help="Confirm same-day manual FMLA is additional non-PPL use."
+    ),
 ) -> None:
     """Update a transaction in place, retaining only its final values."""
     # If this function is called directly (tests), Typer Option defaults arrive as OptionInfo objects.
@@ -754,8 +790,12 @@ def correct(
         console.print(f"[red]ERROR:[/red] {exc}")
         raise typer.Exit(code=2)
 
+    if updated["category"] == "ppl" and updated["direction"] == "earned" and updated["date"] != orig["date"]:
+        for key in ("expiration_date", "original_expiration_date", "expiration_pay_period", "original_earned_date"):
+            updated.pop(key, None)
     orig.clear()
     orig.update(updated)
+    leave_year["_fmla_overlap_acknowledged"] = acknowledge_fmla_overlap is True
     write_json(get_leave_year_path(int(leave_year.get("leave_year", 0)), data_dir), leave_year)
     if json_output:
         _print_json(
@@ -796,6 +836,7 @@ def list_transactions(
 
     from ..cli_helpers import load_read_snapshot
     from ..expirations import synchronize_expirations
+    from ..parental import parental_report
 
     try:
         leave_year = load_read_snapshot(year, data_dir)
@@ -844,12 +885,17 @@ def list_transactions(
     except (FileNotFoundError, ValueError):
         category_rules = {}
     companion_metadata = {
+        "entitlement_history": getattr(leave_year, "entitlement_history", []),
+        "snapshot_rules": getattr(leave_year, "config", {}),
+        "parental": parental_report(leave_year, getattr(leave_year, "config", None)),
         "warnings": getattr(leave_year, "warnings", []),
         "available_leave_years": available_leave_years,
         "visible_categories": sorted(category for category in visible_categories if category),
         "category_definitions": {
             category: {
-                "label": category.replace("_", " ").title(),
+                "label": {"ppl": "Paid Parental Leave (PPL)", "fmla": "Family and Medical Leave Act (FMLA)"}.get(
+                    category, category.replace("_", " ").title()
+                ),
                 "rules": category_rules.get(category, {}),
             }
             for category in TRANSACTION_CATEGORIES
@@ -950,6 +996,7 @@ def types(
     if which in ("categories", "both"):
         console.print("Supported leave categories:")
         console.print("  " + ", ".join(TRANSACTION_CATEGORIES))
+        console.print("  ppl: Paid Parental Leave (PPL); fmla: Family and Medical Leave Act (FMLA), usage only")
 
     if which in ("directions", "both"):
         console.print("Supported transaction directions:")

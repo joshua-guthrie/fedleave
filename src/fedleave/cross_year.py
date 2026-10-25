@@ -35,6 +35,7 @@ class Snapshot(dict):
 
     config: dict
     warnings: list[dict]
+    entitlement_history: list[dict]
 
 
 def seed_accruals(ledger: dict) -> None:
@@ -163,15 +164,26 @@ def resolve_snapshot(
     remove_legacy_transaction_history(ledger)
     metadata = _initialization(ledger)
     warnings = []
+    entitlement_history = []
     if metadata.get("mode", metadata.get("method")) == "carryover":
         source_year = metadata["source_leave_year"]
         if source_year != year - 1:
             raise AccountingError("SOURCE_NOT_CONTIGUOUS", f"Invalid predecessor {source_year} for {year}")
-        source = resolve_snapshot(base, source_year, config, cache=cache)
+        try:
+            source = resolve_snapshot(base, source_year, config, cache=cache)
+        except AccountingError as exc:
+            if exc.code == "MISSING_SOURCE_YEAR":
+                raise AccountingError(
+                    exc.code, "History incomplete: PPL/FMLA availability cannot be verified. " + str(exc)
+                ) from exc
+            raise
+        from .parental import history
+
+        entitlement_history = history(source)
         warnings.extend(source.warnings)
         if metadata.get("source_fingerprint") != source_fingerprint(source, config):
             derived, _ = derive_carryover(source, year, config, pay_periods=ledger.get("pay_period_count"))
-            ledger = replace_generated(ledger, derived, config)
+            ledger = replace_generated(ledger, derived, config, allow_parental_conflicts=True)
             warnings.append(
                 {
                     "code": "STALE_CARRYOVER",
@@ -194,6 +206,13 @@ def resolve_snapshot(
     snapshot = Snapshot(ledger)
     snapshot.config = config
     snapshot.warnings = warnings
+    snapshot.entitlement_history = entitlement_history
+    from .parental import validate_parental_state
+
+    try:
+        validate_parental_state(snapshot, config)
+    except ValueError as exc:
+        snapshot.warnings.append({"code": "INVALID_PARENTAL_HISTORY", "message": str(exc)})
     cache[year] = deepcopy(snapshot)
     return snapshot
 
@@ -223,6 +242,9 @@ def derive_carryover(
     periods = generate_pay_periods(boundary, count)
     cutoff = date.fromisoformat(source["leave_year_end"])
     work = deepcopy(dict(source))
+    work["entitlement_history"] = deepcopy(
+        getattr(source, "entitlement_history", source.get("entitlement_history", []))
+    )
     remove_legacy_transaction_history(work)
     ids = []
     for tx in work.get("transactions", []):
@@ -255,6 +277,8 @@ def derive_carryover(
             and lot.get("expiration_date")
             and lot["expiration_date"] < cutoff.isoformat()
         )
+        if category == "ppl":
+            retained_expired = 0.0  # PPL balance already resolves its event window.
         available_balance = balance - retained_expired
         try:
             policy = category_policy(category, rules)
@@ -275,6 +299,8 @@ def derive_carryover(
             category_lots = [lot for lot in state["lots"] if lot["category"] == category]
             known = sum(state["remaining"][str(lot["id"])] for lot in category_lots)
             unresolved = balance - known
+            if category == "ppl":
+                unresolved = float(work.get("starting_balances", {}).get("ppl", 0.0))
             if abs(unresolved) < EPSILON:
                 unresolved = 0.0
             openings[category] = unresolved
@@ -291,7 +317,9 @@ def derive_carryover(
             origins = set()
             for lot in category_lots:
                 hours = state["remaining"][str(lot["id"])]
-                if hours <= EPSILON or (lot.get("expiration_date") and lot["expiration_date"] < boundary.isoformat()):
+                if (hours <= EPSILON and category != "ppl") or (
+                    lot.get("expiration_date") and lot["expiration_date"] < boundary.isoformat()
+                ):
                     continue
                 legacy = lot.get("source") == "expiration-rollover" and not lot.get("origin_key")
                 origin_year = lot.get("origin_leave_year", None if legacy else source["leave_year"])
@@ -311,9 +339,21 @@ def derive_carryover(
                     else f"{origin_year}:{origin_id}"
                 )
                 origin_amount = lot.get("origin_earned_hours", None if legacy else lot["hours"])
+                origin_remaining = hours
+                if category == "ppl":
+                    from .parental import weekly_hours
+
+                    current_week = weekly_hours(config)
+                    origin_week = float(
+                        lot.get("origin_scheduled_weekly_hours", lot.get("scheduled_weekly_hours", current_week))
+                    )
+                    origin_remaining = hours * origin_week / current_week
                 if origin_year is not None and (not isinstance(origin_year, int) or origin_year > source["leave_year"]):
                     raise AccountingError("CONFLICTING_CARRYOVER", f"Invalid origin year for lot {lot['id']}")
-                if origin_amount is not None and _number(origin_amount, "origin earned amount") + EPSILON < hours:
+                if (
+                    origin_amount is not None
+                    and _number(origin_amount, "origin earned amount") + EPSILON < origin_remaining
+                ):
                     raise AccountingError("CONFLICTING_CARRYOVER", f"Lot {lot['id']} exceeds its original entitlement")
                 origin = origin_key
                 if legacy:
@@ -330,13 +370,27 @@ def derive_carryover(
                 dispositions = dict(lot.get("origin_dispositions", {}))
                 for event in work["transactions"]:
                     if (
-                        event.get("earned_transaction_id") == lot["id"]
+                        (
+                            event.get("earned_transaction_id") == lot["id"]
+                            or any(
+                                allocation.get("transaction_id") == lot["id"]
+                                for allocation in event.get("ppl_allocations", [])
+                            )
+                        )
                         and transaction_is_effective(event)
                         and event.get("direction") in {"used", "paid_out", "forfeited", "expired", "forced_decrease"}
                         and str(event["date"]) <= cutoff.isoformat()
                     ):
                         direction = event["direction"]
-                        dispositions[direction] = dispositions.get(direction, 0.0) + float(event["hours"])
+                        allocated = next(
+                            (
+                                allocation["hours"]
+                                for allocation in event.get("ppl_allocations", [])
+                                if allocation["transaction_id"] == lot["id"]
+                            ),
+                            event["hours"],
+                        )
+                        dispositions[direction] = dispositions.get(direction, 0.0) + float(allocated)
                 row = deepcopy(lot)
                 local_id = f"carry-{origin_year}-{fingerprint(origin_key)[:20]}"
                 row.update(
@@ -354,7 +408,9 @@ def derive_carryover(
                         "origin_transaction_id": origin_id,
                         "origin_earned_hours": origin_amount,
                         "origin_amount_known": origin_amount is not None,
-                        "previously_consumed_hours": None if origin_amount is None else float(origin_amount) - hours,
+                        "previously_consumed_hours": None
+                        if origin_amount is None
+                        else float(origin_amount) - origin_remaining,
                         "carried_from_leave_year": source["leave_year"],
                         "carried_from_transaction_id": lot["id"],
                         "carryover_chain": [*lot.get("carryover_chain", []), source["leave_year"]],
@@ -362,10 +418,16 @@ def derive_carryover(
                         "updated_at": boundary.isoformat() + "T00:00:00",
                     }
                 )
+                if category == "ppl":
+                    row.update(scheduled_weekly_hours=current_week, origin_scheduled_weekly_hours=origin_week)
                 row.pop("rolled_over_to_transaction_id", None)
                 transactions.append(row)
                 carried += hours
             opening = unresolved + carried
+            if category == "ppl":
+                opening = unresolved + min(
+                    (row["hours"] for row in transactions if row["category"] == "ppl"), default=0.0
+                )
         else:
             openings[category] = opening
             if opening > EPSILON:
@@ -464,7 +526,7 @@ def category_policy_safe(category: str, rules: dict) -> bool:
         return False
 
 
-def replace_generated(target: dict, derived: dict, config: dict) -> dict:
+def replace_generated(target: dict, derived: dict, config: dict, *, allow_parental_conflicts: bool = False) -> dict:
     """Replace only marked derived records; reject orphan links and deficits."""
     result = deepcopy(target)
     genuine = [
@@ -513,6 +575,10 @@ def replace_generated(target: dict, derived: dict, config: dict) -> dict:
         if w["code"] == "MISSING_LOT_PROVENANCE"
         and not float(result.get("starting_balances", {}).get(w.get("category"), 0))
     )
+    if allow_parental_conflicts:
+        # Reads preserve orphaned historical PPL usage for diagnostics. Explicit
+        # reconciliation/mutations must still reject an invalid proposed state.
+        conflicts = [row for row in conflicts if row.get("category") != "ppl"]
     if conflicts:
         raise AccountingError("CONFLICTING_CARRYOVER", str(conflicts))
     return result
@@ -613,6 +679,10 @@ def reconciliation_plan(base: Path, year: int, *, repair_openings: bool = False)
             ]
         snapshot = Snapshot(updated)
         snapshot.config, snapshot.warnings = config, []
+        from .parental import history, validate_parental_state
+
+        snapshot.entitlement_history = history(source) if mode == "carryover" else []
+        validate_parental_state(snapshot, config)
         cache[current] = snapshot
         old_lots = [tx for tx in raw.get("transactions", []) if tx.get("source") == "expiration-rollover"]
         new_lots = [tx for tx in updated.get("transactions", []) if tx.get("source") == "expiration-rollover"]
@@ -713,6 +783,8 @@ def manual_ledger(
     config: dict | None = None,
 ) -> dict:
     """Independent manual baseline; never discovers or imports older years."""
+    if any(float(balances.get(category, 0.0)) for category in ("ppl", "fmla")):
+        raise AccountingError("INVALID_PARENTAL_OPENING", "PPL needs a dated earned entitlement; FMLA is usage only")
     if not 1 <= year <= 9998:
         raise AccountingError("INVALID_YEAR", "Leave-year identifier must be between 1 and 9998")
     increment = _number((config or {}).get("defaults", {}).get("time_increment_hours", 0.25), "time increment")

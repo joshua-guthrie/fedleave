@@ -30,6 +30,8 @@ def force_balance(
         effective_date = parse_iso_date(date).isoformat()
         if category not in TRANSACTION_CATEGORIES:
             raise ValueError(f"Invalid category: {category}.")
+        if category in {"ppl", "fmla"}:
+            raise ValueError("PPL/FMLA balances cannot be forced; correct the original dated entitlement or usage.")
         if hours < 0:
             raise ValueError("Forced balance must be zero or positive.")
         comment = sanitize_text(comment, field_name="comment")

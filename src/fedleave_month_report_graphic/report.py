@@ -64,6 +64,8 @@ CATEGORY_LABELS = {
     "flex": ("Flex", "Flex"),
     "other": ("Other", "Other"),
     "restored_annual": ("RA", "Restored Annual"),
+    "ppl": ("PPL", "Paid Parental Leave (PPL)"),
+    "fmla": ("FMLA", "Family and Medical Leave Act (FMLA)"),
 }
 
 NEGATIVE_DIRECTIONS = {"used", "expired", "forfeited", "voided"}

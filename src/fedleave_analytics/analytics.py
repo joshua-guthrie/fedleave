@@ -7,6 +7,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 from typing import Any, Callable
 
+from fedleave.transaction_effects import transaction_is_physical_absence
+
 EXCLUDED_STATUSES = {"denied", "cancelled", "voided", "deleted"}
 BALANCE_INCREASING_DIRECTIONS = {"earned", "restored", "adjusted", "corrected", "reconciled", "forced_increase"}
 BALANCE_DECREASING_DIRECTIONS = {"used", "paid_out", "forfeited", "expired", "forced_decrease"}
@@ -242,9 +244,18 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
     transactions = [
         row for row in transactions if (transaction_date := _date(row)) and start <= transaction_date <= end
     ]
-    absence = [row for row in transactions if row.get("direction") == "used"]
+    absence = [row for row in transactions if transaction_is_physical_absence(row)]
     total_absence = sum(_hours(row) for row in absence)
     visible_categories = _visible_categories(payload, transactions)
+    derived_fmla = [
+        {**row, "category": "fmla", "derived": True, "source_transaction_id": row.get("id")}
+        for row in absence
+        if row.get("category") == "ppl"
+    ]
+    tracking_rows = [*transactions, *derived_fmla]
+    if derived_fmla and "fmla" not in visible_categories:
+        visible_categories.append("fmla")
+        visible_categories.sort()
     detail_transactions = [_transaction_detail(row, today) for row in transactions]
 
     month_starts = _month_starts(start, end)
@@ -319,7 +330,7 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
             if direction == "earned" and category in {"annual", "sick"}:
                 continue
             selected_rows = [
-                row for row in transactions if row.get("category") == category and row.get("direction") == direction
+                row for row in tracking_rows if row.get("category") == category and row.get("direction") == direction
             ]
             total = sum(_hours(row) for row in selected_rows)
             if total <= EPSILON:
@@ -344,7 +355,8 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
             heatmap_options.append(
                 {
                     "key": key,
-                    "label": f"{category.replace('_', ' ').title()} — {direction.title()}",
+                    "label": f"{ {'ppl': 'Paid Parental Leave (PPL)', 'fmla': 'Family and Medical Leave Act (FMLA)'}.get(category, category.replace('_', ' ').title()) } — {direction.title()}"
+                    + (" (tracking only)" if category == "fmla" else ""),
                     "category": category,
                     "direction": direction,
                     "total_hours": total,
@@ -370,7 +382,7 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
         earned_or_added = sum(
             _hours(row) for row in month_rows if row.get("direction") in BALANCE_INCREASING_DIRECTIONS
         )
-        used = sum(_hours(row) for row in month_rows if row.get("direction") == "used")
+        used = sum(_hours(row) for row in month_rows if transaction_is_physical_absence(row))
         paid_out = sum(_hours(row) for row in month_rows if row.get("direction") == "paid_out")
         forfeited = sum(_hours(row) for row in month_rows if row.get("direction") == "forfeited")
         expired = sum(_hours(row) for row in month_rows if row.get("direction") == "expired")
@@ -387,6 +399,8 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
             }
         )
         for category in visible_categories:
+            if category == "fmla":
+                continue  # Entitlement tracking is not paid-leave accumulation.
             category_rows = [row for row in month_rows if row.get("category") == category]
             if not category_rows:
                 continue
@@ -737,7 +751,10 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
             }
         )
 
+    from fedleave.parental import parental_report
+
     return {
+        "parental": parental_report(payload, payload.get("snapshot_rules"), as_of=today),
         "year": payload.get("year", payload.get("leave_year")),
         "leave_year_start": start.isoformat(),
         "leave_year_end": end.isoformat(),

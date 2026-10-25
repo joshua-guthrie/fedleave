@@ -88,3 +88,38 @@ openings/lots and preserves genuine destination activity. Backups precede a
 recoverable journal; errors roll back where possible, and interrupted work
 requires explicit `carryover-reconcile --recover`. Per-file atomic replacement
 is not represented as multi-file atomicity.
+
+## PPL and FMLA accounting
+
+`parental.py` supplies the shared PPL window and FMLA first-use-period reports.
+Snapshots carry operation-local `entitlement_history`, comprising genuine PPL
+and FMLA source events across explicit adjacent-year links. Carried credits and
+derived expiration/FMLA effects are excluded from this history. Manual boundaries
+remain authoritative. JSON snapshots/list outputs expose history and rules to
+companions; no companion walks or writes authoritative ledgers independently.
+
+PPL is a nonextendable expiring lot whose entered earned date anchors its
+calendar anniversary. Unlike FIFO categories, one use debits **every active PPL
+event window**, including exhausted windows. Simultaneous same-date grants are
+rejected. Availability is the minimum remaining active allowance, never their
+sum. Zero-hour carried windows preserve overlap constraints until expiration.
+Original grant hours/tour and dispositions remain auditable; carried hours are
+converted through remaining workweeks to the current tour.
+
+FMLA has no earned or opening credit. One genuine PPL use produces one derived
+FMLA contribution with its source ID/year/status. Manual FMLA is additional
+non-PPL tracking. `transaction_effects.transaction_is_physical_absence` excludes
+FMLA from generic absence analytics. Current-period balances are negative recorded
+hours; capacity uses twelve workweeks and captured transaction tours. Confirmed
+and provisional first-use periods are distinct. Missing coverage yields null
+capacity with explicit warnings, not presumed unused entitlement.
+
+All ordinary mutations pass `parental.validate_write` before backups/replacement.
+It validates a proposed canonical copy using current ancestor state, so a newly
+entered source grant works immediately in an already-created successor without
+silently persisting a reconciliation. Same-day ambiguous new use requires the
+explicit CLI acknowledgement and retains a transaction marker. Import validates
+the entire proposed parental graph before any ledger writes; creation and
+reconciliation validate their pure plans. Journal recovery deliberately restores
+original bytes through the atomic storage primitive without revalidating a
+partially restored graph. Queries only recompute effects on private copies.

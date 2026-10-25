@@ -127,9 +127,58 @@ explicit lot links. Warning-only expiration removes availability and reports a
 warning without inventing a disposal transaction. Configured expiration or
 forfeiture takes effect in the ledger owning that date, once.
 
-PPL and FMLA are not introduced by this change. Future categories must register
-their carryover/usage policy and reuse the same snapshots; a carried entitlement
-must never be renewed merely by crossing a year boundary.
+PPL uses these same snapshots with fixed calendar-month windows and special
+overlap allocation. FMLA follows usage across the explicit ancestry without a
+rollover credit. Neither entitlement renews at a leave-year boundary.
+
+### Paid Parental Leave (PPL) and FMLA
+
+Record PPL as a normal dated entitlement, then enter usage. The **earned date
+stands for the qualifying birth/placement date** and starts the nonextendable
+12-calendar-month use window. A September 1, 2026 grant is usable through
+August 31, 2027; unused hours become unavailable September 1. There is no
+automatic award, payout, separate event record, or service-obligation tracker.
+
+```bash
+fedleave add --year 2026 --date 2026-09-01 --category ppl --earned 480 --data-dir /path/to/data
+fedleave add --year 2026 --date 2026-10-01 --category ppl --used 8 --data-dir /path/to/data
+fedleave add --year 2026 --date 2026-10-15 --category fmla --used 8 --data-dir /path/to/data
+fedleave balance --year 2027 --as-of 2027-03-01 --json --data-dir /path/to/data
+fedleave expirations --year 2027 --category ppl --json --data-dir /path/to/data
+```
+
+PPL use consumes FMLA automatically. Enter manual `fmla used` only for
+**additional non-PPL FMLA use**. Eight PPL hours and eight additional FMLA hours
+produce a `-16` FMLA tracker and eight physical PPL absence hours. Standalone
+FMLA adds no absence; record its underlying annual/sick/LWOP absence separately
+when appropriate. Same-day manual FMLA and PPL require
+`--acknowledge-fmla-overlap`; existing overlaps are retained with warnings.
+
+Calendar's day editor provides the full category names, PPL **Earn/Use**, and
+FMLA **Use only**. Switching a new PPL row to Earn suggests an editable 480-hour
+standard full-time example; saved values are preserved. The CLI still requires
+an explicit amount. The balance status and expiration dialog show window dates,
+scheduled use, source identity, loss, FMLA period and coverage warnings. All
+authoritative reads and writes use the selected CLI executable/data directory.
+
+The limit is **12 administrative workweeks**, normally 480 hours for a 40-hour
+week. A four-day, ten-hour tour remains 480; five ten-hour days give 600. The
+configured workday, lunch and normal workdays determine the weekly conversion;
+`rules.fmla.weekly_hours` permits an agency-confirmed alternate conversion.
+FMLA periods start with first use, independently of PPL grant dates. Future and
+unresolved usage is labeled provisional; confirmed periods are also reported.
+
+Capacity is **N/A / JSON null** until prior FMLA history is reviewed and
+`rules.fmla.history_complete_from` records its verified start in `config.json`.
+Record the actual period origin and all relevant usage, including earlier-year
+use. Missing explicitly linked files stop the query with an incomplete-history
+error. Reports never create files or repair source history automatically.
+These are employee-entered tracking results, not agency eligibility or approval.
+
+See [the PPL/FMLA guide](docs/PARENTAL_LEAVE.md) for coverage, alternate schedules,
+overlaps and audit fields. Policy references:
+[OPM PPL](https://www.opm.gov/policy-data-oversight/pay-leave/leave-administration/fact-sheets/paid-parental-leave/),
+[OPM FMLA](https://www.opm.gov/policy-data-oversight/pay-leave/leave-administration/fact-sheets/family-and-medical-leave/).
 
 ### Preview, source edits, and reconciliation
 
@@ -701,7 +750,7 @@ Commands and common options:
 			- `--authoritative` removes transactions with the same date, category, and direction before adding the new transaction.
 			- `--json` emits the created transaction ID and any replaced transaction IDs.
 			- Transaction IDs are hidden by default in human-readable output. Use `--show-transaction-ids` or `--ShowTransactionIDs` when needed.
-			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual.
+			- Valid categories include: annual, sick, overtime, comp, credit, travel_comp, admin, lwop, military, court, religious_comp, time_off_award, excused, holiday, flex, other, restored_annual, ppl, fmla.
 
 		Examples:
 			fedleave add --date 2026-03-10 --category annual --used 4 --description "Medical appointment"
@@ -734,7 +783,7 @@ Commands and common options:
 		Show individually tracked expiring-leave lots and reminder totals.
 
 		Syntax:
-			fedleave expirations [--year YEAR] [--within-pay-periods N] [--category comp|travel_comp|restored_annual|time_off_award] [--json] [--data-dir PATH]
+			fedleave expirations [--year YEAR] [--within-pay-periods N] [--category comp|travel_comp|restored_annual|time_off_award|ppl] [--as-of YYYY-MM-DD] [--json] [--data-dir PATH]
 
 		Notes:
 			- Uses consume the lot with the earliest expiration first and retain `earned_transaction_id` links.
