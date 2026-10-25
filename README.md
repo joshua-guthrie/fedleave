@@ -1078,8 +1078,39 @@ FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
     --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
 ```
 
-Seasonality counts only actual or scheduled absence (`direction = used`).
-Undefined statistics are displayed as `N/A`, not fabricated zeroes.
+Seasonality has exactly two selectors: **Analysis** and **Leave Type**. The
+default is **Leave Used by Month** + **All Leave Used**, preserving the original
+absence totals. Choose a type such as **Comp Time — Used**, **Travel Comp —
+Earned**, or **Paid Parental Leave (PPL) — Earned** to inspect that activity by
+month, weekday, or actual pay period. Supported types remain selectable with
+zero activity, and a missing selection after refresh safely returns to All Leave
+Used. PPL choices appear when supported by the selected backend.
+
+The original five Analysis options remain in the same order. Leave Type is
+enabled for the first three date groupings, and disabled for **Overtime Worked
+by Month** and **Net Leave Accumulation by Month**; those calculations retain
+their existing behavior. Returning to a leave grouping restores the type choice.
+The selected type/activity appears in the chart title, supporting table,
+drilldown, popup chart, and CSV metadata. Export names distinguish selections.
+
+Earned views include genuine new comp, travel-comp, credit-hour, award, restored
+annual and PPL credits. Annual and sick earned/accrual choices are excluded.
+Rollover lots, openings and balance adjustments are not new earnings, even when
+a carried lot has an `earned` direction. Documented legacy credit `worked` rows
+count as credits; suspected duplicate worked/earned pairs warn and exclude the
+uncertain worked row. Unverified carryover provenance is excluded with source-ID
+warnings instead of inflating totals. Restored annual is labeled **Restored**.
+
+**Recorded Through Cutoff** includes effective past planned/requested entries
+and does not assert attendance. Used views label later entries **Future
+Scheduled**; earned views label them **Future Dated**. FMLA, when available,
+appears only as **FMLA Tracking — Used** and includes derived PPL consumption;
+All Leave Used excludes FMLA tracking so physical absence is counted once.
+Unknown/incomplete totals carry diagnostics and `N/A` rather than a verified
+zero. Charts use the cached CLI snapshot and never write source ledgers.
+
+Calendar Heatmap, Summary and the Overtime/Comp/Credit tab retain their existing
+controls and data; the new Leave Type selector applies only to Seasonality.
 
 ### Companion Application: AnnualLeaveChartForTheYear
 

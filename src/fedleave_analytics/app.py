@@ -8,7 +8,7 @@ import json
 import re
 import subprocess
 import sys
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,7 @@ from .charts import (
     render_horizontal_bar_chart,
     table_widget,
 )
+from .seasonality import seasonality_options, seasonality_series
 
 SUMMARY_COLUMNS = [
     ("metric", "Metric"),
@@ -207,6 +208,12 @@ SEASONALITY_VIEWS: dict[str, tuple[str, list[tuple[str, str]], str, list[tuple[s
     ),
 }
 
+SEASONALITY_GROUPINGS = {
+    "Leave Used by Month": "month",
+    "Leave Used by Day of Week": "weekday",
+    "Leave Used by Pay Period": "pay_period",
+}
+
 
 def _payload_value(data: dict[str, Any], path: str) -> Any:
     value: Any = data
@@ -308,6 +315,11 @@ class AnalyticsWindow(QMainWindow):
         self._current_columns: list[tuple[str, str]] = []
         self._defaulted_splitters: set[int] = set()
         self._monthly_splitters: list[QSplitter] = []
+        self._seasonality_result: dict | None = None
+        self._seasonality_rows: list[dict] = []
+        self._seasonality_columns = MONTH_COLUMNS
+        self._seasonality_title = ""
+        self._default_notice_text = "No data loaded yet."
 
         self.setWindowTitle("FedLeave Analytics")
         self.resize(1320, 860)
@@ -407,6 +419,16 @@ class AnalyticsWindow(QMainWindow):
         self.seasonality_selector.addItems(SEASONALITY_VIEWS)
         self.seasonality_selector.currentTextChanged.connect(self._render_seasonality)
         row.addWidget(self.seasonality_selector)
+        self.seasonality_selector.setToolTip(
+            "The first three analyses choose the time grouping; Leave Type chooses usage or new credits."
+        )
+        row.addWidget(QLabel("Leave Type"))
+        self.leave_type_selector = QComboBox()
+        self.leave_type_selector.setToolTip(
+            "Filter Seasonality only. Earned means genuine new credit, excluding carryover and balance adjustments."
+        )
+        self.leave_type_selector.currentIndexChanged.connect(self._render_seasonality)
+        row.addWidget(self.leave_type_selector)
         row.addStretch(1)
         layout.addLayout(row)
         self.seasonality_description = QLabel()
@@ -608,6 +630,15 @@ class AnalyticsWindow(QMainWindow):
 
         self.summary_table = self._replace_table(self.summary_table, self.data["summary"], SUMMARY_COLUMNS)
         self.warning_table = self._replace_table(self.warning_table, self.data["warnings"], WARNING_COLUMNS)
+        self._default_notice_text = self.notice_label.text()
+        current = self.leave_type_selector.currentData()
+        self.leave_type_selector.blockSignals(True)
+        self.leave_type_selector.clear()
+        context = self.data["seasonality_context"]
+        for option in seasonality_options(context["snapshot"]):
+            self.leave_type_selector.addItem(option["label"], option["key"])
+        self.leave_type_selector.setCurrentIndex(max(0, self.leave_type_selector.findData(current)))
+        self.leave_type_selector.blockSignals(False)
         self._render_seasonality()
         self._render_heatmap()
         lifecycle = self.data["lifecycle"]
@@ -649,6 +680,10 @@ class AnalyticsWindow(QMainWindow):
         name = self.seasonality_selector.currentText()
         path, columns, label_key, series = SEASONALITY_VIEWS[name]
         rows = list(_payload_value(self.data, path))
+        title = f"{name} — {self.data['year']}"
+        grouping = SEASONALITY_GROUPINGS.get(name)
+        self.leave_type_selector.setEnabled(grouping is not None)
+        self._seasonality_result = None
         descriptions = {
             "Leave Used by Month": "Actual and scheduled absence grouped by calendar month within the selected leave year.",
             "Leave Used by Day of Week": "Actual and scheduled absence grouped Monday through Sunday; weekends remain visible.",
@@ -657,6 +692,23 @@ class AnalyticsWindow(QMainWindow):
             "Net Leave Accumulation by Month": "Balance-increasing hours minus used, paid-out, forfeited, and expired hours. Starting balances are excluded.",
         }
         self.seasonality_description.setText(descriptions[name])
+        if grouping:
+            context = self.data["seasonality_context"]
+            key = self.leave_type_selector.currentData() or "all-used"
+            option = next(row for row in seasonality_options(context["snapshot"]) if row["key"] == key)
+            self._seasonality_result = seasonality_series(
+                context["snapshot"],
+                grouping=grouping,
+                category=option["category"],
+                activity=option["activity"],
+                cutoff=date.fromisoformat(context["cutoff"]),
+            )
+            result = self._seasonality_result
+            rows, columns, label_key, series, title = (
+                result[field] for field in ("rows", "columns", "label_key", "series", "title")
+            )
+            self.seasonality_description.setText(result["description"])
+        self._seasonality_rows, self._seasonality_columns, self._seasonality_title = rows, columns, title
         new_table = table_widget(rows, columns)
         new_table.cellDoubleClicked.connect(self._seasonality_drilldown)
         table_index = self.seasonality_splitter.indexOf(self.seasonality_table)
@@ -664,7 +716,7 @@ class AnalyticsWindow(QMainWindow):
         self.seasonality_splitter.insertWidget(table_index, new_table)
         self.seasonality_table.deleteLater()
         self.seasonality_table = new_table
-        chart = render_horizontal_bar_chart(f"{name} — {self.data['year']}", rows, label_key, series)
+        chart = render_horizontal_bar_chart(title, rows, label_key, series)
         self.seasonality_chart_image.set_source_pixmap(chart)
         self.seasonality_chart_scroll.show()
         self.seasonality_splitter.setSizes([600, 300])
@@ -759,11 +811,7 @@ class AnalyticsWindow(QMainWindow):
                 self.summary_table, self.data.get("summary", []) if self.data else [], SUMMARY_COLUMNS
             )
         elif page == 1:
-            name = self.seasonality_selector.currentText()
-            path, columns, _label, _series = SEASONALITY_VIEWS[name]
-            self._set_current_table(
-                self.seasonality_table, list(_payload_value(self.data, path)) if self.data else [], columns
-            )
+            self._set_current_table(self.seasonality_table, self._seasonality_rows, self._seasonality_columns)
         elif page == 2:
             self._schedule_default_chart_ratio(self.heatmap_splitter)
             selected_key = str(self.heatmap_selector.currentData() or "all-used")
@@ -784,6 +832,11 @@ class AnalyticsWindow(QMainWindow):
             if index >= 4:
                 self._schedule_default_chart_ratio(self._monthly_splitters[index - 4])
             self._set_current_table(*mappings[index])
+        self.notice_label.setText(
+            "Seasonality shows recorded hours through the cutoff and future dated entries; unresolved statuses do not confirm attendance."
+            if page == 1 and self._seasonality_result
+            else self._default_notice_text
+        )
 
     def _set_current_table(
         self, table: QTableWidget, rows: list[dict[str, Any]], columns: list[tuple[str, str]]
@@ -797,10 +850,7 @@ class AnalyticsWindow(QMainWindow):
             return
         page = self.pages.currentIndex()
         if page == 1:
-            name = self.seasonality_selector.currentText()
-            path, columns, _label_key, _series = SEASONALITY_VIEWS[name]
-            rows = list(_payload_value(self.data, path))
-            title = f"{name} — {self.data['year']}"
+            rows, columns, title = self._seasonality_rows, self._seasonality_columns, self._seasonality_title
         elif page == 2:
             selected_key = str(self.heatmap_selector.currentData() or "all-used")
             rows = self.data["heatmap_series"][selected_key]
@@ -863,6 +913,10 @@ class AnalyticsWindow(QMainWindow):
             QMessageBox.information(self, "Save Table", "The selected table has no rows to export.")
             return
         default_name = f"fedleave-analytics-{self.data['year']}.csv"
+        seasonality = self._seasonality_result if self.pages.currentIndex() == 1 else None
+        if seasonality:
+            selection = seasonality["selection"]
+            default_name = f"fedleave-seasonality-{selection['key'].replace(':', '-')}-{selection['grouping']}-{self.data['year']}.csv"
         default_path = str(Path(self.pdf_folder).expanduser() / default_name) if self.pdf_folder else default_name
         path, _filter = QFileDialog.getSaveFileName(self, "Save Table as CSV", default_path, "CSV files (*.csv)")
         if not path:
@@ -870,7 +924,10 @@ class AnalyticsWindow(QMainWindow):
         try:
             with Path(path).open("w", newline="", encoding="utf-8") as handle:
                 writer = csv.writer(handle)
-                writer.writerow(["Leave Year", self.data["year"]])
+                if seasonality:
+                    writer.writerows(seasonality["metadata"])
+                else:
+                    writer.writerow(["Leave Year", self.data["year"]])
                 writer.writerow([label for _key, label in self._current_columns])
                 for row in self._current_rows:
                     writer.writerow([row.get(key) for key, _label in self._current_columns])
@@ -879,6 +936,11 @@ class AnalyticsWindow(QMainWindow):
 
     def _seasonality_drilldown(self, row_index: int, _column: int) -> None:
         if not self.data:
+            return
+        if self._seasonality_result is not None:
+            index = self._source_row_index(self.seasonality_table, row_index)
+            if 0 <= index < len(self._seasonality_result["bucket_transactions"]):
+                TransactionDialog(self._seasonality_result["bucket_transactions"][index], self).exec()
             return
         name = self.seasonality_selector.currentText()
         path, _columns, _label, _series = SEASONALITY_VIEWS[name]
@@ -1028,12 +1090,32 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--year", type=int)
     parser.add_argument("--font-size", type=int, default=10)
     parser.add_argument("--pdf-folder", default="")
+    parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     backend = Path(args.backend) if args.backend else Path("fedleave")
     year = args.year or datetime.now().year
     app = QApplication.instance() or QApplication(sys.argv)
     data_dir = args.data_dir or str(get_default_data_dir())
-    window = AnalyticsWindow(backend, data_dir, year, args.font_size, args.pdf_folder)
+    window = AnalyticsWindow(backend, data_dir, year, args.font_size, args.pdf_folder, auto_load=not args.smoke_test)
+    if args.smoke_test:
+        # Installed-bundle QA: use the real sibling CLI and render the existing
+        # Seasonality page without writing any ledger or creating another app.
+        window.set_data(load_analytics_data(backend, data_dir, year))
+        window.pages.setCurrentIndex(1)
+        assert len(window.seasonality_page.findChildren(QComboBox)) == 2
+        assert window.leave_type_selector.currentData() == "all-used"
+        for key in ("comp:earned", "comp:used"):
+            index = window.leave_type_selector.findData(key)
+            assert index >= 0
+            window.leave_type_selector.setCurrentIndex(index)
+            for name in SEASONALITY_GROUPINGS:
+                window.seasonality_selector.setCurrentText(name)
+                assert window._seasonality_result["selection"]["key"] == key
+                assert not window.seasonality_chart_image.source_pixmap().isNull()
+        window.show()
+        app.processEvents()
+        window.close()
+        return 0
     window.show()
     return app.exec()
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import subprocess
@@ -152,6 +153,35 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
             # issue in installed/frozen children too. Windows NUL previously
             # appeared interactive, so a clean-store validation would miss it.
             base = root / "data" if restricted else root / ("local" if os.name == "nt" else "xdg") / "fedleave"
+            # The existing packaged Analytics executable must actually render
+            # Seasonality's two selectors against this exact CLI/datastore.
+            suffix = ".exe" if os.name == "nt" else ""
+            sibling = Path(command).parent
+            before_gui = {
+                str(path.relative_to(base)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in base.rglob("*")
+                if path.is_file()
+            }
+            subprocess.run(
+                [
+                    str(sibling / ("FedLeaveAnalytics" + suffix)),
+                    "--smoke-test",
+                    "--backend",
+                    str(sibling / ("fedleave" + suffix)),
+                    "--data-dir",
+                    str(base),
+                    "--year",
+                    "2026",
+                ],
+                env={**env, "QT_QPA_PLATFORM": "offscreen"},
+                check=True,
+                timeout=60,
+            )
+            assert {
+                str(path.relative_to(base)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in base.rglob("*")
+                if path.is_file()
+            } == before_gui
             year_path = base / "leave_years" / "2026.json"
             year = json.loads(year_path.read_text(encoding="utf-8"))
             original_date = year["transactions"][0]["date"]

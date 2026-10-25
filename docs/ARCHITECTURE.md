@@ -123,3 +123,22 @@ the entire proposed parental graph before any ledger writes; creation and
 reconciliation validate their pure plans. Journal recovery deliberately restores
 original bytes through the atomic storage primitive without revalidating a
 partially restored graph. Queries only recompute effects on private copies.
+
+## Seasonality selections
+
+`fedleave_analytics.seasonality` owns the validated category/activity/grouping
+selection and pure result used only by the Seasonality tab. Backend registry
+metadata supplies supported categories, including zero-activity choices and
+conditional PPL support. Original credits are distinguished from carryover,
+openings and adjustments; legacy credit worked/earned ambiguity is reported.
+Canonical transaction eligibility applies before date grouping. FMLA tracking
+is separate from physical absence.
+
+`analyze_leave_year` adds an operation-local `seasonality_context` containing a
+private snapshot and injected cutoff. Existing analytics fields are preserved.
+Changing Seasonality controls makes no subprocess call: one result supplies
+the chart, table, sorted-row transaction drilldowns, popup and CSV metadata.
+The overtime/net analyses retain their existing data and disable Leave Type.
+Heatmap, Summary and lifecycle calculations do not use this new selection path.
+The installed Analytics smoke mode exercises both controls through the real
+sibling CLI and checks that the selected datastore hashes remain unchanged.

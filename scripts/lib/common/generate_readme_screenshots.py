@@ -321,6 +321,7 @@ def _gui_screenshots(data_dir: Path) -> None:
 
     analytics.pages.setCurrentIndex(1)
     analytics.seasonality_selector.setCurrentText("Leave Used by Month")
+    analytics.leave_type_selector.setCurrentIndex(analytics.leave_type_selector.findData("comp:earned"))
     _capture(analytics, EXAMPLES / "fedleave-analytics-seasonality.png", 1920, 1080, app)
 
     analytics.pages.setCurrentIndex(2)

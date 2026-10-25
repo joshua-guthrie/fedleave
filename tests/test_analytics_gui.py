@@ -11,6 +11,7 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 from fedleave_analytics.analytics import analyze_leave_year
 from fedleave_analytics.app import AnalyticsWindow
 from fedleave_analytics.charts import render_bar_chart, render_heatmap, render_horizontal_bar_chart, table_widget
+from test_analytics import seasonal_payload, seasonal_tx
 
 
 def _application() -> QApplication:
@@ -239,3 +240,201 @@ def test_embedded_and_opened_charts_fit_their_available_space():
     assert second.width() <= chart.scroll_area.viewport().width()
     assert second.height() <= chart.scroll_area.viewport().height()
     assert second != first
+
+
+def _seasonality_window(qtbot):
+    data = analyze_leave_year(
+        seasonal_payload(
+            [
+                seasonal_tx("comp-new", direction="earned", hours=10),
+                seasonal_tx("comp-future", direction="earned", hours=2, day="2026-07-01"),
+                seasonal_tx("comp-use", hours=4),
+                seasonal_tx("annual-use", "annual", hours=8),
+                seasonal_tx("carry", direction="earned", hours=100, source="expiration-rollover"),
+            ]
+        ),
+        date(2026, 6, 1),
+    )
+    window = AnalyticsWindow(Path("fedleave"), "/exact selected data", 2026, auto_load=False)
+    qtbot.addWidget(window)
+    window.set_data(data)
+    window.pages.setCurrentIndex(1)
+    return window
+
+
+def test_seasonality_exactly_two_selectors_preserve_analysis_and_option_state(qtbot, monkeypatch):
+    from PySide6.QtWidgets import QComboBox
+
+    import fedleave_analytics.app as module
+
+    window = _seasonality_window(qtbot)
+    assert len(window.seasonality_page.findChildren(QComboBox)) == 2
+    assert window.seasonality_selector.currentText() == "Leave Used by Month"
+    assert window.leave_type_selector.currentData() == "all-used"
+    names = [window.seasonality_selector.itemText(index) for index in range(5)]
+    assert names == [
+        "Leave Used by Month",
+        "Leave Used by Day of Week",
+        "Leave Used by Pay Period",
+        "Overtime Worked by Month",
+        "Net Leave Accumulation by Month",
+    ]
+    monkeypatch.setattr(
+        module.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(AssertionError("Dropdown must not call CLI"))
+    )
+    window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData("comp:earned"))
+    for name in names[:3]:
+        window.seasonality_selector.setCurrentText(name)
+        assert window.leave_type_selector.isEnabled()
+        assert window.leave_type_selector.currentData() == "comp:earned"
+        assert window._seasonality_result["total_hours"] == 12
+    for name, key in ((names[3], "overtime_months"), (names[4], "net_accumulation")):
+        window.seasonality_selector.setCurrentText(name)
+        assert not window.leave_type_selector.isEnabled()
+        assert window._current_rows == window.data[key]
+        assert window._seasonality_result is None
+    window.seasonality_selector.setCurrentText(names[0])
+    assert window.leave_type_selector.currentData() == "comp:earned"
+    assert window._seasonality_title == "Comp Time Earned by Month — 2026"
+    assert window.seasonality_table.horizontalHeaderItem(2).text() == "Future Dated"
+
+
+def test_seasonality_refresh_and_backend_registry_fallback(qtbot):
+    from copy import deepcopy
+
+    window = _seasonality_window(qtbot)
+    window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData("ppl:earned"))
+    assert "No matching transactions" in window.seasonality_description.text()
+    data = deepcopy(window.data)
+    window.set_data(data)
+    assert window.leave_type_selector.currentData() == "ppl:earned"
+    data["seasonality_context"]["snapshot"]["category_definitions"].pop("ppl")
+    window.set_data(data)
+    assert window.leave_type_selector.currentData() == "all-used"
+    keys = [window.leave_type_selector.itemData(index) for index in range(window.leave_type_selector.count())]
+    assert "ppl:earned" not in keys
+    assert not {"annual:earned", "sick:earned", "fmla:earned"} & set(keys)
+
+
+def test_seasonality_zero_data_earned_view_and_other_pages_remain_unchanged(qtbot):
+    from copy import deepcopy
+
+    window = _seasonality_window(qtbot)
+    baseline = deepcopy(window.data)
+    window.heatmap_selector.setCurrentIndex(window.heatmap_selector.findData("comp:used"))
+    for key in ("comp:earned", "travel_comp:earned", "annual:used", "ppl:earned"):
+        window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData(key))
+        assert not window.seasonality_chart_image.source_pixmap().isNull()
+    assert "No matching transactions" in window.seasonality_description.text()
+    assert window.pages.count() == 4
+    assert window.heatmap_selector.currentData() == "comp:used"
+    for key in (
+        "summary",
+        "months",
+        "weekdays",
+        "pay_periods",
+        "heatmap",
+        "heatmap_options",
+        "heatmap_series",
+        "lifecycle",
+        "overtime_months",
+        "net_accumulation",
+    ):
+        assert window.data[key] == baseline[key]
+
+
+def test_seasonality_sorted_drilldown_uses_only_contributing_credits(qtbot, monkeypatch):
+    import fedleave_analytics.app as module
+
+    window = _seasonality_window(qtbot)
+    captured = []
+
+    class Capture:
+        def __init__(self, rows, parent):
+            captured[:] = rows
+
+        def exec(self):
+            pass
+
+    monkeypatch.setattr(module, "TransactionDialog", Capture)
+    window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData("comp:earned"))
+    for name in ("Leave Used by Month", "Leave Used by Day of Week", "Leave Used by Pay Period"):
+        window.seasonality_selector.setCurrentText(name)
+        table = window.seasonality_table
+        table.sortItems(table.columnCount() - 1, Qt.DescendingOrder)
+        window._seasonality_drilldown(0, 0)
+        assert [row["transaction_id"] for row in captured] == ["comp-new"]
+        assert sum(row["hours"] for row in captured) == 10
+
+
+def test_seasonality_csv_popup_and_image_use_exact_selection(qtbot, monkeypatch, tmp_path):
+    import csv
+
+    window = _seasonality_window(qtbot)
+    window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData("comp:earned"))
+    target = tmp_path / "selected.csv"
+    suggested = []
+
+    def choose(*args, **kwargs):
+        suggested.append(args[2])
+        return str(target), "CSV"
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", choose)
+    window.save_csv()
+    with target.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))
+    assert ["Category", "comp"] in rows
+    assert ["Activity", "earned"] in rows and ["Time Grouping", "month"] in rows
+    assert ["Cutoff", "2026-06-01"] in rows and ["Units", "hours"] in rows
+    header = next(index for index, row in enumerate(rows) if row[0] == "Month")
+    assert len(rows[header + 1 :]) == len(window._current_rows)
+    assert sum(float(row[-1]) for row in rows[header + 1 :]) == 12
+    assert "comp-earned-month" in suggested[-1]
+    window.open_chart()
+    chart = window._chart_windows[-1]
+    assert chart.windowTitle() == "Comp Time Earned by Month — 2026"
+    assert "comp-time-earned-by-month" in chart._base_name
+    assert chart._pixmap.toImage() == window.seasonality_chart_image.source_pixmap().toImage()
+    png = tmp_path / "selected.png"
+    assert chart._pixmap.save(str(png))
+    assert png.stat().st_size > 1000
+
+
+def test_seasonality_loaded_from_readonly_exact_datastore_never_writes(qtbot, tmp_path, monkeypatch):
+    import sysconfig
+
+    import fedleave_analytics.app as module
+    from leave_year_support import store, tree
+
+    base = tmp_path / "selected datastore with spaces"
+    store(base, transactions=[seasonal_tx("new", direction="earned", hours=10), seasonal_tx("used", hours=4)])
+    backend = Path(sysconfig.get_path("scripts")) / ("fedleave.exe" if os.name == "nt" else "fedleave")
+    real_run = module.subprocess.run
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return real_run(command, **kwargs)
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    real_analyze = analyze_leave_year
+    monkeypatch.setattr(module, "analyze_leave_year", lambda value: real_analyze(value, date(2026, 6, 1)))
+    year_file = base / "leave_years/2026.json"
+    before = tree(base)
+    year_file.chmod(0o444)
+    year_file.parent.chmod(0o555)
+    try:
+        data = module.load_analytics_data(backend, str(base), 2026)
+        window = AnalyticsWindow(backend, str(base), 2026, auto_load=False)
+        qtbot.addWidget(window)
+        window.set_data(data)
+        window.pages.setCurrentIndex(1)
+        for name in list(module.SEASONALITY_GROUPINGS):
+            window.seasonality_selector.setCurrentText(name)
+            for key in ("all-used", "comp:earned", "comp:used", "travel_comp:earned"):
+                window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData(key))
+        assert calls == [[str(backend), "list", "--year", "2026", "--json", "--data-dir", str(base)]]
+        assert tree(base) == before
+    finally:
+        year_file.parent.chmod(0o755)
+        year_file.chmod(0o644)

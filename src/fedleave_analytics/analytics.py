@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import calendar
 from collections import defaultdict
+from copy import deepcopy
 from datetime import date, timedelta
 from typing import Any, Callable
 
@@ -754,6 +755,7 @@ def analyze_leave_year(payload: dict[str, Any], today: date | None = None) -> di
     from fedleave.parental import parental_report
 
     return {
+        "seasonality_context": {"snapshot": deepcopy(payload), "cutoff": today.isoformat()},
         "parental": parental_report(payload, payload.get("snapshot_rules"), as_of=today),
         "year": payload.get("year", payload.get("leave_year")),
         "leave_year_start": start.isoformat(),

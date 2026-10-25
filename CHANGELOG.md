@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a second Seasonality selector for per-type usage and genuine earned/restored credits across month, weekday and actual pay-period groupings, with consistent charts, sorted drilldowns and exports.
+- Exclude carried lots and uncertain credit copies from new-earning totals, retain zero-activity supported choices, and preserve the existing overtime/net views and other Analytics tabs.
+
 - Add Paid Parental Leave earned/use windows and usage-only FMLA tracking, with one derived FMLA contribution per PPL use and no duplicate physical absence.
 - Preserve source grant identity, overlapping event limits, schedule conversions and first-use FMLA periods across existing leave-year files, including source corrections after successor creation.
 - Add Calendar PPL Earn/Use with an editable 480-hour suggestion, FMLA Use only, expiration/coverage diagnostics and explicit acknowledgement of potential duplicate same-day tracking.
