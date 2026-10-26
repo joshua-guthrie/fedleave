@@ -136,6 +136,47 @@ def write_checksum(path: Path) -> Path:
     return checksum_path
 
 
+def required_glibc_versions(version_info: str) -> set[str]:
+    """Read ELF version *requirements*, not symbol definitions provided by a DSO."""
+    needs = version_info.partition("Version needs section")[2]
+    return set(re.findall(r"Name: (GLIBC_[A-Za-z0-9_.]+)", needs))
+
+
+def audit_linux_abi(bundle_dir: Path, max_glibc: str = "2.35") -> int:
+    """Reject any bundled ELF requiring a newer host libc than our baseline."""
+    if not re.fullmatch(r"\d+(?:\.\d+)+", max_glibc):
+        raise PackagingError("Invalid maximum GLIBC version")
+    if not bundle_dir.is_dir():
+        raise PackagingError(f"Bundle directory does not exist: {bundle_dir}")
+    ceiling = tuple(map(int, max_glibc.split(".")))
+    seen, failures = set(), []
+    elf_count = 0
+    for path in sorted(bundle_dir.rglob("*")):
+        if not path.is_file() or path.resolve() in seen:
+            continue
+        seen.add(path.resolve())
+        with path.open("rb") as handle:
+            if handle.read(4) != b"\x7fELF":
+                continue
+        elf_count += 1
+        result = subprocess.run(
+            ["readelf", "--version-info", "--wide", str(path)],
+            check=True,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "LC_ALL": "C"},
+        )
+        for version in sorted(required_glibc_versions(result.stdout)):
+            suffix = version.removeprefix("GLIBC_")
+            if not re.fullmatch(r"\d+(?:\.\d+)+", suffix) or tuple(map(int, suffix.split("."))) > ceiling:
+                failures.append(f"{path.relative_to(bundle_dir)} requires {version}")
+    if not elf_count:
+        raise PackagingError("No ELF files found; Linux ABI audit did not inspect a real bundle")
+    if failures:
+        raise PackagingError(f"Linux bundle exceeds GLIBC {max_glibc} compatibility baseline:\n" + "\n".join(failures))
+    return elf_count
+
+
 def validate_file_size(path: Path, max_mib: float) -> int:
     """Return artifact size after enforcing a packaging regression limit."""
     if not path.is_file():
@@ -212,6 +253,9 @@ def build_parser() -> argparse.ArgumentParser:
     size_parser = subparsers.add_parser("check-size", help="enforce a maximum artifact size")
     size_parser.add_argument("file", type=Path)
     size_parser.add_argument("--max-mib", type=float, required=True)
+    abi_parser = subparsers.add_parser("audit-linux-abi", help="check every ELF's required GLIBC versions")
+    abi_parser.add_argument("--bundle-dir", type=Path, required=True)
+    abi_parser.add_argument("--max-glibc", default="2.35")
     return parser
 
 
@@ -240,6 +284,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "check-size":
             size = validate_file_size(args.file.resolve(), args.max_mib)
             print(f"{args.file.name}: {size / 1024 / 1024:.1f} MiB (limit {args.max_mib:g} MiB)")
+        elif args.command == "audit-linux-abi":
+            count = audit_linux_abi(args.bundle_dir, args.max_glibc)
+            print(f"Validated {count} ELF files against GLIBC {args.max_glibc}.")
     except (OSError, PackagingError, subprocess.CalledProcessError) as exc:
         raise SystemExit(f"ERROR: {exc}") from exc
     return 0

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -82,6 +83,67 @@ def test_bundle_validation_is_driven_by_all_project_scripts(tmp_path: Path) -> N
     missing.unlink()
     with pytest.raises(module.PackagingError, match=re.escape(str(missing))):
         module.validate_bundle(bundle, "linux")
+
+
+def test_glibc_audit_reads_requirements_not_exported_version_definitions():
+    module = _load_packaging_module()
+    info = "Version definition section '.gnu.version_d':\n Name: GLIBC_2.99\nVersion needs section '.gnu.version_r':\n Name: GLIBC_2.9\n Name: GLIBC_2.35\n"
+    assert module.required_glibc_versions(info) == {"GLIBC_2.9", "GLIBC_2.35"}
+
+
+@pytest.mark.skipif(
+    os.name == "nt" or not shutil.which("gcc") or not shutil.which("readelf"), reason="ELF compiler/binutils test"
+)
+def test_glibc_audit_rejects_real_elf_with_the_reported_243_requirement(tmp_path):
+    module = _load_packaging_module()
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (tmp_path / "provider.c").write_text("int future_glib(void) { return 43; }\n")
+    (tmp_path / "consumer.c").write_text("extern int future_glib(void); int entry(void) { return future_glib(); }\n")
+    versions = tmp_path / "versions.map"
+    provider = bundle / "libfuture.so"
+    consumer = bundle / "libglib-2.0.so.0"
+    for version in ("2.43", "2.9"):
+        versions.write_text(f"GLIBC_{version} {{ global: future_glib; }};\n")
+        subprocess.run(
+            [
+                "gcc",
+                "-shared",
+                "-fPIC",
+                str(tmp_path / "provider.c"),
+                f"-Wl,--version-script={versions}",
+                "-o",
+                str(provider),
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["gcc", "-shared", "-fPIC", str(tmp_path / "consumer.c"), f"-L{bundle}", "-lfuture", "-o", str(consumer)],
+            check=True,
+        )
+        if version == "2.43":
+            with pytest.raises(module.PackagingError, match=r"libglib-2.0.so.0 requires GLIBC_2.43"):
+                module.audit_linux_abi(bundle)
+        else:
+            assert module.audit_linux_abi(bundle) == 2
+
+
+def test_glibc_audit_rejects_empty_or_fake_bundles(tmp_path):
+    module = _load_packaging_module()
+    (tmp_path / "not-elf").write_bytes(b"GLIBC_2.43")
+    with pytest.raises(module.PackagingError, match="No ELF files"):
+        module.audit_linux_abi(tmp_path)
+
+
+def test_linux_publication_requires_pinned_build_abi_audit_and_independent_runtime_tests():
+    workflow = (ROOT / ".github/workflows/distribution.yml").read_text()
+    linux = workflow.split("\n  linux:\n")[1].split("\n  linux-compatibility:")[0]
+    assert "runs-on: ubuntu-22.04" in linux
+    assert "audit-linux-abi" in linux and "--max-glibc 2.35" in linux
+    compatibility = workflow.split("\n  linux-compatibility:")[1].split("\n  publish-latest:")[0]
+    assert '"ubuntu:22.04"' in compatibility and '"debian:12"' in compatibility
+    assert "linux_runtime_smoke.py" in compatibility
+    assert "needs: [metadata, windows, linux, linux-compatibility]" in workflow
 
 
 def test_linux_archive_has_stable_root_and_matching_checksum(tmp_path: Path) -> None:

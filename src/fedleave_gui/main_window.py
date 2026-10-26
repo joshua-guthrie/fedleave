@@ -1339,9 +1339,9 @@ class MainWindow(QMainWindow):
     whose lifetimes must extend beyond the callback that created them.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, settings: GuiSettings | None = None) -> None:
         super().__init__()
-        self.settings = load_settings()
+        self.settings = settings if settings is not None else load_settings()
         self.backend = self._backend()
         self.setWindowIcon(window_icon())
         self.today = date.today()

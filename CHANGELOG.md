@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix Linux GLIBC compatibility after the moving Ubuntu runner bundled GLIBC 2.43 dependencies: pin the build baseline, audit every bundled ELF, and gate publication on released CLI/Calendar/Analytics launches in independent Ubuntu/Debian containers.
+
 - Add a second Seasonality selector for per-type usage and genuine earned/restored credits across month, weekday and actual pay-period groupings, with consistent charts, sorted drilldowns and exports.
 - Exclude carried lots and uncertain credit copies from new-earning totals, retain zero-activity supported choices, and preserve the existing overtime/net views and other Analytics tabs.
 

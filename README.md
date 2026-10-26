@@ -281,7 +281,14 @@ unrecognized publisher.
 
 ### Linux installation
 
-FedLeave supports 64-bit Ubuntu, Debian, and Debian-based distributions. Install
+Prebuilt Linux installers target x86-64 Ubuntu 22.04+ and Debian 12+ (GLIBC
+2.35 or newer). They are built on pinned Ubuntu 22.04, audited for imported
+GLIBC symbol versions, and launch-tested as released archives in independent
+Ubuntu 22.04 and Debian 12 containers before publication. Both Calendar and
+Analytics must render using the bundled runtime and preserve datastore hashes.
+Newer build hosts must not silently raise this compatibility baseline; see
+[PyInstaller's Linux portability guidance](https://pyinstaller.org/en/stable/usage.html#gnu-linux).
+Install
 the latest successful `master` build with:
 
 ```bash
