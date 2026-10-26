@@ -143,7 +143,28 @@ def test_linux_publication_requires_pinned_build_abi_audit_and_independent_runti
     compatibility = workflow.split("\n  linux-compatibility:")[1].split("\n  publish-latest:")[0]
     assert '"ubuntu:22.04"' in compatibility and '"debian:12"' in compatibility
     assert "linux_runtime_smoke.py" in compatibility
+    assert "--archive-dir /work/artifacts" in compatibility
     assert "needs: [metadata, windows, linux, linux-compatibility]" in workflow
+
+
+@pytest.mark.parametrize(
+    "relative", ["FedLeave-test-Linux-x86_64.tar.gz", "artifacts/FedLeave-test-Linux-x86_64.tar.gz"]
+)
+def test_runtime_smoke_discovers_flat_and_preserved_artifact_layouts(tmp_path, relative):
+    spec = importlib.util.spec_from_file_location(
+        "linux_runtime_smoke", ROOT / "scripts/lib/common/linux_runtime_smoke.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with pytest.raises(RuntimeError, match="found 0"):
+        module.release_archive(tmp_path)
+    archive = tmp_path / relative
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    archive.write_bytes(b"fixture")
+    assert module.release_archive(tmp_path) == archive
+    (tmp_path / "FedLeave-other-Linux-x86_64.tar.gz").write_bytes(b"fixture")
+    with pytest.raises(RuntimeError, match="found 2"):
+        module.release_archive(tmp_path)
 
 
 def test_linux_archive_has_stable_root_and_matching_checksum(tmp_path: Path) -> None:

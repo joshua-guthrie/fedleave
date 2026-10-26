@@ -68,7 +68,24 @@ def smoke(bundle: Path) -> None:
         print("Released CLI, Calendar and Analytics launched/rendered; datastore hashes unchanged.")
 
 
+def release_archive(artifact_dir: Path) -> Path:
+    """Uploads with multiple roots preserve artifacts/ inside the downloaded zip."""
+    archives = sorted(artifact_dir.rglob("FedLeave-*-Linux-x86_64.tar.gz"))
+    if len(archives) != 1:
+        raise RuntimeError(f"Expected exactly one Linux archive under {artifact_dir}; found {len(archives)}")
+    return archives[0]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bundle-dir", type=Path, required=True)
-    smoke(parser.parse_args().bundle_dir.resolve())
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--bundle-dir", type=Path)
+    source.add_argument("--archive-dir", type=Path)
+    options = parser.parse_args()
+    if options.bundle_dir:
+        smoke(options.bundle_dir.resolve())
+    else:
+        archive = release_archive(options.archive_dir.resolve())
+        with tempfile.TemporaryDirectory(prefix="fedleave-extracted-") as folder:
+            subprocess.run(["tar", "-xzf", str(archive), "-C", folder], check=True)
+            smoke(Path(folder) / "FedLeave")
