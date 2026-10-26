@@ -4,6 +4,7 @@ import re
 from datetime import date, datetime
 
 import pytest
+from PIL import ImageDraw
 
 from fedleave.executable_search import is_executable
 from fedleave.ledger import TRANSACTION_CATEGORIES
@@ -18,6 +19,7 @@ from fedleave_month_report_graphic.report import (
     load_report_data,
     parse_args,
     parse_month,
+    render_png,
     render_svg,
     write_output,
 )
@@ -198,6 +200,32 @@ def test_render_svg_places_marker_legend_at_bottom_of_abbreviations_section():
     assert ">Pay Day<" in svg
     assert ">Pay Period End<" in svg
     assert ">Today<" in svg
+
+
+@pytest.mark.parametrize("width", [800, 1920, 3840])
+def test_png_abbreviations_fit_panel_without_overlapping(monkeypatch, tmp_path, width):
+    scale = width / 1920
+    bounds = []
+    values = []
+    original_text = ImageDraw.ImageDraw.text
+
+    def record_text(draw, xy, text, *args, **kwargs):
+        if xy[0] >= 1224 * scale and xy[1] >= 790 * scale:
+            bounds.append(draw.textbbox(xy, text, font=kwargs["font"], anchor=kwargs["anchor"]))
+            values.append(text)
+        return original_text(draw, xy, text, *args, **kwargs)
+
+    monkeypatch.setattr(ImageDraw.ImageDraw, "text", record_text)
+    render_png(_report_data(), tmp_path / "report.png", width)
+
+    for category in TRANSACTION_CATEGORIES:
+        assert CATEGORY_LABELS[category][0] in values
+        assert CATEGORY_LABELS[category][1] in values
+    for index, (left, top, right, bottom) in enumerate(bounds):
+        assert 1224 * scale < left < right < 1892 * scale
+        assert 790 * scale < top < bottom < 1040 * scale
+        for other_left, other_top, other_right, other_bottom in bounds[index + 1 :]:
+            assert right <= other_left or other_right <= left or bottom <= other_top or other_bottom <= top
 
 
 def test_render_svg_shows_year_end_use_or_lose_when_annual_exceeds_carryover():

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep all monthly report abbreviations and full category names inside their panel in PDF, print, SVG, and PNG output, with room for the marker legend below.
+
 - Fix Linux GLIBC compatibility after the moving Ubuntu runner bundled GLIBC 2.43 dependencies: pin the build baseline, audit every bundled ELF, and gate publication on released CLI/Calendar/Analytics launches in independent Ubuntu/Debian containers.
 
 - Add a second Seasonality selector for per-type usage and genuine earned/restored credits across month, weekday and actual pay-period groupings, with consistent charts, sorted drilldowns and exports.

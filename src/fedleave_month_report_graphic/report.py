@@ -30,6 +30,10 @@ BASE_HEIGHT = 1080
 MIN_RESOLUTION = 800
 MAX_RESOLUTION = 7680
 
+ABBREVIATION_COLUMN_WIDTHS = [52, 258]
+ABBREVIATION_COLUMN_GAP = 14
+ABBREVIATION_ROW_HEIGHT = 16
+
 TEXT = "#1f2937"
 MUTED = "#64748b"
 BORDER = "#94a3b8"
@@ -655,7 +659,10 @@ def _abbreviation_columns() -> list[list[list[str]]]:
         ]
         for category in TRANSACTION_CATEGORIES
     ]
-    return [rows[index : index + 6] for index in range(0, len(rows), 6)]
+    # Two balanced columns keep every category inside the panel and give the
+    # full PPL/FMLA names room without colliding with their abbreviations.
+    rows_per_column = (len(rows) + 1) // 2
+    return [rows[:rows_per_column], rows[rows_per_column:]]
 
 
 def _marker_legend_items() -> list[tuple[str, str, str]]:
@@ -703,8 +710,17 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
         ]
     )
     for index, rows in enumerate(_abbreviation_columns()):
+        x = 1238 + index * (sum(ABBREVIATION_COLUMN_WIDTHS) + ABBREVIATION_COLUMN_GAP)
         parts.extend(
-            _render_table_svg(1238 + index * 216, 808, ["Abbr", "Category"], rows, [48, 154], row_h=20, font_size=11)
+            _render_table_svg(
+                x,
+                808,
+                ["Abbr", "Category"],
+                rows,
+                ABBREVIATION_COLUMN_WIDTHS,
+                row_h=ABBREVIATION_ROW_HEIGHT,
+                font_size=11,
+            )
         )
     parts.extend(_render_marker_legend_svg(1240, 1018))
     return parts
@@ -845,19 +861,23 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
         yy += 19
     text(1224, 764, "Abbreviations", font_obj=bold)
     rect((1224, 790, 1892, 1040), outline=BORDER, width_px=2)
+    # Scale this dense section with its cells, including at the minimum output
+    # resolution; the general report font has a nine-pixel readability floor.
+    abbreviation_font = load_font(max(1, round(11 * scale)))
+    abbreviation_bold = load_font(max(1, round(11 * scale)), bold=True)
     for column, rows in enumerate(_abbreviation_columns()):
-        x = 1240 + column * 216
-        text(x, 802, "Abbr", font_obj=bold)
-        text(x + 52, 802, "Category", font_obj=bold)
-        yy = 816
+        x = 1238 + column * (sum(ABBREVIATION_COLUMN_WIDTHS) + ABBREVIATION_COLUMN_GAP)
+        text(x + 6, 825, "Abbr", font_obj=abbreviation_bold, anchor="ls")
+        text(x + ABBREVIATION_COLUMN_WIDTHS[0] + 6, 825, "Category", font_obj=abbreviation_bold, anchor="ls")
+        yy = 847
         for abbr, label in rows:
-            text(x, yy, abbr, font_obj=bold)
-            text(x + 52, yy, label)
-            yy += 18
+            text(x + 6, yy, abbr, font_obj=abbreviation_bold, anchor="ls")
+            text(x + ABBREVIATION_COLUMN_WIDTHS[0] + 6, yy, label, font_obj=abbreviation_font, anchor="ls")
+            yy += ABBREVIATION_ROW_HEIGHT
     for index, (label, fill, outline) in enumerate(_marker_legend_items()):
         x = 1240 + index * 154
         rect((x, 1004, x + 16, 1020), fill=fill, outline=outline, width_px=2)
-        text(x + 24, 1005, label)
+        text(x + 24, 1005, label, font_obj=abbreviation_font)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     image.save(output, format="PNG")

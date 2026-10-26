@@ -1,12 +1,18 @@
 import os
 
+import pytest
+
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtGui import QPageLayout
+from PySide6.QtCore import QRectF
+from PySide6.QtGui import QPageLayout, QPageSize
+from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtWidgets import QApplication, QFileDialog
 
+from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave_gui.main_window import MainWindow
+from fedleave_month_report_graphic.report import CATEGORY_LABELS
 
 
 def _application() -> QApplication:
@@ -85,3 +91,42 @@ def test_save_pdf_delegates_to_print_document(monkeypatch, tmp_path):
     assert isinstance(printer, QPrinter)
     assert printer.outputFileName() == str(tmp_path / "month.pdf")
     assert printer.outputFormat() == QPrinter.PdfFormat
+
+
+@pytest.mark.parametrize("page_size", [QPageSize.A4, QPageSize.Letter])
+def test_exported_pdf_keeps_complete_abbreviations_inside_panel(monkeypatch, tmp_path, page_size):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    window = MainWindow()
+    window.month_json = _month_json()
+    output = tmp_path / "month.pdf"
+    printer = QPrinter(QPrinter.HighResolution)
+    printer.setPageSize(QPageSize(page_size))
+    printer.setOutputFormat(QPrinter.PdfFormat)
+    printer.setOutputFileName(str(output))
+
+    window._print_document(printer)
+
+    document = QPdfDocument()
+    assert document.load(str(output)) == QPdfDocument.Error.None_
+    assert document.pageCount() == 1
+    text = document.getAllText(0).text()
+    start = text.index("Abbreviations") + len("Abbreviations")
+    section = text[start:]
+    for category in TRANSACTION_CATEGORIES:
+        assert CATEGORY_LABELS[category][1] in section
+    for marker in ("Holiday", "Pay Day", "Pay Period End", "Today"):
+        assert marker in section
+
+    page = printer.pageLayout().paintRectPoints()
+    panel = QRectF(
+        page.x() + 1224 / 1920 * page.width(),
+        page.y() + 790 / 1080 * page.height(),
+        668 / 1920 * page.width(),
+        250 / 1080 * page.height(),
+    )
+    bounds = document.getSelectionAtIndex(0, start, len(section)).boundingRectangle()
+    assert not bounds.isEmpty()
+    assert panel.contains(bounds)
+    document.close()
+    window.close()
