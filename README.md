@@ -1049,8 +1049,8 @@ directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calen
 passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
 
-The four pages are Summary, Seasonality, Calendar Heatmap, and Overtime, Comp,
-and Credit. Monthly views combine horizontal bar charts with their supporting
+The pages are Summary, Seasonality, Calendar Heatmap, Overtime, Comp,
+and Credit, and Planning. Monthly views combine horizontal bar charts with their supporting
 tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
 Leave Year values; double-clicking a row opens its supporting transactions.
 The application never modifies leave data or displays backend/data-directory
@@ -1084,6 +1084,86 @@ Double-click a table row to inspect the transactions supporting that result:
 FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
     --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
 ```
+
+#### What-if Planner
+
+Choose **Analysis > Planning > What-if Planner...** in the calendar, or open
+**Planning > What-if Planner** in Analytics. Both use the selected backend,
+exact data directory, initialized leave year, font size, and report folder.
+`FedLeaveAnalytics --view planning` opens the same view directly; there is no
+separate planner executable or CLI planning command.
+
+The planner compares the unchanged **Scheduled baseline** with a session-only
+scenario. Choose the cutoff, horizon, scenario name, and category. The cutoff
+defaults to today, clamped to the selected leave year's bounds; the horizon
+defaults to its actual end. Set an optional reserve for each category using
+**Category** and **Reserve**. Equality with the reserve is allowed; a breach
+means the daily closing balance is strictly below it. Categories are never
+pooled into a combined bank. Purpose-restricted choices are labeled, and a
+projected balance does not establish eligibility for their use.
+
+- **Add tentative use** adds an editable dated absence. Dates stay where you
+  enter them; the planner does not schedule or distribute a vacation for you.
+- In **Scheduled originals**, select existing future absence rows and choose
+  **Replace selected scheduled use** or **Remove selected scheduled use**.
+  Original transaction IDs remain visible in the scenario. Replacement
+  suppresses those originals in the scenario and adds the proposed use, so the
+  original and replacement are not counted together. Recorded rows, accruals,
+  and synthetic events cannot be targeted. Overlapping targets are errors.
+- **Delete scenario row** removes an operation and restores its originals.
+  **Reset scenario** removes all operations, preserving the name, date controls,
+  and reserve thresholds. Neither action changes the ledger.
+
+For example, 100 hours at cutoff, an 8-hour accrual, and a scheduled 16-hour use
+give a 92-hour baseline. Adding a later 24-hour use gives 68 hours and breaches
+an 80-hour reserve on that later date. Replacing the scheduled 16 hours with
+24 gives 84 hours; removing it gives 108. These are balance examples: entering
+16 or 24 hours on one eight-hour workday also produces a separate capacity
+conflict. The requested hours remain visible for analysis.
+
+Charts show daily **closing** balances, a cutoff marker, an optional reserve
+line, and distinct scheduled/tentative markers. Same-day event ordering does
+not establish intraday availability. Summary, daily, event/provenance, capacity,
+lot, and warning tables use the same calculated result. A scenario can end
+positive yet have an earlier negative balance; the first shortfall and minimum
+dates remain visible. Annual pre-cap balance, carryover, and prospective
+forfeiture appear only when the horizon reaches the actual leave-year end.
+Unknown metrics show **N/A**, rather than zero.
+
+Capacity uses configured workdays and start/end/lunch hours, cached observed
+nonworking holidays, and scheduled absences across categories. Irregular rosters
+are not reconstructed. Missing schedule/holiday context makes affected capacity
+unknown. Canonical accrual posting dates and rate changes apply once; expiring
+lots retain explicit links and use earliest eligible expiration first. Scenario
+changes recalculate derived disposals. Missing original lot provenance or
+unsupported policy produces warnings and unknown affected metrics.
+
+**Recorded Through Cutoff** describes effective dated rows in the current
+snapshot. Past planned/requested rows are unresolved, not proof of attendance.
+A historical cutoff uses presently available records; it does not reconstruct
+what was known or booked at that earlier time. This limitation is also included
+in scenario exports.
+
+**Export scenario JSON...** saves a versioned definition, source identity,
+original reference fingerprints, assumptions, and operations. **Import scenario
+JSON...** requires an explicit Replace or Merge choice and validates against a
+fresh read-only backend snapshot. Unknown schemas, conflicting operations,
+invalid increments/dates, and materially changed or missing originals are
+rejected atomically. Unrelated source changes do not invalidate unchanged
+references. On refresh, stale rows remain visible; inspect the current originals
+and explicitly resolve their references or delete the operation. A modified
+indicator tracks changes since the last import/export. Session scenarios are
+not stored automatically.
+
+**Save Table as CSV...** includes the selected table/category, cutoff, horizon,
+hours, reserves, assumptions, provenance, and warnings. **Open Chart** retains
+the exact supporting daily table and offers CSV, PNG, PDF, and Print. Exports
+must be outside the selected canonical datastore. Opening, editing, computing,
+importing, canceling, and closing the planner never initialize, migrate, back
+up, synchronize, or write leave data. There is no Apply to Ledger action.
+Edits reuse the cached snapshot; **Refresh** reads current backend data and
+revalidates references. Old worker results are discarded after edits, source
+changes, cancellation, or close.
 
 Seasonality has exactly two selectors: **Analysis** and **Leave Type**. The
 default is **Leave Used by Month** + **All Leave Used**, preserving the original

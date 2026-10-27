@@ -647,16 +647,11 @@ def snapshot_command(
     data_dir: Path | None = typer.Option(None),
 ) -> None:
     """Read-only accounting snapshot for charts, analytics, and integrations."""
-    from ..cross_year import resolve_snapshot, seed_accruals
+    from ..cli_helpers import read_snapshot_payload
     from .rollover import report_error
 
     try:
-        snapshot = resolve_snapshot(get_default_data_dir(data_dir), year)
-        seed_accruals(snapshot)
-        result = dict(snapshot)
-        result["snapshot_rules"] = snapshot.config
-        result["accounting_warnings"] = snapshot.warnings
-        result["entitlement_history"] = snapshot.entitlement_history
+        result = read_snapshot_payload(year, data_dir)
     except (ValueError, OSError, TypeError, KeyError) as exc:
         report_error(exc, json_output)
     if json_output:

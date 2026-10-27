@@ -144,6 +144,45 @@ def test_analytics_view_action_passes_resolved_default_data_directory(monkeypatc
     assert calls[0][calls[0].index("--data-dir") + 1] == str(tmp_path / "data")
 
 
+def test_planning_menu_launches_existing_analytics_with_exact_context(monkeypatch, tmp_path):
+    _application()
+    monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
+    monkeypatch.setattr(
+        "fedleave_gui.main_window.load_settings",
+        lambda: GuiSettings(
+            data_dir=str(tmp_path / "selected data"), font_size=12, pdf_export_folder=str(tmp_path / "pdf")
+        ),
+    )
+    window = MainWindow()
+    window.year = 2026
+    backend, analytics = tmp_path / "selected backend", tmp_path / "FedLeaveAnalytics"
+    calls = []
+    monkeypatch.setattr(window.backend, "executable_path", lambda: backend)
+    monkeypatch.setattr("fedleave_gui.main_window.find_analytics", lambda: analytics)
+    monkeypatch.setattr("fedleave_gui.main_window.subprocess.Popen", lambda command: calls.append(command))
+    analysis = next(action for action in window.menuBar().actions() if action.text() == "Analysis")
+    planning = next(action for action in analysis.menu().actions() if action.text() == "Planning")
+    planner_action = next(action for action in planning.menu().actions() if action.text() == "What-if Planner...")
+    planner_action.trigger()
+    assert calls == [
+        [
+            str(analytics),
+            "--backend",
+            str(backend),
+            "--year",
+            "2026",
+            "--font-size",
+            "12",
+            "--data-dir",
+            str(tmp_path / "selected data"),
+            "--pdf-folder",
+            str(tmp_path / "pdf"),
+            "--view",
+            "planning",
+        ]
+    ]
+
+
 def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):
     _application()
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)

@@ -5,15 +5,17 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import subprocess
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
-from PySide6.QtGui import QAction, QPixmap
+from PySide6.QtGui import QAction, QFontDatabase, QPixmap
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -44,6 +46,7 @@ from .charts import (
     render_horizontal_bar_chart,
     table_widget,
 )
+from .planning_view import PlannerWidget
 from .seasonality import seasonality_options, seasonality_series
 
 SUMMARY_COLUMNS = [
@@ -227,7 +230,10 @@ def load_analytics_data(backend: Path, data_dir: str | None, year: int) -> dict[
     command = [str(backend), "list", "--year", str(year), "--json"]
     if data_dir:
         command.extend(["--data-dir", data_dir])
-    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, check=False, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError("The selected backend did not respond within 30 seconds.") from exc
     if result.returncode:
         raise RuntimeError((result.stderr or result.stdout or "fedleave command failed").strip())
     try:
@@ -300,6 +306,7 @@ class AnalyticsWindow(QMainWindow):
         font_size: int = 10,
         pdf_folder: str = "",
         auto_load: bool = True,
+        initial_view: str = "analytics",
     ) -> None:
         super().__init__()
         self.backend = backend
@@ -320,6 +327,7 @@ class AnalyticsWindow(QMainWindow):
         self._seasonality_columns = MONTH_COLUMNS
         self._seasonality_title = ""
         self._default_notice_text = "No data loaded yet."
+        self._closing = False
 
         self.setWindowTitle("FedLeave Analytics")
         self.resize(1320, 860)
@@ -327,7 +335,9 @@ class AnalyticsWindow(QMainWindow):
         font.setPointSize(font_size)
         self.setFont(font)
         self._build_ui()
-        if auto_load:
+        if initial_view == "planning":
+            self.pages.setCurrentWidget(self.planning_page)
+        elif auto_load:
             self.refresh_data()
 
     def _build_ui(self) -> None:
@@ -369,10 +379,12 @@ class AnalyticsWindow(QMainWindow):
         self.seasonality_page = QWidget()
         self.heatmap_page = QWidget()
         self.lifecycle_page = QWidget()
+        self.planning_page = QWidget()
         self.pages.addTab(self.summary_page, "Summary")
         self.pages.addTab(self.seasonality_page, "Seasonality")
         self.pages.addTab(self.heatmap_page, "Calendar Heatmap")
         self.pages.addTab(self.lifecycle_page, "Overtime, Comp, and Credit")
+        self.pages.addTab(self.planning_page, "Planning")
         layout.addWidget(self.pages, 1)
         self.setCentralWidget(root)
 
@@ -380,6 +392,12 @@ class AnalyticsWindow(QMainWindow):
         self._build_seasonality_page()
         self._build_heatmap_page()
         self._build_lifecycle_page()
+        planning_layout = QVBoxLayout(self.planning_page)
+        self.planning_tabs = QTabWidget()
+        self.planner = PlannerWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.planning_tabs.addTab(self.planner, "What-if Planner")
+        planning_layout.addWidget(self.planning_tabs)
+        self.planner.source_loaded.connect(self._planning_source_loaded)
         self.pages.currentChanged.connect(self._page_changed)
 
         file_menu = self.menuBar().addMenu("File")
@@ -559,6 +577,10 @@ class AnalyticsWindow(QMainWindow):
 
     @Slot()
     def refresh_data(self) -> None:
+        if self.pages.currentWidget() is self.planning_page:
+            self.planner.set_source(self.backend, self.data_dir, self.year)
+            self.planner.load_source()
+            return
         if self._load_thread and self._load_thread.isRunning():
             return
         self.refresh_button.setEnabled(False)
@@ -578,6 +600,8 @@ class AnalyticsWindow(QMainWindow):
 
     @Slot(dict)
     def _loaded(self, data: dict[str, Any]) -> None:
+        if self._closing:
+            return
         self.data = data
         self.progress.hide()
         self.refresh_button.setEnabled(True)
@@ -587,6 +611,8 @@ class AnalyticsWindow(QMainWindow):
 
     @Slot(str)
     def _load_failed(self, message: str) -> None:
+        if self._closing:
+            return
         self.progress.hide()
         self.refresh_button.setEnabled(True)
         self._load_thread = None
@@ -801,9 +827,28 @@ class AnalyticsWindow(QMainWindow):
         if selected is None or int(selected) == self.year:
             return
         self.year = int(selected)
+        self.planner.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
 
+    @Slot(object)
+    def _planning_source_loaded(self, snapshot) -> None:
+        available = snapshot.get("planning_available_years", [self.year])
+        self.year_combo.blockSignals(True)
+        self.year_combo.clear()
+        for year in sorted(set(available)):
+            self.year_combo.addItem(str(year), year)
+        self.year_combo.setCurrentIndex(max(0, self.year_combo.findData(self.year)))
+        self.year_combo.blockSignals(False)
+
     def _page_changed(self, _index: int = -1) -> None:
+        if self.pages.currentWidget() is self.planning_page:
+            self.open_chart_button.setEnabled(True)
+            self.notice_label.setText(
+                "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. Leave records are never modified."
+            )
+            self.planner.set_source(self.backend, self.data_dir, self.year)
+            self.planner.activate()
+            return
         page = self.pages.currentIndex()
         self.open_chart_button.setEnabled(page != 0)
         if page == 0:
@@ -846,6 +891,9 @@ class AnalyticsWindow(QMainWindow):
         self._current_columns = columns
 
     def open_chart(self) -> None:
+        if self.pages.currentWidget() is self.planning_page:
+            self.planner.open_chart()
+            return
         if not self.data:
             return
         page = self.pages.currentIndex()
@@ -909,6 +957,9 @@ class AnalyticsWindow(QMainWindow):
         window.show()
 
     def save_csv(self) -> None:
+        if self.pages.currentWidget() is self.planning_page:
+            self.planner.save_csv()
+            return
         if not self.data or not self._current_rows:
             QMessageBox.information(self, "Save Table", "The selected table has no rows to export.")
             return
@@ -1078,6 +1129,26 @@ class AnalyticsWindow(QMainWindow):
         ]
         TransactionDialog(transactions, self).exec()
 
+    def closeEvent(self, event) -> None:
+        self._closing = True
+        self.planner.shutdown()
+        if self._load_thread and self._load_thread.isRunning():
+            # Hide promptly, retain the worker's owner, then close after its
+            # bounded backend read completes. No running QThread is destroyed.
+            self.hide()
+            event.ignore()
+            self._load_thread.requestInterruption()
+            self._load_thread.quit()
+            self._load_thread.finished.connect(self._finish_close)
+            return
+        super().closeEvent(event)
+
+    @Slot()
+    def _finish_close(self) -> None:
+        self._load_thread = None
+        self._loader = None
+        self.close()
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
@@ -1090,13 +1161,35 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--year", type=int)
     parser.add_argument("--font-size", type=int, default=10)
     parser.add_argument("--pdf-folder", default="")
+    parser.add_argument(
+        "--view",
+        choices=["analytics", "planning"],
+        default="analytics",
+        help="Initial view in the existing Analytics application.",
+    )
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     backend = Path(args.backend) if args.backend else Path("fedleave")
     year = args.year or datetime.now().year
     app = QApplication.instance() or QApplication(sys.argv)
+    if args.smoke_test and sys.platform.startswith("win"):
+        # Offscreen Qt uses FreeType on Windows, so register real system fonts
+        # for installed-bundle rendering rather than accepting box glyphs.
+        for filename in ("arial.ttf", "arialbd.ttf"):
+            assert (
+                QFontDatabase.addApplicationFont(str(Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / filename))
+                >= 0
+            )
     data_dir = args.data_dir or str(get_default_data_dir())
-    window = AnalyticsWindow(backend, data_dir, year, args.font_size, args.pdf_folder, auto_load=not args.smoke_test)
+    window = AnalyticsWindow(
+        backend,
+        data_dir,
+        year,
+        args.font_size,
+        args.pdf_folder,
+        auto_load=not args.smoke_test,
+        initial_view=args.view if not args.smoke_test else "analytics",
+    )
     if args.smoke_test:
         # Installed-bundle QA: use the real sibling CLI and render the existing
         # Seasonality page without writing any ledger or creating another app.
@@ -1112,6 +1205,28 @@ def main(argv: list[str] | None = None) -> int:
                 window.seasonality_selector.setCurrentText(name)
                 assert window._seasonality_result["selection"]["key"] == key
                 assert not window.seasonality_chart_image.source_pixmap().isNull()
+        window.pages.setCurrentWidget(window.planning_page)
+
+        def await_planning():
+            deadline = time.monotonic() + 40
+            while window.planner.session is None or window.planner.session.result is None:
+                app.processEvents()
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(window.planner.status_label.text())
+                QThread.msleep(5)
+
+        await_planning()
+        assert not window.planner.chart_image.source_pixmap().isNull()
+        definition = window.planner.session.definition
+        if definition.cutoff < definition.horizon:
+            window.planner.add_tentative()
+            window.planner.recalculate()
+            await_planning()
+            assert any(event.timing == "Tentative" for event in window.planner.session.result.events)
+            window.planner.reset_scenario()
+            window.planner.recalculate()
+            await_planning()
+            assert all(row.baseline == row.scenario for row in window.planner.session.result.categories)
         window.show()
         app.processEvents()
         window.close()

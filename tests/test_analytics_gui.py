@@ -70,6 +70,7 @@ def test_main_window_has_required_pages_controls_without_backend_diagnostics():
         "Seasonality",
         "Calendar Heatmap",
         "Overtime, Comp, and Credit",
+        "Planning",
     ]
     assert window.summary_table.rowCount() == 15
     assert window.refresh_button.text() == "Refresh"
@@ -326,7 +327,7 @@ def test_seasonality_zero_data_earned_view_and_other_pages_remain_unchanged(qtbo
         window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData(key))
         assert not window.seasonality_chart_image.source_pixmap().isNull()
     assert "No matching transactions" in window.seasonality_description.text()
-    assert window.pages.count() == 4
+    assert window.pages.count() == 5
     assert window.heatmap_selector.currentData() == "comp:used"
     for key in (
         "summary",

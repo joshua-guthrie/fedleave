@@ -1517,6 +1517,8 @@ class MainWindow(QMainWindow):
         analysis_menu = self.menuBar().addMenu("Analysis")
         self._action(analysis_menu, "View Leave Transactions...", self.view_leave_transactions)
         self._action(analysis_menu, "Analytics...", self.open_analytics)
+        planning_menu = analysis_menu.addMenu("Planning")
+        self._action(planning_menu, "What-if Planner...", self.open_planning)
         leave_charts_menu = analysis_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self.leave_chart_actions[CHART_APP_CATEGORIES[app_name]] = self._action(
@@ -2155,6 +2157,12 @@ class MainWindow(QMainWindow):
             dialog.show()
 
     def open_analytics(self) -> None:
+        self._launch_analytics()
+
+    def open_planning(self) -> None:
+        self._launch_analytics(view="planning")
+
+    def _launch_analytics(self, *, view: str | None = None) -> None:
         try:
             analytics = find_analytics()
             backend = self.backend.executable_path()
@@ -2173,6 +2181,8 @@ class MainWindow(QMainWindow):
         command.extend(["--data-dir", str(self.backend.data_directory())])
         if self.settings.pdf_export_folder:
             command.extend(["--pdf-folder", self.settings.pdf_export_folder])
+        if view is not None:
+            command.extend(["--view", view])
         try:
             process = subprocess.Popen(command)
         except OSError as exc:

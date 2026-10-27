@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add a session-only What-if Planner under Analysis > Planning, with canonical baseline/scenario daily balances, reserves, lot effects, capacity conflicts, provenance, and atomic JSON/CSV exchange.
+- Reuse read-only snapshots with explicit schedule/holiday context; keep canonical leave data unchanged through editing, imports/exports, cancellation, and close.
+
 - Keep all monthly report abbreviations and full category names inside their panel in PDF, print, SVG, and PNG output, with room for the marker legend below.
 
 - Fix Linux GLIBC compatibility after the moving Ubuntu runner bundled GLIBC 2.43 dependencies: pin the build baseline, audit every bundled ELF, and gate publication on released CLI/Calendar/Analytics launches in independent Ubuntu/Debian containers.

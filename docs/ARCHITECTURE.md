@@ -142,3 +142,53 @@ The overtime/net analyses retain their existing data and disable Leave Type.
 Heatmap, Summary and lifecycle calculations do not use this new selection path.
 The installed Analytics smoke mode exercises both controls through the real
 sibling CLI and checks that the selected datastore hashes remain unchanged.
+
+## Read-only planning foundation
+
+`fedleave.planning` owns schema-v1 `Scenario`/`ScenarioOperation` definitions,
+validation/import, and the typed `ProjectionResult` contract with method version
+`daily-closing-canonical-v1`. Its only inputs are snapshot data, a definition,
+and an injected current date. It accepts no repository, path for persistence,
+writer, Qt object, or backend callback. It defensively copies snapshots and
+uses canonical transaction eligibility, accruals, balances, parental rules,
+carryover and expiration allocation on private copies. Recalculation starts
+from the same source, never a previously mutated scenario.
+
+`cli_helpers.read_snapshot_payload` supplies the existing `snapshot --json`
+command. Additive `calculation_context` metadata carries the resolved datastore
+identity, configured tour/increment, cached observed holidays and coverage,
+synthetic accrual IDs, and missing-context warnings. It does not initialize a
+store, refresh holiday caches, acquire a write lock, or persist normalization.
+The older list/analytics page definitions remain compatible.
+
+Definitions retain material fingerprints for original future used transaction
+IDs. At most one operation can target an original; synthetic IDs cannot be
+targets. Multi-target validation and import/merge are atomic. An overall source
+hash change warns, while unchanged referenced originals stay usable. Missing,
+ineffective, ambiguous, or materially changed originals require resolution.
+
+Results include per-category baseline/scenario daily closing balances,
+cutoff/horizon balances, earliest minima/negative/reserve-breach dates and
+shortfalls, actual-year-end annual pre-cap/carryover/forfeiture values, lot
+effects, workday capacity and conflicts, original/synthetic/tentative provenance,
+assumptions, and structured warnings. Unknown affected metrics are `None`/JSON
+`null`. Financial shortfalls and schedule-capacity excess are distinct valid
+outcomes; invalid inputs are structured row-level validation errors. No dates
+are optimized or moved. Historical cutoffs do not reconstruct historical
+knowledge; current past planned/requested rows remain unresolved.
+
+`fedleave_analytics.planning_model` owns the session and table/CSV view model;
+presentation and exports consume the result without recomputing accounting.
+`planning_view` embeds What-if Planner under the existing Analytics Planning
+area. Calendar's Analysis > Planning entry launches that companion with
+`--view planning`, preserving backend, datastore, year, font and PDF folder.
+Snapshot acquisition uses `years --json` followed by `snapshot --json` on the
+selected backend. Edits reuse the snapshot; file imports refresh before identity
+validation. Thread-pool jobs carry revisions; edits, source changes, cancellation,
+and close invalidate old results before queued callbacks can install them.
+
+JSON, CSV, and chart-file exports use atomic replacement outside the selected
+datastore; they cannot overwrite a canonical file through an existing hard link.
+There is no planner persistence or apply-to-ledger interface. Forecast, Budget,
+Holiday Planner, and Reserve features should reuse this snapshot/result contract
+and the Planning container rather than create competing engines or executables.

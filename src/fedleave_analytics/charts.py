@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QResizeEvent
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
@@ -419,6 +420,128 @@ def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
     return pixmap
 
 
+def render_planning_chart(
+    title: str, rows: list[dict], events: list[dict], reserve: float | None, cutoff: str, horizon: str
+) -> QPixmap:
+    """Render only supplied daily closing values; no accounting is recalculated."""
+    height = 520
+    pixmap = QPixmap(WIDTH, height)
+    pixmap.fill(QColor(BACKGROUND))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    try:
+        font = QFont(painter.font())
+        font.setPointSize(22)
+        font.setBold(True)
+        painter.setFont(font)
+        painter.setPen(QColor(TEXT))
+        painter.drawText(
+            45, 25, WIDTH - 90, 55, Qt.AlignCenter, QFontMetrics(font).elidedText(title, Qt.ElideRight, WIDTH - 100)
+        )
+        font.setPointSize(14)
+        font.setBold(False)
+        painter.setFont(font)
+        painter.drawText(
+            45,
+            85,
+            WIDTH - 90,
+            30,
+            Qt.AlignCenter,
+            f"Cutoff {cutoff} | Horizon {horizon} | Hours | Daily closing balances",
+        )
+        left, top, right, bottom = 135, 185, WIDTH - 65, height - 130
+        values = [float(row[key]) for row in rows for key in ("baseline", "scenario") if row.get(key) is not None]
+        if reserve is not None:
+            values.append(reserve)
+        low, high = min([0.0, *values]), max([0.0, *values])
+        span = max(1.0, high - low)
+        low -= span * 0.08
+        high += span * 0.08
+
+        def x(index):
+            return left + (right - left) * index / max(1, len(rows) - 1)
+
+        def y(value):
+            return bottom - (float(value) - low) / (high - low) * (bottom - top)
+
+        for tick in range(6):
+            value = high - (high - low) * tick / 5
+            yy = y(value)
+            painter.setPen(QPen(QColor(GRID_MAJOR), 1))
+            painter.drawLine(QPointF(left, yy), QPointF(right, yy))
+            painter.setPen(QColor(TEXT))
+            painter.drawText(10, round(yy) - 12, 110, 24, Qt.AlignRight | Qt.AlignVCenter, _display(value))
+        painter.setPen(QPen(QColor(BORDER), 2))
+        painter.drawRect(left, top, right - left, bottom - top)
+        for index in sorted({round(index * max(0, len(rows) - 1) / 5) for index in range(6)}):
+            if rows:
+                painter.drawText(round(x(index)) - 85, bottom + 16, 170, 30, Qt.AlignCenter, rows[index]["date"])
+        if reserve is not None:
+            painter.setPen(QPen(QColor(TEXT), 2, Qt.DashDotLine))
+            painter.drawLine(QPointF(left, y(reserve)), QPointF(right, y(reserve)))
+            painter.drawText(left + 8, round(y(reserve)) - 26, 320, 24, Qt.AlignLeft, f"Reserve: {_display(reserve)} h")
+        painter.setPen(QPen(QColor(TEXT), 2, Qt.DotLine))
+        painter.drawLine(left + 1, top, left + 1, bottom)
+        painter.drawText(left + 8, bottom - 28, 220, 24, Qt.AlignLeft, "Cutoff (closing)")
+        for key, label, color, style, legend_x in (
+            ("baseline", "Scheduled baseline", BLUE, Qt.DashLine, 135),
+            ("scenario", "What-if scenario", RED, Qt.SolidLine, 500),
+        ):
+            painter.setPen(QPen(QColor(color), 3, style))
+            painter.drawLine(legend_x, 145, legend_x + 50, 145)
+            painter.drawText(legend_x + 65, 132, 290, 30, Qt.AlignLeft | Qt.AlignVCenter, label)
+            previous = None
+            for index, row in enumerate(rows):
+                if row.get(key) is None:
+                    previous = None
+                    continue
+                point = QPointF(x(index), y(row[key]))
+                if previous is not None:
+                    painter.drawLine(previous, point)
+                previous = point
+        points = {row["date"]: (index, row) for index, row in enumerate(rows)}
+        markers = set()
+        for event in events:
+            if event.get("direction") != "used" or event.get("date") not in points:
+                continue
+            tentative = event.get("timing") == "Tentative"
+            if not tentative and not (event.get("branch") == "baseline" and event.get("timing") == "Scheduled"):
+                continue
+            index, row = points[event["date"]]
+            key = "scenario" if tentative else "baseline"
+            if row.get(key) is None or (event["date"], key) in markers:
+                continue
+            markers.add((event["date"], key))
+            painter.setPen(QPen(QColor(RED if tentative else BLUE), 2))
+            painter.setBrush(QColor(BACKGROUND))
+            xx, yy = x(index), y(row[key])
+            if tentative:
+                painter.drawRect(round(xx) - 5, round(yy) - 5, 10, 10)
+            else:
+                painter.drawEllipse(QPointF(xx, yy), 6, 6)
+        painter.setPen(QColor(TEXT))
+        painter.drawText(
+            80,
+            height - 70,
+            WIDTH - 160,
+            55,
+            Qt.AlignCenter | Qt.TextWordWrap,
+            "Circles: scheduled absence. Squares: tentative absence. Same-day rows share a closing balance; the chart does not imply intraday order.",
+        )
+        if not any(row.get("baseline") is not None or row.get("scenario") is not None for row in rows):
+            painter.drawText(
+                left + 40,
+                top + 80,
+                right - left - 80,
+                100,
+                Qt.AlignCenter | Qt.TextWordWrap,
+                "N/A: exact balances are unavailable. Review the warnings and source context.",
+            )
+    finally:
+        painter.end()
+    return pixmap
+
+
 class AnalyticsChartWindow(QMainWindow):
     """Show one analytic as both a graphic and its supporting data table."""
 
@@ -430,6 +553,8 @@ class AnalyticsChartWindow(QMainWindow):
         columns: list[tuple[str, str]],
         default_folder: str = "",
         base_name: str = "fedleave-analytics",
+        csv_export=None,
+        export_target=None,
     ) -> None:
         super().__init__()
         self.setAttribute(Qt.WA_DeleteOnClose, True)
@@ -438,6 +563,7 @@ class AnalyticsChartWindow(QMainWindow):
         self._pixmap = pixmap
         self._default_folder = Path(default_folder).expanduser() if default_folder else Path()
         self._base_name = base_name
+        self._export_target = export_target
 
         tabs = QTabWidget()
         scroll = QScrollArea()
@@ -451,6 +577,10 @@ class AnalyticsChartWindow(QMainWindow):
         self.setCentralWidget(tabs)
 
         file_menu = self.menuBar().addMenu("File")
+        if csv_export is not None:
+            action = QAction("Save Table as CSV...", self)
+            action.triggered.connect(csv_export)
+            file_menu.addAction(action)
         for label, callback in (
             ("Save Graphic as PNG...", self.save_png),
             ("Save Graphic as PDF...", self.save_pdf),
@@ -472,8 +602,13 @@ class AnalyticsChartWindow(QMainWindow):
         path, _filter = QFileDialog.getSaveFileName(
             self, "Save Graphic as PNG", self._default_path("png"), "PNG files (*.png)"
         )
-        if path and not self._pixmap.save(path, "PNG"):
-            QMessageBox.warning(self, "Save Graphic", f"Could not save PNG to {path}.")
+        if path:
+            try:
+                with self._export_target(path) if self._export_target else nullcontext(path) as destination:
+                    if not self._pixmap.save(str(destination), "PNG"):
+                        raise OSError(f"Could not save PNG to {path}.")
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(self, "Save Graphic", str(exc))
 
     def save_pdf(self) -> None:
         path, _filter = QFileDialog.getSaveFileName(
@@ -481,16 +616,30 @@ class AnalyticsChartWindow(QMainWindow):
         )
         if not path:
             return
-        printer = QPrinter(QPrinter.HighResolution)
-        printer.setOutputFormat(QPrinter.PdfFormat)
-        printer.setOutputFileName(path)
-        self._print_document(printer)
+        try:
+            with self._export_target(path) if self._export_target else nullcontext(path) as destination:
+                printer = QPrinter(QPrinter.HighResolution)
+                printer.setOutputFormat(QPrinter.PdfFormat)
+                printer.setOutputFileName(str(destination))
+                self._print_document(printer)
+                del printer
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Save Graphic", str(exc))
 
     def print_chart(self) -> None:
         printer = QPrinter(QPrinter.HighResolution)
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.Accepted:
-            self._print_document(printer)
+            try:
+                output = printer.outputFileName()
+                if output and self._export_target:
+                    with self._export_target(output) as destination:
+                        printer.setOutputFileName(str(destination))
+                        self._print_document(printer)
+                else:
+                    self._print_document(printer)
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(self, "Print Graphic", str(exc))
 
     def _print_document(self, printer: QPrinter) -> None:
         painter = QPainter(printer)
