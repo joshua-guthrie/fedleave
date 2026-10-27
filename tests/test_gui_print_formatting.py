@@ -1,18 +1,21 @@
 import os
+import xml.etree.ElementTree as ET
+from math import ceil, floor
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QRectF
+from PySide6.QtCore import QByteArray, QRectF
 from PySide6.QtGui import QPageLayout, QPageSize
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPrintSupport import QPrinter
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import QApplication, QFileDialog
 
 from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave_gui.main_window import MainWindow
-from fedleave_month_report_graphic.report import CATEGORY_LABELS
+from fedleave_month_report_graphic.report import CATEGORY_LABELS, render_svg
 
 
 def _application() -> QApplication:
@@ -99,6 +102,33 @@ def test_exported_pdf_keeps_complete_abbreviations_inside_panel(monkeypatch, tmp
     monkeypatch.setattr(MainWindow, "refresh", lambda self: None)
     window = MainWindow()
     window.month_json = _month_json()
+
+    # Inspect Qt's actual text geometry rather than PDF text extraction, which
+    # varies with the platform's font embedding and encoding.
+    root = ET.fromstring(render_svg(window._month_report_data(), 1920))
+    labels = [
+        element
+        for element in root.findall("{http://www.w3.org/2000/svg}text")
+        if float(element.get("x")) >= 1224 and float(element.get("y")) > 790
+    ]
+    for index, element in enumerate(labels):
+        element.set("id", f"abbreviation-{index}")
+    renderer = QSvgRenderer(QByteArray(ET.tostring(root)))
+    panel = QRectF(1224, 790, 668, 250)
+    bounds = []
+    for element in labels:
+        box = renderer.boundsOnElement(element.get("id"))
+        assert not box.isEmpty(), element.text
+        assert panel.contains(box), element.text
+        assert not any(box.intersects(other) for other in bounds), element.text
+        bounds.append(box)
+    values = [element.text for element in labels]
+    for category in TRANSACTION_CATEGORIES:
+        assert CATEGORY_LABELS[category][0] in values
+        assert CATEGORY_LABELS[category][1] in values
+    for marker in ("Holiday", "Pay Day", "Pay Period End", "Today"):
+        assert marker in values
+
     output = tmp_path / "month.pdf"
     printer = QPrinter(QPrinter.HighResolution)
     printer.setPageSize(QPageSize(page_size))
@@ -110,23 +140,25 @@ def test_exported_pdf_keeps_complete_abbreviations_inside_panel(monkeypatch, tmp
     document = QPdfDocument()
     assert document.load(str(output)) == QPdfDocument.Error.None_
     assert document.pageCount() == 1
-    text = document.getAllText(0).text()
-    start = text.index("Abbreviations") + len("Abbreviations")
-    section = text[start:]
-    for category in TRANSACTION_CATEGORIES:
-        assert CATEGORY_LABELS[category][1] in section
-    for marker in ("Holiday", "Pay Day", "Pay Period End", "Today"):
-        assert marker in section
-
+    image = document.render(0, document.pagePointSize(0).toSize() * 2)
+    assert not image.isNull()
     page = printer.pageLayout().paintRectPoints()
-    panel = QRectF(
+    pdf_panel = QRectF(
         page.x() + 1224 / 1920 * page.width(),
         page.y() + 790 / 1080 * page.height(),
         668 / 1920 * page.width(),
         250 / 1080 * page.height(),
     )
-    bounds = document.getSelectionAtIndex(0, start, len(section)).boundingRectangle()
-    assert not bounds.isEmpty()
-    assert panel.contains(bounds)
+    # A non-full-page QPrinter already translates the painter to the printable
+    # origin before _print_document supplies its paint rectangle to QtSvg.
+    if not printer.fullPage():
+        pdf_panel.translate(page.topLeft())
+    scale_x = image.width() / document.pagePointSize(0).width()
+    scale_y = image.height() / document.pagePointSize(0).height()
+    # The actual exported page must keep the margin to the panel's right white.
+    # A little padding excludes antialiasing on the panel border itself.
+    for x in range(ceil(pdf_panel.right() * scale_x) + 3, image.width()):
+        for y in range(ceil(pdf_panel.top() * scale_y) + 3, floor(pdf_panel.bottom() * scale_y) - 3):
+            assert image.pixelColor(x, y).lightness() == 255
     document.close()
     window.close()
