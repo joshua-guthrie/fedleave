@@ -119,9 +119,10 @@ def test_exported_pdf_keeps_complete_abbreviations_inside_panel(monkeypatch, tmp
     for element in labels:
         box = renderer.boundsOnElement(element.get("id"))
         assert not box.isEmpty(), element.text
-        assert panel.contains(box), element.text
-        assert not any(box.intersects(other) for other in bounds), element.text
-        bounds.append(box)
+        assert panel.contains(box), (element.text, box)
+        overlaps = [(text, other) for text, other in bounds if box.intersects(other)]
+        assert not overlaps, (element.text, box, overlaps)
+        bounds.append((element.text, box))
     values = [element.text for element in labels]
     for category in TRANSACTION_CATEGORIES:
         assert CATEGORY_LABELS[category][0] in values

@@ -32,7 +32,8 @@ MAX_RESOLUTION = 7680
 
 ABBREVIATION_COLUMN_WIDTHS = [52, 258]
 ABBREVIATION_COLUMN_GAP = 14
-ABBREVIATION_ROW_HEIGHT = 16
+ABBREVIATION_TABLE_Y = 796
+ABBREVIATION_ROW_HEIGHT = 18
 
 TEXT = "#1f2937"
 MUTED = "#64748b"
@@ -714,7 +715,7 @@ def _render_bottom_svg(data: ReportData) -> list[str]:
         parts.extend(
             _render_table_svg(
                 x,
-                808,
+                ABBREVIATION_TABLE_Y,
                 ["Abbr", "Category"],
                 rows,
                 ABBREVIATION_COLUMN_WIDTHS,
@@ -867,9 +868,15 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
     abbreviation_bold = load_font(max(1, round(11 * scale)), bold=True)
     for column, rows in enumerate(_abbreviation_columns()):
         x = 1238 + column * (sum(ABBREVIATION_COLUMN_WIDTHS) + ABBREVIATION_COLUMN_GAP)
-        text(x + 6, 825, "Abbr", font_obj=abbreviation_bold, anchor="ls")
-        text(x + ABBREVIATION_COLUMN_WIDTHS[0] + 6, 825, "Category", font_obj=abbreviation_bold, anchor="ls")
-        yy = 847
+        text(x + 6, ABBREVIATION_TABLE_Y + 17, "Abbr", font_obj=abbreviation_bold, anchor="ls")
+        text(
+            x + ABBREVIATION_COLUMN_WIDTHS[0] + 6,
+            ABBREVIATION_TABLE_Y + 17,
+            "Category",
+            font_obj=abbreviation_bold,
+            anchor="ls",
+        )
+        yy = ABBREVIATION_TABLE_Y + 39
         for abbr, label in rows:
             text(x + 6, yy, abbr, font_obj=abbreviation_bold, anchor="ls")
             text(x + ABBREVIATION_COLUMN_WIDTHS[0] + 6, yy, label, font_obj=abbreviation_font, anchor="ls")
