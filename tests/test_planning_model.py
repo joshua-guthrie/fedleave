@@ -110,12 +110,13 @@ def test_loader_uses_exact_backend_years_discovery_and_single_snapshot(monkeypat
         return type("Result", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
 
     monkeypatch.setattr("fedleave_analytics.planning_model.subprocess.run", run)
-    result = load_planning_snapshot(Path("/selected/backend"), "/selected data with spaces", 2026)
+    backend = Path("/selected/backend")
+    result = load_planning_snapshot(backend, "/selected data with spaces", 2026)
     assert calls == [
-        ["/selected/backend", "years", "--json", "--data-dir", "/selected data with spaces"],
-        ["/selected/backend", "snapshot", "--year", "2026", "--json", "--data-dir", "/selected data with spaces"],
+        [str(backend), "years", "--json", "--data-dir", "/selected data with spaces"],
+        [str(backend), "snapshot", "--year", "2026", "--json", "--data-dir", "/selected data with spaces"],
     ]
-    assert result["calculation_context"]["backend"] == "/selected/backend"
+    assert result["calculation_context"]["backend"] == str(backend)
     calls.clear()
     with pytest.raises(RuntimeError, match="not initialized"):
         load_planning_snapshot(Path("/selected/backend"), "/selected data with spaces", 2027)
