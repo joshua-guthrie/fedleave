@@ -1,13 +1,14 @@
 import os
 import xml.etree.ElementTree as ET
 from math import ceil, floor
+from pathlib import Path
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QByteArray, QRectF
-from PySide6.QtGui import QPageLayout, QPageSize
+from PySide6.QtGui import QFont, QFontDatabase, QFontMetricsF, QPageLayout, QPageSize
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtSvg import QSvgRenderer
@@ -19,7 +20,18 @@ from fedleave_month_report_graphic.report import CATEGORY_LABELS, render_svg
 
 
 def _application() -> QApplication:
-    return QApplication.instance() or QApplication([])
+    application = QApplication.instance() or QApplication([])
+    if os.name == "nt":
+        # Windows' offscreen backend uses FreeType rather than the native font
+        # database. Register real fonts so layout tests cannot measure box glyphs.
+        font_dir = Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts"
+        for filename in ("arial.ttf", "arialbd.ttf"):
+            path = font_dir / filename
+            assert QFontDatabase.addApplicationFont(str(path)) >= 0, f"Could not load {path}"
+        application.setFont(QFont("Arial", 9))
+        metrics = QFontMetricsF(application.font())
+        assert metrics.horizontalAdvance("iiii") < metrics.horizontalAdvance("WWWW"), "Qt has no usable text font"
+    return application
 
 
 def _month_json() -> dict:
