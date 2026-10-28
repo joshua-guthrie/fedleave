@@ -1,6 +1,9 @@
 import json
 import os
+import subprocess
+import sys
 import sysconfig
+import textwrap
 from copy import deepcopy
 from dataclasses import replace
 from pathlib import Path
@@ -17,6 +20,65 @@ from fedleave.planning import PlanningValidationError, export_scenario
 from fedleave_analytics.planning_view import PlannerWidget
 from leave_year_support import store, tree, tx
 from test_planning import TODAY, category, lot_source, operation, scenario, snapshot
+
+
+def test_repeated_planner_rendering_and_process_shutdown_are_clean():
+    # Native Qt reference corruption can surface only during a later render or
+    # interpreter shutdown. Keep this in a child so a crash is a test failure,
+    # including on Python 3.11 where None is not immortal.
+    script = textwrap.dedent("""\
+        import gc
+        import json
+        import sys
+        import time
+        from datetime import date
+        from pathlib import Path
+        from PySide6.QtCore import QCoreApplication, QDate, QEvent, QThreadPool
+        from PySide6.QtWidgets import QApplication
+        from fedleave_analytics.planning_view import PlannerWidget
+
+        app = QApplication([])
+        view = PlannerWidget(Path('/unused/backend'), '/unused/store', 2026, today=date(2026, 7, 1))
+
+        def wait_result():
+            deadline = time.monotonic() + 15
+            while view.session is None or view.session.result is None or view._tasks:
+                app.processEvents()
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(view.status_label.text())
+                time.sleep(.005)
+            QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+            gc.collect()
+
+        view.set_snapshot(json.load(sys.stdin))
+        wait_result()
+        view.horizon_edit.setDate(QDate(2026, 7, 31))
+        wait_result()
+        for index in range(10):
+            if index % 2:
+                view.reset_scenario()
+            else:
+                view.add_tentative()
+            view.recalculate()
+            wait_result()
+            assert not view.chart_image.source_pixmap().isNull()
+        view.shutdown()
+        assert QThreadPool.globalInstance().waitForDone(15000)
+        view.close()
+        view.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+        del view
+        gc.collect()
+    """)
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        input=json.dumps(snapshot()),
+        text=True,
+        capture_output=True,
+        env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def wait_result(qtbot, view, horizon="2026-07-31"):

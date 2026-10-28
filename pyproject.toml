@@ -22,7 +22,9 @@ dependencies = [
 
 [project.optional-dependencies]
 gui = [
-  "PySide6>=6,<7",
+  # 6.12.0 corrupts None references when rebuilding tables on Python 3.11.
+  # Keep source installs and both packaged GUIs on the verified 6.11 series.
+  "PySide6>=6,<6.12",
 ]
 test = [
   "hypothesis",

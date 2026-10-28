@@ -4,6 +4,7 @@
 
 - Add a session-only What-if Planner under Analysis > Planning, with canonical baseline/scenario daily balances, reserves, lot effects, capacity conflicts, provenance, and atomic JSON/CSV exchange.
 - Reuse read-only snapshots with explicit schedule/holiday context; keep canonical leave data unchanged through editing, imports/exports, cancellation, and close.
+- Exclude PySide6 6.12 from GUI installs and packages after reproducing native table-rendering reference corruption on Python 3.11; exercise repeated planner rendering and clean process exit in a subprocess regression.
 
 - Keep all monthly report abbreviations and full category names inside their panel in PDF, print, SVG, and PNG output, with room for the marker legend below.
 
