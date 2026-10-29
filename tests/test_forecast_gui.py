@@ -282,3 +282,31 @@ def test_canceled_inflight_loading_never_installs_late_data_or_preferences(qtbot
     assert view.snapshot is None
     assert view.result is None
     assert not path.exists()
+
+
+def test_canceled_refresh_clears_old_coverage_context(qtbot, forecast_view, monkeypatch):
+    view = forecast_view
+    released = Event()
+
+    def snapshot(self, year):
+        assert released.wait(10)
+        return source(year)
+
+    monkeypatch.setattr("fedleave_analytics.snapshots.ReadOnlySnapshotSource.snapshot", snapshot)
+    monkeypatch.setattr(
+        "fedleave_analytics.snapshots.ReadOnlySnapshotSource.inventory",
+        lambda self: [{"leave_year": 2026, "valid": True}],
+    )
+    previous = deepcopy(view.preferences)
+    try:
+        view.load_source()
+        view.cancel()
+        assert view.snapshot is None
+        assert view.history_table.rowCount() == 0
+        assert view.period_table.rowCount() == 0
+        assert view.check_year.count() == 0
+        view._confirm(True, True)
+        assert view.preferences == previous
+    finally:
+        released.set()
+        qtbot.waitUntil(lambda: not view._tasks, timeout=15000)

@@ -222,6 +222,15 @@ class ForecastWidget(QWidget):
     def load_source(self):
         self.cancel()
         self.snapshot = None
+        self._updating = True
+        try:
+            self.history = {}
+            self._history_years = []
+            self.history_table.setRowCount(0)
+            self.period_table.setRowCount(0)
+            self.check_year.clear()
+        finally:
+            self._updating = False
         self._loading = True
         self._set_enabled(False)
         self._cancel_event = Event()
@@ -547,7 +556,7 @@ class ForecastWidget(QWidget):
 
     def _confirm(self, confirmed, whole):
         year = self._selected_year()
-        if year not in self.history:
+        if self.snapshot is None or year not in self.history:
             self.status_label.setText("Select a loaded historical year first.")
             return
         periods = None
