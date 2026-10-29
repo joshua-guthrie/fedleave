@@ -1044,7 +1044,8 @@ The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Mi
 ### Companion Application: FedLeaveAnalytics
 
 `FedLeaveAnalytics` is the read-only companion for seasonality, calendar
-heatmaps, overtime, compensatory-time, and credit-hour analysis. Launch it
+heatmaps, overtime, compensatory-time, credit-hour analysis, planning and usage
+forecasts. Launch it
 directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calendar
 passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
@@ -1164,6 +1165,98 @@ up, synchronize, or write leave data. There is no Apply to Ledger action.
 Edits reuse the cached snapshot; **Refresh** reads current backend data and
 revalidates references. Old worker results are discarded after edits, source
 changes, cancellation, or close.
+
+#### Usage Forecast
+
+Choose **Analysis > Planning > Usage Forecast...** in the calendar, or
+**Planning > Usage Forecast** in Analytics. The existing companion uses the
+same backend, exact datastore, selected leave year, font and PDF folder.
+Select annual only, sick only, or combined annual/sick, an inclusive
+cutoff/horizon inside the selected year, optional per-category reserves and
+reference years. The default is up to five most recent prior leave years;
+Reference and Exclude unusual controls make the inclusion list explicit.
+
+**Usage Forecast is a read-only planning and analysis feature. It does not
+create, modify, or delete leave transactions. Forecast calculations use
+isolated in-memory data, and historical coverage preferences are stored
+separately from leave records.** There is no Apply Forecast action.
+
+Historical coverage starts **unconfirmed**. Select a source year to confirm
+its whole year or selected represented pay periods, inspect their dates, or
+revoke confirmation. Confirm only records you consider complete. A valid
+calendar skeleton does not prove complete recordkeeping: confirmed zero-use
+periods contribute zero; unconfirmed/stale periods are missing. Material
+source changes require renewed confirmation for affected periods; display-only
+notes do not. Coverage, reference selections and manual exclusions persist in
+a versioned analytics preferences file beside the existing GUI settings,
+scoped to the selected source and outside canonical leave data.
+
+- **Scheduled** projects effective entered leave with canonical accruals and
+  expiration rules, even when no historical estimate is available.
+- **Typical Usage** adds estimates based on the median historical rate.
+- **Higher Usage** uses the historical 80th percentile, linearly interpolated
+  at `(n - 1) * 0.8`, clamped to at least Typical. These are historical planning
+  scenarios, not confidence intervals or calibrated probabilities.
+
+Rates are recorded category hours divided by scheduled working-hour exposure
+in the corresponding calendar month within actual leave-year bounds. When
+January occurs at both leave-year edges, its historical exposure is combined;
+target segments remain distinct. Three eligible year observations are needed
+for seasonal estimates; otherwise independently eligible whole-year rates
+supply the fallback. One or two observations are labeled **Limited history**.
+No eligible history or unknown exposure gives **N/A**, never fabricated zero.
+An optional confirmed-status basis includes worked/submitted/certified/
+reconciled rows; past planned/requested records stay unresolved **Recorded
+Through Cutoff**. Future reconciled rows are not historical training data.
+
+Additional use is calculated separately for each category and target month
+segment: `max(0, estimated total - effective scheduled use)`. With Typical =
+32 hours, Higher = 40 and 24 already scheduled, add only 8 and 16 hours.
+If 48 are scheduled, retain all 48 and add zero. A July surplus cannot offset
+December demand, and annual/sick balances never offset one another.
+
+The configured tour, lunch, workdays and cached observed holidays determine
+exposure. Unless historical schedules are explicitly available, current
+settings are applied retrospectively with a visible assumption. Off-schedule
+historical use stays in source hours with a warning. Missing context produces
+unknown metrics. Combined forecasts share remaining daily work capacity after
+existing absences across all categories. Proportional category quotas, largest
+remainders and stable date ordering allocate configured time increments.
+Typical and Higher allocate independently. Leave-balance shortages do not cap
+use; earlier deficits and subsequent recovery remain visible.
+
+**Incomplete Allocation** shows allocated and unallocated demand, including
+residuals smaller than the time increment. Daily curves and allocated horizon
+balances include only dated allocated estimates. A separately labeled
+**hypothetical full-demand balance** shows undated demand's sensitivity when
+reliable; timing-dependent expiration/year-end effects make it N/A. No dates
+are invented for unallocated demand, and undated demand cannot establish a
+negative/minimum/reserve-breach date. Actual year-end carryover/use-or-lose
+appears only at the actual leave-year end.
+
+Summary, monthly explanations, daily closing balances, source transactions,
+estimated allocations, events/expiration, lot and warning tables share one
+versioned result. Monthly explanations include eligible seasonal/fallback
+years, per-year rates, exclusion reasons, scheduled use and additional demand;
+double-click for source transaction IDs and coverage details. **Save Table as
+CSV...** includes filters, hours, source/method versions, status set and
+assumptions. **Export Results JSON...** retains the complete result and any
+retrospective check. **Open Chart** uses its exact supporting daily table and
+existing CSV/PNG/PDF/Print actions. Save exports outside the leave datastore.
+Changing chart category rerenders cached results; Refresh reloads read-only
+snapshots. Stale worker results are discarded after edits, source changes,
+cancellation or close.
+
+**Retrospective usage check** evaluates prior pay-period-end cutoffs in a
+completed year using only selected earlier source years. It reports Typical
+and Higher hours of error, absolute error, MAE and sample counts alongside a
+whole-year-rate comparison; differing training populations are disclosed.
+Missing actual coverage remains unknown, and zero actual usage is not used
+as a percentage denominator. Present records do not reconstruct bookings or
+statuses known at the earlier cutoff. These checks validate usage estimation,
+not the operational accuracy of forecasts issued at that time.
+
+#### Seasonality
 
 Seasonality has exactly two selectors: **Analysis** and **Leave Type**. The
 default is **Leave Used by Month** + **All Leave Used**, preserving the original

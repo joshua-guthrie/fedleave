@@ -130,7 +130,7 @@ def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> 
     for row_index, row in enumerate(rows):
         for column_index, (key, _label) in enumerate(columns):
             value = row.get(key)
-            item = SortableTableItem(_display(value))
+            item = SortableTableItem(f"{value:.8g}" if key == "rate" and isinstance(value, float) else _display(value))
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 item.setData(Qt.UserRole, float(value))
@@ -421,9 +421,21 @@ def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
 
 
 def render_planning_chart(
-    title: str, rows: list[dict], events: list[dict], reserve: float | None, cutoff: str, horizon: str
+    title: str,
+    rows: list[dict],
+    events: list[dict],
+    reserve: float | None,
+    cutoff: str,
+    horizon: str,
+    *,
+    series=None,
+    caption=None,
 ) -> QPixmap:
     """Render only supplied daily closing values; no accounting is recalculated."""
+    series = series or (
+        ("baseline", "Scheduled baseline", BLUE, Qt.DashLine, 135),
+        ("scenario", "What-if scenario", RED, Qt.SolidLine, 500),
+    )
     height = 520
     pixmap = QPixmap(WIDTH, height)
     pixmap.fill(QColor(BACKGROUND))
@@ -450,7 +462,7 @@ def render_planning_chart(
             f"Cutoff {cutoff} | Horizon {horizon} | Hours | Daily closing balances",
         )
         left, top, right, bottom = 135, 185, WIDTH - 65, height - 130
-        values = [float(row[key]) for row in rows for key in ("baseline", "scenario") if row.get(key) is not None]
+        values = [float(row[key]) for row in rows for key, *_ in series if row.get(key) is not None]
         if reserve is not None:
             values.append(reserve)
         low, high = min([0.0, *values]), max([0.0, *values])
@@ -483,10 +495,7 @@ def render_planning_chart(
         painter.setPen(QPen(QColor(TEXT), 2, Qt.DotLine))
         painter.drawLine(left + 1, top, left + 1, bottom)
         painter.drawText(left + 8, bottom - 28, 220, 24, Qt.AlignLeft, "Cutoff (closing)")
-        for key, label, color, style, legend_x in (
-            ("baseline", "Scheduled baseline", BLUE, Qt.DashLine, 135),
-            ("scenario", "What-if scenario", RED, Qt.SolidLine, 500),
-        ):
+        for key, label, color, style, legend_x in series:
             painter.setPen(QPen(QColor(color), 3, style))
             painter.drawLine(legend_x, 145, legend_x + 50, 145)
             painter.drawText(legend_x + 65, 132, 290, 30, Qt.AlignLeft | Qt.AlignVCenter, label)
@@ -526,9 +535,10 @@ def render_planning_chart(
             WIDTH - 160,
             55,
             Qt.AlignCenter | Qt.TextWordWrap,
-            "Circles: scheduled absence. Squares: tentative absence. Same-day rows share a closing balance; the chart does not imply intraday order.",
+            caption
+            or "Circles: scheduled absence. Squares: tentative absence. Same-day rows share a closing balance; the chart does not imply intraday order.",
         )
-        if not any(row.get("baseline") is not None or row.get("scenario") is not None for row in rows):
+        if not any(row.get(key) is not None for row in rows for key, *_ in series):
             painter.drawText(
                 left + 40,
                 top + 80,
@@ -540,6 +550,28 @@ def render_planning_chart(
     finally:
         painter.end()
     return pixmap
+
+
+def render_forecast_chart(title, rows, reserve, cutoff, horizon, completeness):
+    series = []
+    for key, label, color, style, position in (
+        ("scheduled", "Scheduled", BLUE, Qt.DashLine, 135),
+        ("typical", "Typical allocated", "#41894C", Qt.SolidLine, 600),
+        ("higher", "Higher allocated", RED, Qt.DotLine, 1065),
+    ):
+        if key != "scheduled" and not completeness.get(key):
+            label += " (incomplete)"
+        series.append((key, label, color, style, position))
+    return render_planning_chart(
+        title,
+        rows,
+        [],
+        reserve,
+        cutoff,
+        horizon,
+        series=series,
+        caption="Historical planning scenarios, not a confidence interval. Curves show allocated estimates only; review missing history and unallocated demand in the tables.",
+    )
 
 
 class AnalyticsChartWindow(QMainWindow):

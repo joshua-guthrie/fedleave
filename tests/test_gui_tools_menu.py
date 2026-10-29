@@ -181,6 +181,10 @@ def test_planning_menu_launches_existing_analytics_with_exact_context(monkeypatc
             "planning",
         ]
     ]
+    forecast_action = next(action for action in planning.menu().actions() if action.text() == "Usage Forecast...")
+    forecast_action.trigger()
+    assert calls[-1][:-1] == calls[0][:-1]
+    assert calls[-1][-1] == "forecast"
 
 
 def test_file_menu_includes_change_leave_year_action(monkeypatch, tmp_path):

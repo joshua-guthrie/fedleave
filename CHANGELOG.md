@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Add Usage Forecast under Analysis > Planning with Scheduled, Typical and Higher scenarios, confirmed historical coverage, month/exposure normalization, deterministic shared annual/sick capacity, incomplete-demand reporting and retrospective usage checks.
+- Keep historical coverage/exclusion preferences outside leave records; reuse cached read-only backend snapshots and the canonical projection engine for forecast tables, charts and exports.
+
 - Add a session-only What-if Planner under Analysis > Planning, with canonical baseline/scenario daily balances, reserves, lot effects, capacity conflicts, provenance, and atomic JSON/CSV exchange.
 - Reuse read-only snapshots with explicit schedule/holiday context; keep canonical leave data unchanged through editing, imports/exports, cancellation, and close.
 - Exclude PySide6 6.12 from GUI installs and packages after reproducing native table-rendering reference corruption on Python 3.11; exercise repeated planner rendering and clean process exit in a subprocess regression.

@@ -1519,6 +1519,7 @@ class MainWindow(QMainWindow):
         self._action(analysis_menu, "Analytics...", self.open_analytics)
         planning_menu = analysis_menu.addMenu("Planning")
         self._action(planning_menu, "What-if Planner...", self.open_planning)
+        self._action(planning_menu, "Usage Forecast...", self.open_usage_forecast)
         leave_charts_menu = analysis_menu.addMenu("Leave Charts")
         for label, app_name in LEAVE_CHARTS:
             self.leave_chart_actions[CHART_APP_CATEGORIES[app_name]] = self._action(
@@ -2161,6 +2162,9 @@ class MainWindow(QMainWindow):
 
     def open_planning(self) -> None:
         self._launch_analytics(view="planning")
+
+    def open_usage_forecast(self) -> None:
+        self._launch_analytics(view="forecast")
 
     def _launch_analytics(self, *, view: str | None = None) -> None:
         try:

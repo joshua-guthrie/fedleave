@@ -816,9 +816,14 @@ def _schedule(snapshot: dict, warnings: list[PlanningWarning]) -> tuple[float | 
     return hours, workdays, schedule
 
 
-def _capacity(
-    snapshot: dict, baseline: dict, alternate: dict, scenario: Scenario, warnings: list[PlanningWarning]
-) -> tuple[tuple[CapacityDay, ...], dict]:
+def working_calendar(
+    snapshot: dict, start: str, end: str, warnings: list[PlanningWarning]
+) -> tuple[dict[str, float | None], dict]:
+    """Shared scheduled work exposure, before subtracting physical absences.
+
+    Only backend-supplied settings/cached holidays are used. Missing context
+    remains unknown; historical analysis and planning share the same calendar.
+    """
     hours, weekdays, assumptions = _schedule(snapshot, warnings)
     config = snapshot.get("snapshot_rules", {})
     context = snapshot.get("calculation_context", {})
@@ -836,6 +841,24 @@ def _capacity(
                 "Cached holiday coverage is unavailable; working-hour capacity is N/A until the backend supplies it.",
             )
         )
+    result = {}
+    day, last = _date(start, "start"), _date(end, "end")
+    while day <= last:
+        key = day.isoformat()
+        result[key] = (
+            None
+            if hours is None or (enabled and day.year not in coverage)
+            else (hours if day.weekday() in weekdays and (not enabled or key not in holidays) else 0.0)
+        )
+        day += timedelta(days=1)
+    assumptions["holidays_enabled"] = enabled
+    return result, assumptions
+
+
+def _capacity(
+    snapshot: dict, baseline: dict, alternate: dict, scenario: Scenario, warnings: list[PlanningWarning]
+) -> tuple[tuple[CapacityDay, ...], dict]:
+    calendar, assumptions = working_calendar(snapshot, scenario.cutoff, scenario.horizon, warnings)
     original: dict[str, float] = {}
     scheduled: dict[str, float] = {}
     tentative: dict[str, dict[str, float]] = {}
@@ -871,14 +894,7 @@ def _capacity(
     day, end = _date(scenario.cutoff, "cutoff"), _date(scenario.horizon, "horizon")
     while day <= end:
         key = day.isoformat()
-        available = (
-            None
-            if hours is None
-            or key in unknown_absence_dates
-            or "" in unknown_absence_dates
-            or (enabled and day.year not in coverage)
-            else (hours if day.weekday() in weekdays and (not enabled or key not in holidays) else 0.0)
-        )
+        available = None if key in unknown_absence_dates or "" in unknown_absence_dates else calendar[key]
         planned = sum(tentative.get(key, {}).values())
         scheduled_hours = scheduled.get(key, 0.0)
         total = scheduled_hours + planned
@@ -905,7 +921,6 @@ def _capacity(
                 )
             )
         day += timedelta(days=1)
-    assumptions["holidays_enabled"] = enabled
     return tuple(rows), assumptions
 
 

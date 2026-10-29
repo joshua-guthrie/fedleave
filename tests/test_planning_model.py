@@ -109,7 +109,7 @@ def test_loader_uses_exact_backend_years_discovery_and_single_snapshot(monkeypat
         payload = {"years": [{"leave_year": 2026, "valid": True}]} if command[1] == "years" else source
         return type("Result", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
 
-    monkeypatch.setattr("fedleave_analytics.planning_model.subprocess.run", run)
+    monkeypatch.setattr("fedleave_analytics.snapshots.subprocess.run", run)
     backend = Path("/selected/backend")
     result = load_planning_snapshot(backend, "/selected data with spaces", 2026)
     assert calls == [
@@ -130,7 +130,7 @@ def test_loader_failure_never_falls_back_or_changes_active_scenario(monkeypatch)
         calls.append(command)
         return type("Result", (), {"returncode": 1, "stdout": "", "stderr": "selected store unavailable"})()
 
-    monkeypatch.setattr("fedleave_analytics.planning_model.subprocess.run", run)
+    monkeypatch.setattr("fedleave_analytics.snapshots.subprocess.run", run)
     with pytest.raises(RuntimeError, match="selected store unavailable"):
         load_planning_snapshot(Path("/selected/backend"), "/selected store", 2026)
     assert len(calls) == 1

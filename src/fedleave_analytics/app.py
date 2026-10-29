@@ -46,6 +46,7 @@ from .charts import (
     render_horizontal_bar_chart,
     table_widget,
 )
+from .forecast_view import ForecastWidget
 from .planning_view import PlannerWidget
 from .seasonality import seasonality_options, seasonality_series
 
@@ -335,7 +336,9 @@ class AnalyticsWindow(QMainWindow):
         font.setPointSize(font_size)
         self.setFont(font)
         self._build_ui()
-        if initial_view == "planning":
+        if initial_view in {"planning", "forecast"}:
+            if initial_view == "forecast":
+                self.planning_tabs.setCurrentWidget(self.forecaster)
             self.pages.setCurrentWidget(self.planning_page)
         elif auto_load:
             self.refresh_data()
@@ -396,8 +399,12 @@ class AnalyticsWindow(QMainWindow):
         self.planning_tabs = QTabWidget()
         self.planner = PlannerWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
         self.planning_tabs.addTab(self.planner, "What-if Planner")
+        self.forecaster = ForecastWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.planning_tabs.addTab(self.forecaster, "Usage Forecast")
         planning_layout.addWidget(self.planning_tabs)
         self.planner.source_loaded.connect(self._planning_source_loaded)
+        self.forecaster.source_loaded.connect(self._planning_source_loaded)
+        self.planning_tabs.currentChanged.connect(self._page_changed)
         self.pages.currentChanged.connect(self._page_changed)
 
         file_menu = self.menuBar().addMenu("File")
@@ -578,8 +585,9 @@ class AnalyticsWindow(QMainWindow):
     @Slot()
     def refresh_data(self) -> None:
         if self.pages.currentWidget() is self.planning_page:
-            self.planner.set_source(self.backend, self.data_dir, self.year)
-            self.planner.load_source()
+            view = self.planning_tabs.currentWidget()
+            view.set_source(self.backend, self.data_dir, self.year)
+            view.load_source()
             return
         if self._load_thread and self._load_thread.isRunning():
             return
@@ -828,6 +836,7 @@ class AnalyticsWindow(QMainWindow):
             return
         self.year = int(selected)
         self.planner.set_source(self.backend, self.data_dir, self.year)
+        self.forecaster.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
 
     @Slot(object)
@@ -844,10 +853,13 @@ class AnalyticsWindow(QMainWindow):
         if self.pages.currentWidget() is self.planning_page:
             self.open_chart_button.setEnabled(True)
             self.notice_label.setText(
-                "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. Leave records are never modified."
+                "Usage Forecast: Scheduled, Typical Usage and Higher Usage are historical planning scenarios. Confirm historical coverage and review allocation completeness."
+                if self.planning_tabs.currentWidget() is self.forecaster
+                else "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. Leave records are never modified."
             )
-            self.planner.set_source(self.backend, self.data_dir, self.year)
-            self.planner.activate()
+            view = self.planning_tabs.currentWidget()
+            view.set_source(self.backend, self.data_dir, self.year)
+            view.activate()
             return
         page = self.pages.currentIndex()
         self.open_chart_button.setEnabled(page != 0)
@@ -892,7 +904,7 @@ class AnalyticsWindow(QMainWindow):
 
     def open_chart(self) -> None:
         if self.pages.currentWidget() is self.planning_page:
-            self.planner.open_chart()
+            self.planning_tabs.currentWidget().open_chart()
             return
         if not self.data:
             return
@@ -958,7 +970,7 @@ class AnalyticsWindow(QMainWindow):
 
     def save_csv(self) -> None:
         if self.pages.currentWidget() is self.planning_page:
-            self.planner.save_csv()
+            self.planning_tabs.currentWidget().save_csv()
             return
         if not self.data or not self._current_rows:
             QMessageBox.information(self, "Save Table", "The selected table has no rows to export.")
@@ -1132,6 +1144,7 @@ class AnalyticsWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         self._closing = True
         self.planner.shutdown()
+        self.forecaster.shutdown()
         if self._load_thread and self._load_thread.isRunning():
             # Hide promptly, retain the worker's owner, then close after its
             # bounded backend read completes. No running QThread is destroyed.
@@ -1163,7 +1176,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-folder", default="")
     parser.add_argument(
         "--view",
-        choices=["analytics", "planning"],
+        choices=["analytics", "planning", "forecast"],
         default="analytics",
         help="Initial view in the existing Analytics application.",
     )
@@ -1227,6 +1240,26 @@ def main(argv: list[str] | None = None) -> int:
             window.planner.recalculate()
             await_planning()
             assert all(row.baseline == row.scenario for row in window.planner.session.result.categories)
+        window.planning_tabs.setCurrentWidget(window.forecaster)
+
+        def await_forecast():
+            deadline = time.monotonic() + 40
+            while window.forecaster.result is None:
+                app.processEvents()
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(window.forecaster.status_label.text())
+                QThread.msleep(5)
+
+        await_forecast()
+        assert not window.forecaster.chart_image.source_pixmap().isNull()
+        assert not window.forecaster.result.scenarios["scheduled"].projection.operations
+        window.forecaster.scope_combo.setCurrentIndex(2)
+        window.forecaster.recalculate()
+        await_forecast()
+        assert window.forecaster.result.parameters.categories == ("annual", "sick")
+        assert all(
+            row["category"] in {"annual", "sick"} for row in window.forecaster.result.scenarios["scheduled"].summaries
+        )
         window.show()
         app.processEvents()
         window.close()

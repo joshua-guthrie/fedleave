@@ -5,8 +5,6 @@ from __future__ import annotations
 import csv
 import io
 import json
-import subprocess
-import sys
 import tempfile
 from contextlib import contextmanager
 from copy import deepcopy
@@ -30,6 +28,8 @@ from fedleave.planning import (
     project,
     validate_scenario,
 )
+
+from .snapshots import ReadOnlySnapshotSource
 
 LABELS = {
     "annual": "Annual leave",
@@ -161,43 +161,8 @@ def write_export(path: Path, text: str, snapshot: dict) -> None:
 
 
 def load_planning_snapshot(backend: Path, data_dir: str | None, year: int) -> dict:
-    """Use only the exact selected backend and its canonical snapshot command."""
-
-    def run(args):
-        command = [str(backend), *args, *(["--data-dir", data_dir] if data_dir else [])]
-        kwargs = {"capture_output": True, "text": True, "check": False, "timeout": 30}
-        if sys.platform.startswith("win"):
-            kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
-        try:
-            result = subprocess.run(command, **kwargs)
-        except subprocess.TimeoutExpired as exc:
-            raise RuntimeError("The selected backend did not respond within 30 seconds.") from exc
-        if result.returncode:
-            raise RuntimeError((result.stderr or result.stdout or "The selected backend failed.").strip())
-        try:
-            payload = json.loads(result.stdout)
-        except ValueError as exc:
-            raise RuntimeError("The selected backend returned invalid JSON.") from exc
-        if not isinstance(payload, dict):
-            raise RuntimeError("The selected backend returned an unsupported snapshot format.")
-        return payload
-
-    discovered = run(["years", "--json"])
-    years = discovered.get("years")
-    if not isinstance(years, list) or not any(
-        row.get("leave_year") == year and row.get("valid") is True for row in years if isinstance(row, dict)
-    ):
-        raise RuntimeError(f"Leave year {year} is not initialized and readable in the selected data directory.")
-    snapshot = run(["snapshot", "--year", str(year), "--json"])
-    if snapshot.get("leave_year") != year or not isinstance(snapshot.get("calculation_context"), dict):
-        raise RuntimeError(
-            "The selected backend must support read-only snapshots with calculation context. Update that backend; no alternate datastore was loaded."
-        )
-    snapshot["calculation_context"]["backend"] = str(backend)
-    snapshot["planning_available_years"] = [
-        row["leave_year"] for row in years if isinstance(row, dict) and row.get("valid") is True
-    ]
-    return snapshot
+    """Use the shared cached read-only CLI boundary for one planner load."""
+    return ReadOnlySnapshotSource(backend, data_dir).snapshot(year)
 
 
 class PlanningSession:

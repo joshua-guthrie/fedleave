@@ -1,4 +1,4 @@
-"""Read-only seasonality and comp-lifecycle analytics."""
+"""Read-only seasonality, lifecycle, planning and historical usage analytics."""
 
 from fedleave import __version__
 

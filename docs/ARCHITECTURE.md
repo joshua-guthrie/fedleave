@@ -192,3 +192,50 @@ datastore; they cannot overwrite a canonical file through an existing hard link.
 There is no planner persistence or apply-to-ledger interface. Forecast, Budget,
 Holiday Planner, and Reserve features should reuse this snapshot/result contract
 and the Planning container rather than create competing engines or executables.
+
+## Historical usage and forecasts
+
+`fedleave.history` is the common pure coverage/eligibility layer for historical
+analytics. Represented pay periods must cover the exact year without gaps or
+overlap. Explicit whole-year or period confirmations bind material transaction
+fingerprints to the source identity and dates. Display-only edits preserve
+confirmations; changed accounting records make affected periods stale. Missing
+coverage is distinct from confirmed zero use. Historical exposure reuses
+`planning.working_calendar`, with current configured tours explicitly applied
+retrospectively unless the backend supplies an actual historical schedule.
+
+`fedleave.forecast` receives defensive snapshot copies, coverage assertions and
+`ForecastParameters`, with no filesystem/backend/storage capability. Its
+versioned `month-exposure-median-p80-v1` result drives every view/export. Calendar
+month rates combine corresponding month segments within each actual source
+year. Three eligible year observations permit a seasonal estimate; otherwise
+independently eligible whole-year observations supply the fallback. Typical is
+the median; Higher uses linear p80 interpolation. Scheduled usage is subtracted
+per category/target segment without erasing entered leave.
+
+Each forecast allocates independently against the same shared engine capacity.
+Category demand shares scarce capacity proportionally; capped largest
+remainders and stable category/date ordering assign configured time increments.
+Residual demand, including sub-increment amounts, remains explicit. Allocation
+never depends on the available leave balance: negative balances remain valid
+diagnostic outcomes. Daily curves include only allocated dated estimates.
+Hypothetical full-demand horizon values remain separate and become unknown
+when undated demand has timing-dependent expiration/year-end effects.
+
+`retrospective_check` evaluates pay-period-end cutoffs in a completed year,
+training only on selected earlier years. It compares total estimated future
+usage with later recorded usage, without subtracting today's bookings as if
+they were known then. Typical/Higher and whole-year comparison errors, MAE,
+sample counts and training populations are explicit. It makes no claim to
+reconstruct operational historical forecasts.
+
+`fedleave_analytics.snapshots.ReadOnlySnapshotSource` is the one cached CLI
+acquisition implementation reused by both planning and forecasting. It honors
+the exact backend/datastore and never falls back or initializes missing data.
+Analytics coverage/reference exclusions use a single versioned `analytics.json`
+beside the existing GUI preferences, scoped by source, and are atomically saved
+outside the selected datastore. Calendar display/backend settings remain shared.
+`forecast_model` only maps result data to supporting rows/CSV; `forecast_view`
+handles controls, revision-bound workers and charts in the existing Planning
+container. Changing chart category only rerenders cached results. There are no
+new console executables, forecasting CLI commands, or ledger-application actions.
