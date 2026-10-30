@@ -236,6 +236,23 @@ def make_operation(snapshot: dict, **values: Any) -> ScenarioOperation:
     return ScenarioOperation(**values)
 
 
+def scenario_transaction(operation: ScenarioOperation) -> dict:
+    """One canonical synthetic absence shared by projection and budget checks."""
+    return {
+        "id": f"scenario:{operation.row_id}",
+        "date": operation.date,
+        "category": operation.category,
+        "direction": "used",
+        "hours": operation.hours,
+        "status": "planned",
+        "source": "what-if-planner",
+        "description": operation.note,
+        "planning_row_id": operation.row_id,
+        "planning_targeted_ids": list(operation.original_ids),
+        "earned_transaction_id": operation.earned_transaction_id,
+    }
+
+
 def validate_scenario(snapshot: dict, document: dict | Scenario) -> Scenario:
     """Validate atomically, including material identities and overlapping targets."""
     if isinstance(document, Scenario):
@@ -374,6 +391,8 @@ def validate_scenario(snapshot: dict, document: dict | Scenario) -> Scenario:
     if not isinstance(assumptions, dict):
         _invalid("assumptions", "Scenario assumptions must be an object.")
     assumptions = deepcopy(assumptions)
+    if "budget_credit_caps" in assumptions and not isinstance(assumptions["budget_credit_caps"], bool):
+        _invalid("assumptions", "budget_credit_caps must be true or false.")
     assumptions["historical_cutoff_limitation"] = HISTORICAL_CUTOFF_WARNING
     return Scenario(
         name.strip(),
@@ -503,9 +522,10 @@ class ProjectionResult:
         return asdict(self)
 
 
-def _prepare(
+def prepare_projection_snapshot(
     snapshot: dict, horizon: str, warnings: list[PlanningWarning], proposed_categories: set[str]
 ) -> tuple[dict, set[str]]:
+    """Canonical accruals and validated policy on a private copy; unknown banks stay isolated."""
     work = deepcopy(dict(snapshot))
     config = deepcopy(work.get("snapshot_rules", getattr(snapshot, "config", {})))
     if not isinstance(config, dict):
@@ -661,6 +681,10 @@ def _projection_events(
             explanation = f"Scenario {row_id}; {explanation}"
             original_id = None
             event_id = f"scenario:{row_id}:{transaction.get('earned_transaction_id') or 'unlinked'}:{transaction.get('allocation_order', [])}"
+        elif source == "credit-cap-engine":
+            timing = "Synthetic credit cap"
+            original_id = None
+            event_id = transaction_id
         elif source == "expiration-engine":
             timing = "Synthetic expiration"
             original_id = None
@@ -696,6 +720,15 @@ def _projection_events(
 def _branch(
     work: dict, unknown: set[str], scenario: Scenario, branch: str, warnings: list[PlanningWarning]
 ) -> tuple[dict[str, list[float | None]], tuple[ProjectionEvent, ...], tuple[LotEffect, ...]]:
+    if scenario.assumptions.get("budget_credit_caps"):
+        from .credit_caps import credit_cap_limitation, simulate_credit_caps
+
+        limitation = credit_cap_limitation(work.get("snapshot_rules", {}))
+        if limitation:
+            unknown = unknown | {"credit"}
+            warnings.append(PlanningWarning("UNSUPPORTED_CREDIT_CAP", limitation, "credit", branch=branch))
+        else:
+            simulate_credit_caps(work, scenario.cutoff, scenario.horizon)
     categories = sorted(set(CATEGORY_POLICIES) | unknown)
     daily: dict[str, list[float | None]] = {category: [] for category in categories}
     cutoff, horizon = _date(scenario.cutoff, "cutoff"), _date(scenario.horizon, "horizon")
@@ -971,7 +1004,7 @@ def project(snapshot: dict, scenario: Scenario | dict, *, today: date) -> Projec
     proposed_categories = {
         operation.category for operation in definition.operations if operation.category is not None
     } | set(definition.reserves)
-    baseline, unknown = _prepare(snapshot, definition.horizon, warnings, proposed_categories)
+    baseline, unknown = prepare_projection_snapshot(snapshot, definition.horizon, warnings, proposed_categories)
     for operation in definition.operations:
         if operation.category in RESTRICTED_CATEGORIES:
             warnings.append(
@@ -1008,19 +1041,7 @@ def project(snapshot: dict, scenario: Scenario | dict, *, today: date) -> Projec
         event_id = f"scenario:{operation.row_id}"
         if event_id in original_ids:
             _invalid("row_id", "Synthetic ID collides with a real transaction.", row_id=operation.row_id)
-        transaction = {
-            "id": event_id,
-            "date": operation.date,
-            "category": operation.category,
-            "direction": "used",
-            "hours": operation.hours,
-            "status": "planned",
-            "source": "what-if-planner",
-            "description": operation.note,
-            "planning_row_id": operation.row_id,
-            "planning_targeted_ids": list(operation.original_ids),
-            "earned_transaction_id": operation.earned_transaction_id,
-        }
+        transaction = scenario_transaction(operation)
         capacity_alternate["transactions"].append(deepcopy(transaction))
         if operation.category not in unknown:
             alternate["transactions"].append(transaction)

@@ -39,6 +39,7 @@ from fedleave.config import get_default_data_dir
 from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
+from .budget_view import BudgetWidget
 from .charts import (
     AnalyticsChartWindow,
     ResponsivePixmapLabel,
@@ -336,9 +337,11 @@ class AnalyticsWindow(QMainWindow):
         font.setPointSize(font_size)
         self.setFont(font)
         self._build_ui()
-        if initial_view in {"planning", "forecast"}:
+        if initial_view in {"planning", "forecast", "budget"}:
             if initial_view == "forecast":
                 self.planning_tabs.setCurrentWidget(self.forecaster)
+            elif initial_view == "budget":
+                self.planning_tabs.setCurrentWidget(self.budgeter)
             self.pages.setCurrentWidget(self.planning_page)
         elif auto_load:
             self.refresh_data()
@@ -401,9 +404,13 @@ class AnalyticsWindow(QMainWindow):
         self.planning_tabs.addTab(self.planner, "What-if Planner")
         self.forecaster = ForecastWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
         self.planning_tabs.addTab(self.forecaster, "Usage Forecast")
+        self.budgeter = BudgetWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.planning_tabs.addTab(self.budgeter, "Leave Budget")
+        self.budgeter.transfer_ready.connect(self._transfer_budget)
         planning_layout.addWidget(self.planning_tabs)
         self.planner.source_loaded.connect(self._planning_source_loaded)
         self.forecaster.source_loaded.connect(self._planning_source_loaded)
+        self.budgeter.source_loaded.connect(self._planning_source_loaded)
         self.planning_tabs.currentChanged.connect(self._page_changed)
         self.pages.currentChanged.connect(self._page_changed)
 
@@ -837,6 +844,7 @@ class AnalyticsWindow(QMainWindow):
         self.year = int(selected)
         self.planner.set_source(self.backend, self.data_dir, self.year)
         self.forecaster.set_source(self.backend, self.data_dir, self.year)
+        self.budgeter.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
 
     @Slot(object)
@@ -849,11 +857,18 @@ class AnalyticsWindow(QMainWindow):
         self.year_combo.setCurrentIndex(max(0, self.year_combo.findData(self.year)))
         self.year_combo.blockSignals(False)
 
+    @Slot(object, object)
+    def _transfer_budget(self, snapshot, result):
+        self.planner.accept_budget(snapshot, result)
+        self.planning_tabs.setCurrentWidget(self.planner)
+
     def _page_changed(self, _index: int = -1) -> None:
         if self.pages.currentWidget() is self.planning_page:
             self.open_chart_button.setEnabled(True)
             self.notice_label.setText(
-                "Usage Forecast: Scheduled, Typical Usage and Higher Usage are historical planning scenarios. Confirm historical coverage and review allocation completeness."
+                "Leave Budget: deadline-first planning suggestions, explicit purpose eligibility, shared work capacity and before/after risk. Leave records are never modified."
+                if self.planning_tabs.currentWidget() is self.budgeter
+                else "Usage Forecast: Scheduled, Typical Usage and Higher Usage are historical planning scenarios. Confirm historical coverage and review allocation completeness."
                 if self.planning_tabs.currentWidget() is self.forecaster
                 else "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. Leave records are never modified."
             )
@@ -1145,6 +1160,7 @@ class AnalyticsWindow(QMainWindow):
         self._closing = True
         self.planner.shutdown()
         self.forecaster.shutdown()
+        self.budgeter.shutdown()
         if self._load_thread and self._load_thread.isRunning():
             # Hide promptly, retain the worker's owner, then close after its
             # bounded backend read completes. No running QThread is destroyed.
@@ -1176,7 +1192,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-folder", default="")
     parser.add_argument(
         "--view",
-        choices=["analytics", "planning", "forecast"],
+        choices=["analytics", "planning", "forecast", "budget"],
         default="analytics",
         help="Initial view in the existing Analytics application.",
     )
@@ -1260,6 +1276,18 @@ def main(argv: list[str] | None = None) -> int:
         assert all(
             row["category"] in {"annual", "sick"} for row in window.forecaster.result.scenarios["scheduled"].summaries
         )
+        window.planning_tabs.setCurrentWidget(window.budgeter)
+        deadline = time.monotonic() + 40
+        while window.budgeter.result is None:
+            app.processEvents()
+            if time.monotonic() >= deadline:
+                raise RuntimeError(window.budgeter.status_label.text())
+            QThread.msleep(5)
+        assert not window.budgeter.chart_image.source_pixmap().isNull()
+        assert not window.budgeter.result.suggestions  # Purpose eligibility is never assumed.
+        for strategy in ("even", "earliest", "latest", "weighted"):
+            assert window.budgeter.strategy_combo.findData(strategy) >= 0
+        assert "Source and allocation audit" in window.budgeter.tables
         window.show()
         app.processEvents()
         window.close()

@@ -165,6 +165,38 @@ def load_planning_snapshot(backend: Path, data_dir: str | None, year: int) -> di
     return ReadOnlySnapshotSource(backend, data_dir).snapshot(year)
 
 
+def projection_summary(result):
+    """Exact shared before/after summary rows for calculated projections."""
+    return [
+        {
+            "category": row.category,
+            "reserve": row.reserve,
+            "cutoff_balance": row.baseline.cutoff_balance,
+            "baseline_horizon": row.baseline.horizon_balance,
+            "scenario_horizon": row.scenario.horizon_balance,
+            "baseline_minimum": row.baseline.minimum_balance,
+            "baseline_minimum_date": row.baseline.minimum_date,
+            "scenario_minimum": row.scenario.minimum_balance,
+            "scenario_minimum_date": row.scenario.minimum_date,
+            "baseline_breach": row.baseline.first_reserve_breach,
+            "baseline_reserve_shortfall": row.baseline.reserve_shortfall,
+            "scenario_breach": row.scenario.first_reserve_breach,
+            "scenario_reserve_shortfall": row.scenario.reserve_shortfall,
+            "baseline_negative_date": row.baseline.earliest_negative_date,
+            "baseline_shortfall": row.baseline.negative_shortfall,
+            "negative_date": row.scenario.earliest_negative_date,
+            "shortfall": row.scenario.negative_shortfall,
+            "baseline_pre_cap": row.baseline.annual_pre_cap_balance,
+            "scenario_pre_cap": row.scenario.annual_pre_cap_balance,
+            "baseline_carryover": row.baseline.annual_carryover,
+            "scenario_carryover": row.scenario.annual_carryover,
+            "baseline_forfeiture": row.baseline.prospective_forfeiture,
+            "scenario_forfeiture": row.scenario.prospective_forfeiture,
+        }
+        for row in result.categories
+    ]
+
+
 class PlanningSession:
     """Session-only scenario edits; no datastore reference or ledger writer."""
 
@@ -226,34 +258,7 @@ class PlanningSession:
         if self.result is None:
             return {}
         result = self.result
-        summary = [
-            {
-                "category": row.category,
-                "reserve": row.reserve,
-                "cutoff_balance": row.baseline.cutoff_balance,
-                "baseline_horizon": row.baseline.horizon_balance,
-                "scenario_horizon": row.scenario.horizon_balance,
-                "baseline_minimum": row.baseline.minimum_balance,
-                "baseline_minimum_date": row.baseline.minimum_date,
-                "scenario_minimum": row.scenario.minimum_balance,
-                "scenario_minimum_date": row.scenario.minimum_date,
-                "baseline_breach": row.baseline.first_reserve_breach,
-                "baseline_reserve_shortfall": row.baseline.reserve_shortfall,
-                "scenario_breach": row.scenario.first_reserve_breach,
-                "scenario_reserve_shortfall": row.scenario.reserve_shortfall,
-                "baseline_negative_date": row.baseline.earliest_negative_date,
-                "baseline_shortfall": row.baseline.negative_shortfall,
-                "negative_date": row.scenario.earliest_negative_date,
-                "shortfall": row.scenario.negative_shortfall,
-                "baseline_pre_cap": row.baseline.annual_pre_cap_balance,
-                "scenario_pre_cap": row.scenario.annual_pre_cap_balance,
-                "baseline_carryover": row.baseline.annual_carryover,
-                "scenario_carryover": row.scenario.annual_carryover,
-                "baseline_forfeiture": row.baseline.prospective_forfeiture,
-                "scenario_forfeiture": row.scenario.prospective_forfeiture,
-            }
-            for row in result.categories
-        ]
+        summary = projection_summary(result)
         events = [asdict(row) for row in result.events if row.category == category]
         originals = {str(row.get("id")): row for row in self.snapshot.get("transactions", [])}
         for operation in result.operations:

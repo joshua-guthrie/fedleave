@@ -9,9 +9,11 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
-from decimal import ROUND_FLOOR, Decimal
 from math import floor, isfinite
 
+from .allocation import apportion_units as _apportion
+from .allocation import hours_for_units as _hours
+from .allocation import whole_units as _units
 from .history import CONFIRMED_STATUSES, HistoricalYear, prepare_history
 from .planning import (
     ProjectionResult,
@@ -89,43 +91,6 @@ def month_segments(cutoff, horizon):
         result.append((day.isoformat(), end.isoformat(), day.month))
         day = end + timedelta(days=1)
     return tuple(result)
-
-
-def _units(hours, increment):
-    return int(
-        (Decimal(str(max(0, hours))) / Decimal(str(increment)) + Decimal("1e-9")).to_integral_value(
-            rounding=ROUND_FLOOR
-        )
-    )
-
-
-def _hours(units, increment):
-    return float(Decimal(str(increment)) * units)
-
-
-def _apportion(total: int, weights: dict, caps: dict):
-    """Capped largest remainders with explicit stable key ordering."""
-    keys = sorted(weights)
-    assigned = {key: 0 for key in keys}
-    remaining = min(total, sum(caps.values()))
-    while remaining:
-        eligible = [key for key in keys if caps[key] > assigned[key] and weights[key] > 0]
-        weight = sum(weights[key] for key in eligible)
-        if not weight:
-            break
-        quotas = {key: remaining * weights[key] / weight for key in eligible}
-        added = {key: min(caps[key] - assigned[key], floor(quotas[key])) for key in eligible}
-        for key, amount in added.items():
-            assigned[key] += amount
-        remaining -= sum(added.values())
-        if not remaining:
-            break
-        order = sorted(eligible, key=lambda key: (-(quotas[key] - floor(quotas[key])), key))
-        for key in order:
-            if remaining and assigned[key] < caps[key]:
-                assigned[key] += 1
-                remaining -= 1
-    return assigned
 
 
 def allocate_demand(demand: dict[str, float], capacity: dict[str, float | None], increment: float):

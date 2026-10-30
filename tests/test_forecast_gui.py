@@ -177,6 +177,7 @@ def test_existing_analytics_container_routes_forecast_actions(qtbot, monkeypatch
     assert [window.planning_tabs.tabText(i) for i in range(window.planning_tabs.count())] == [
         "What-if Planner",
         "Usage Forecast",
+        "Leave Budget",
     ]
     monkeypatch.setattr(window.forecaster, "load_source", lambda: calls.append("refresh"))
     monkeypatch.setattr(window.forecaster, "open_chart", lambda: calls.append("chart"))

@@ -73,7 +73,9 @@ class SortableTableItem(QTableWidgetItem):
         other_value = other.data(Qt.UserRole)
         if isinstance(own_value, (int, float)) and isinstance(other_value, (int, float)):
             return float(own_value) < float(other_value)
-        return super().__lt__(other)
+        # Calling Qt's virtual operator from this Python override can dispatch
+        # back into __lt__ recursively when sorting text cells (native crash).
+        return self.text() < other.text()
 
 
 class ResponsivePixmapLabel(QLabel):
@@ -130,7 +132,15 @@ def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> 
     for row_index, row in enumerate(rows):
         for column_index, (key, _label) in enumerate(columns):
             value = row.get(key)
-            item = SortableTableItem(f"{value:.8g}" if key == "rate" and isinstance(value, float) else _display(value))
+            item = SortableTableItem(
+                f"{value:.8g}"
+                if key in {"rate", "average_hours_per_period"} and isinstance(value, float)
+                else _display(value)
+            )
+            if key == "average_hours_per_period" and value is not None:
+                item.setToolTip(
+                    f"Unrounded required hours / usable pay periods: {value!r}. CSV retains the full value."
+                )
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 item.setData(Qt.UserRole, float(value))
@@ -430,6 +440,8 @@ def render_planning_chart(
     *,
     series=None,
     caption=None,
+    value_basis="Daily closing balances",
+    origin_label="Cutoff (closing)",
 ) -> QPixmap:
     """Render only supplied daily closing values; no accounting is recalculated."""
     series = series or (
@@ -459,7 +471,7 @@ def render_planning_chart(
             WIDTH - 90,
             30,
             Qt.AlignCenter,
-            f"Cutoff {cutoff} | Horizon {horizon} | Hours | Daily closing balances",
+            f"Cutoff {cutoff} | Horizon {horizon} | Hours | {value_basis}",
         )
         left, top, right, bottom = 135, 185, WIDTH - 65, height - 130
         values = [float(row[key]) for row in rows for key, *_ in series if row.get(key) is not None]
@@ -494,7 +506,7 @@ def render_planning_chart(
             painter.drawText(left + 8, round(y(reserve)) - 26, 320, 24, Qt.AlignLeft, f"Reserve: {_display(reserve)} h")
         painter.setPen(QPen(QColor(TEXT), 2, Qt.DotLine))
         painter.drawLine(left + 1, top, left + 1, bottom)
-        painter.drawText(left + 8, bottom - 28, 220, 24, Qt.AlignLeft, "Cutoff (closing)")
+        painter.drawText(left + 8, bottom - 28, 220, 24, Qt.AlignLeft, origin_label)
         for key, label, color, style, legend_x in series:
             painter.setPen(QPen(QColor(color), 3, style))
             painter.drawLine(legend_x, 145, legend_x + 50, 145)
@@ -507,6 +519,8 @@ def render_planning_chart(
                 point = QPointF(x(index), y(row[key]))
                 if previous is not None:
                     painter.drawLine(previous, point)
+                if len(rows) == 1:
+                    painter.drawEllipse(point, 4, 4)
                 previous = point
         points = {row["date"]: (index, row) for index, row in enumerate(rows)}
         markers = set()

@@ -43,6 +43,9 @@ def _validate_source(preferences):
         values = preferences.get(key, [])
         if not isinstance(values, list) or any(type(year) is not int for year in values):
             raise ValueError("Malformed analytics year preferences; no historical coverage is assumed.")
+    strategy = preferences.get("budget_strategy", "even")
+    if not isinstance(strategy, str) or strategy not in {"even", "earliest", "latest", "weighted"}:
+        raise ValueError("Unsupported Leave Budget strategy preference.")
 
 
 def load_preferences(snapshot):
@@ -73,6 +76,11 @@ def save_preferences(snapshot, preferences):
         payload = {"schema_version": PREFERENCE_VERSION, "sources": {}}
     if not _valid_document(payload):
         raise ValueError("Cannot replace unsupported analytics preferences.")
-    payload["sources"][source_preferences_key(snapshot)] = deepcopy(preferences)
+    key = source_preferences_key(snapshot)
+    # Another open analytics view may have saved its own keys since this view
+    # loaded. Preserve those keys while replacing the explicitly supplied ones.
+    previous = payload["sources"].get(key, {})
+    _validate_source(previous)
+    payload["sources"][key] = {**previous, **deepcopy(preferences)}
     path.parent.mkdir(parents=True, exist_ok=True)
     write_export(path, json.dumps(payload, indent=2, sort_keys=True) + "\n", snapshot)

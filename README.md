@@ -1256,6 +1256,82 @@ as a percentage denominator. Present records do not reconstruct bookings or
 statuses known at the earlier cutoff. These checks validate usage estimation,
 not the operational accuracy of forecasts issued at that time.
 
+#### Leave Budget by deadline
+
+Choose **Analysis > Planning > Leave Budget...** in Calendar, or **Planning >
+Leave Budget** in Analytics. The selected backend, exact datastore, year, font
+and PDF folder are reused. Set a cutoff and horizon within the initialized year,
+then explicitly select categories eligible for your intended leave purpose.
+Nothing is selected by default. Adjacent fields are optional per-category
+reserve hours; a selection does not establish legal eligibility.
+
+The deadline table reports annual use-or-lose, dated comp/travel comp/restored
+annual/time-off award lots, and supported credit pay-period rollover caps.
+Annual required use is `max(0, projected pre-cap balance - carryover cap)` after
+known accruals, scheduled use and other disposals. A 288-hour pre-cap balance
+with a 240-hour cap needs 48 hours; adding 16 scheduled hours reduces the
+pre-cap balance to 272 and required use to 32, without a second subtraction.
+Lot audit rows retain original/local hours, cutoff availability, canonical
+scheduled allocations, other disposals, inclusive deadlines and configured
+warn/expiration/forfeiture outcomes. Opening hours without lot provenance are
+separate N/A rows. Expired lots are past dispositions/unresolved warnings.
+Later deadlines are **Outside current horizon**, without invented pay periods.
+A midyear horizon does not claim a completed year-end annual risk calculation.
+
+All four **Scheduling strategy** choices prioritize the earliest deadline, then
+category, original earned date and lot ID:
+
+- **Even across pay periods** (default) uses equal capped quotas with stable
+  largest remainders and redistribution, then earliest dates within each period.
+- **Earliest available** fills the earliest eligible dates first.
+- **Latest available** fills the latest eligible dates before each deadline.
+- **Capacity-weighted** apportions period quotas by remaining eligible capacity,
+  then fills earliest dates within each period.
+
+The preferred strategy is saved beside GUI preferences, outside leave records.
+Strategy changes reuse the cached snapshot and preserve raw required hours.
+Suggestions respect dated bank/lot availability, future bookings, reserves,
+configured increments and remaining shared work hours across all categories.
+Current configured workdays, tour/lunch and cached observed holidays are assumed;
+actual future rosters are not reconstructed. Dates must be strictly after the
+cutoff and within represented pay periods. The current partial period is labeled.
+The unrounded required/usable-period average is separate from the rounded dated
+schedule. Missing context is N/A. Two 16-hour lots sharing only 24 available
+hours leave an eight-hour joint shortfall. Feasible partial suggestions remain
+visible when the full demand cannot fit.
+
+The cumulative chart shows required and feasibly allocated hours. Its exact
+table also reports raw shared work capacity and a dated maximum-flow capacity
+upper bound: individual earning windows and joint date capacity are checked;
+interacting bank reserves/caps are additionally checked on the actual schedule.
+A chosen-strategy shortfall does not claim every alternative schedule is
+impossible. Before/after risk is recalculated through the shared projection and
+expiration rules. States distinguish **No additional use required**, **Feasible**,
+**Partially feasible**, **Infeasible** and **Unknown/unsupported**. Unsupported
+credit policy produces a specific limitation while other categories remain usable.
+Supported credit caps are replayed once at actual period boundaries; earlier
+use/loss affects later caps. This is an explicit planning-only assumption,
+preserved on transfer; it does not change default CLI ledger accounting.
+
+Inspect deadline, suggested date/period, daily capacity, before/after balance,
+source/allocation audit and warning tabs. Double-click a row for exact details;
+dated funding checks identify the candidate date, failing balance date and
+reserve threshold. **Save Table as CSV...** exports exact
+values with source, versions, strategy, filters, units, rules and assumptions.
+**Open Chart** reuses the existing supporting table, CSV, PNG, PDF and Print
+workflow. **Send suggestions to What-if...** checks a fresh read-only snapshot
+and creates schema-versioned Add operations in memory. An existing scenario
+requires **Replace**, **Merge** or **Cancel**; merge retains its operations and
+adopts budget assumptions/reserves, so the combined projection can differ.
+Stale material records/context reject transfer until refresh/recalculation.
+
+**Suggestions are planning suggestions, not booked leave.** Opening, calculating,
+exporting, transferring and closing cannot write canonical ledger JSON. There
+is no booking/apply action, new executable, or budget CLI command. Save exports
+outside the selected datastore. Recorded Through Cutoff identifies effective
+dated rows, including unresolved past planned/requested rows; Scheduled means
+future source rows, and generated suggestions remain Estimated.
+
 #### Seasonality
 
 Seasonality has exactly two selectors: **Analysis** and **Leave Type**. The

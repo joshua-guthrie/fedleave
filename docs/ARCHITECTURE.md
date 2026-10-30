@@ -239,3 +239,44 @@ outside the selected datastore. Calendar display/backend settings remain shared.
 handles controls, revision-bound workers and charts in the existing Planning
 container. Changing chart category only rerenders cached results. There are no
 new console executables, forecasting CLI commands, or ledger-application actions.
+
+
+## Deadline budgets
+
+`fedleave.budget` accepts data-only snapshots and `BudgetParameters`; it has no
+filesystem, backend or writer callback. `deadline-budget-v1` is the one versioned
+result for deadlines, audit records, cumulative checks, date/period suggestions,
+shared before/after projections, warnings, and schema-1 scenario transfer.
+`planning.prepare_projection_snapshot` seeds canonical accruals on private copies;
+`scenario_transaction` is shared by budget funding checks and What-if projection.
+`allocation` owns quantization and capped largest remainders reused by Forecast.
+
+Expiration synchronization adds an allocation audit without replacing existing
+report fields. Budgets synchronize independent private copies at cutoff and each
+inclusive deadline, preserving explicit links and canonical FIFO exactly once.
+Future earning dates are releases; provenance-free openings and unsupported
+categories remain separately unknown. Annual excess uses the shared year-end
+pre-cap summary after scheduled usage. Later deadlines stay outside the initialized
+horizon. Past dispositions are distinct from future actionable demand.
+
+An EDD allocator applies one of four strategies to remaining shared daily capacity.
+Period quotas use largest remainders and redistribute overflow; dated canonical
+balance checks preserve future bookings and bank reserves. A separate maximum-flow
+check connects obligations to independently fundable dates and shared capacities.
+This is a capacity upper bound; interacting reserves/caps are validated on the
+actual schedule, whose remaining risk is recomputed canonically. The result never
+claims all strategies are infeasible merely because the chosen strategy is partial.
+
+`credit_caps` replays supported future period-end rollover caps once, posting
+synthetic loss on the next day. Known boundary disposals are not counted twice.
+The explicit scenario assumption `budget_credit_caps` enables this replay for
+both baseline and scenario branches; default CLI/What-if calculations are unchanged.
+Unsupported cap policies isolate credit metrics and warn. The assumption survives
+budget transfer and export from What-if, keeping projected balances reproducible.
+
+`budget_model` maps results to exact tables/CSV and creates atomic transfer
+candidates after checking the complete fresh source identity. `budget_view` reuses
+read-only snapshots, revision-bound workers, chart windows and guarded exports.
+An existing What-if draft requires Replace/Merge/Cancel; failed merge leaves it
+unchanged. Only the strategy preference is written outside the datastore, merging
+with current shared analytics preferences. No budget action can book leave.

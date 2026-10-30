@@ -172,6 +172,7 @@ def synchronize_expirations(
         raise ValueError("CONFLICTING_CARRYOVER: duplicate local lot IDs")
     existing_ids = [str(tx.get("id", "")) for tx in transactions]
     additions = []
+    allocations = []
     events = sorted(
         [
             tx
@@ -287,6 +288,17 @@ def synchronize_expirations(
             target["origin_leave_year"] = lot.get("origin_leave_year", leave_year.get("leave_year"))
             target["origin_transaction_id"] = lot.get("origin_transaction_id", lot["id"])
             remaining[str(lot["id"])] -= allocated
+            allocations.append(
+                {
+                    "transaction_id": str(event_id),
+                    "lot_id": str(lot["id"]),
+                    "date": str(use["date"]),
+                    "category": category,
+                    "direction": use["direction"],
+                    "hours": allocated,
+                    "explicit_link": bool(linked),
+                }
+            )
             needed -= allocated
             first = False
             part += 1
@@ -344,7 +356,14 @@ def synchronize_expirations(
             }
         )
         remaining[lot_id] = 0.0
-    return {"changed": leave_year != before, "rules": rules, "lots": lots, "remaining": remaining, "warnings": warnings}
+    return {
+        "changed": leave_year != before,
+        "rules": rules,
+        "lots": lots,
+        "remaining": remaining,
+        "warnings": warnings,
+        "allocations": allocations,
+    }
 
 
 def expiration_report(

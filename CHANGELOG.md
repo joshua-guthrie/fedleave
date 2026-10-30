@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add Leave Budget under Analysis > Planning with annual/lot/credit deadline audits, explicit purpose eligibility, reserves, four deterministic scheduling strategies, joint dated capacity checks, and canonical before/after risk.
+- Add read-only budget tables, cumulative chart and exact CSV exports; persist only analytics strategy preferences and transfer suggestions to What-if through fresh-source validation and explicit Replace/Merge/Cancel.
+- Share allocation arithmetic and scenario preparation; isolate opt-in credit rollover simulation from default CLI balances and verify unchanged ledger bytes through budget workflows.
+- Fix recursive native comparisons when sorting text in shared Analytics tables; keep sorted audit drilldowns bound to their original source rows.
+
 - Add Usage Forecast under Analysis > Planning with Scheduled, Typical and Higher scenarios, confirmed historical coverage, month/exposure normalization, deterministic shared annual/sick capacity, incomplete-demand reporting and retrospective usage checks.
 - Keep historical coverage/exclusion preferences outside leave records; reuse cached read-only backend snapshots and the canonical projection engine for forecast tables, charts and exports.
 
