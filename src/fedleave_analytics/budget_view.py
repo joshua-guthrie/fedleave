@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from fedleave.budget import CATEGORIES, STRATEGIES, STRATEGY_HELP, BudgetParameters, budget
 from fedleave.planning import source_identity
 
+from .action_help import ACTION_HELP
 from .budget_model import CUMULATIVE_COLUMNS, export_csv, result_views
 from .charts import BLUE, RED, AnalyticsChartWindow, ResponsivePixmapLabel, render_planning_chart, table_widget
 from .planning_model import LABELS, export_destination
@@ -101,11 +102,13 @@ class BudgetWidget(QWidget):
             ("Save Table as CSV...", self.save_csv),
         ):
             button = QPushButton(label)
+            button.setToolTip(ACTION_HELP[label])
             button.clicked.connect(callback)
             buttons.addWidget(button)
             if label == "Calculate":
                 self.calculate_button = button
         self.transfer_button = QPushButton("Send suggestions to What-if...")
+        self.transfer_button.setToolTip(ACTION_HELP["Send suggestions to What-if..."])
         self.transfer_button.clicked.connect(self.transfer)
         self.transfer_button.setEnabled(False)
         buttons.addWidget(self.transfer_button)

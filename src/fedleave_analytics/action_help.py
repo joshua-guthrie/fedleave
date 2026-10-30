@@ -1,0 +1,25 @@
+"""Plain-language action descriptions shared by Planning controls."""
+
+ACTION_HELP = {
+    "Add tentative use": "Add extra leave to this scenario. Existing bookings stay in place; nothing is booked in the ledger.",
+    "Replace scheduled use...": "Choose existing bookings in a dialog, then edit their replacement date, category and hours. Only the scenario changes.",
+    "Remove scheduled use...": "Choose existing bookings to omit from the scenario. They remain unchanged in the baseline and ledger.",
+    "Undo selected changes": "Delete the selected draft operations. Added use disappears; replaced or removed original bookings return to the scenario.",
+    "Reset all changes": "Clear every draft operation and restore the scheduled baseline. Keep the name, cutoff, horizon and reserve settings.",
+    "Recalculate": "Recompute this draft from the cached read-only snapshot. Use File > Refresh to read current ledger data.",
+    "Cancel": "Stop waiting for the current calculation/load and discard its late result. Keep draft entries and leave records unchanged.",
+    "Resolve selected references": "After reviewing refreshed originals, accept their current identities for the selected scenario rows and recalculate.",
+    "Export scenario JSON...": "Save an editable scenario definition outside the datastore. This is a plan file, not a ledger update.",
+    "Import scenario JSON...": "Load a saved plan against a fresh read-only snapshot. Choose Replace or Merge; invalid or stale references leave the current draft unchanged.",
+    "Calculate": "Calculate from the cached read-only snapshot using the current controls. No leave is booked or edited.",
+    "Open Chart": "Open the current chart with its exact supporting table and CSV, PNG, PDF and Print actions.",
+    "Save Table as CSV...": "Export the currently selected result table with its filters, source identity and assumptions, outside the leave datastore.",
+    "Export Results JSON...": "Export the complete calculated forecast and retrospective results with versions, sources and assumptions.",
+    "Confirm whole year": "Assert that the selected historical year is complete enough to use as usage evidence, including months with zero leave. Saves analytics preferences only.",
+    "Revoke whole year": "Remove the selected year's coverage assertion; missing coverage becomes unknown rather than zero usage.",
+    "Confirm selected periods": "Assert complete historical coverage only for selected pay periods. This does not certify individual leave entries.",
+    "Revoke selected periods": "Remove coverage assertions for selected historical pay periods, leaving other assertions intact.",
+    "Run retrospective usage check": "Evaluate forecasts at earlier pay-period cutoffs using only prior selected years, then compare with later recorded usage.",
+    "Send suggestions to What-if...": "Check a fresh source snapshot and send suggestions as in-memory Add operations. An existing draft requires Replace, Merge or Cancel.",
+    "Close": "Close this window without changing leave records.",
+}

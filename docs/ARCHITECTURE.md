@@ -280,3 +280,21 @@ read-only snapshots, revision-bound workers, chart windows and guarded exports.
 An existing What-if draft requires Replace/Merge/Cancel; failed merge leaves it
 unchanged. Only the strategy preference is written outside the datastore, merging
 with current shared analytics preferences. No budget action can book leave.
+
+
+## Planning interaction and help
+
+`planning_controls` owns passive date and scheduled-use chooser dialogs, accepting
+only dates and defensive transaction copies. Calendar picks use the current
+cutoff-exclusive/horizon-inclusive range, while cancellation preserves original
+cell text. Remove operations do not expose editable dates. Mouse click and
+Space/Enter share the same picker; existing ISO text validation remains canonical.
+Checked bookings preserve stable source-row identities during sorting; already
+targeted originals cannot be selected again. Dialog confirmation creates ordinary
+schema-1 operations through the existing planner session, never ledger writers.
+
+`action_help` supplies short descriptions across the three Planning views.
+Analytics File > Help/F1 opens `help_view` at the current tool's section. The
+self-contained `fedleave_analytics/help.html` is package data (wheel/sdist and
+PyInstaller collect-all), so it requires no network, website or source checkout.
+Installed companion smoke checks load the actual bundled help document.

@@ -75,6 +75,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-dir = {"" = "src"}
 
+[tool.setuptools.package-data]
+fedleave_analytics = ["help.html"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["fedleave*", "annual_leave_chart*", "sick_leave_chart*", "credit_hours_chart*", "comp_time_chart*", "travel_comp_chart*", "time_off_award_chart*", "yearly_leave_comparison_chart*", "fedleave_month_report_graphic*", "fedleave_gui*", "fedleave_analytics*"]

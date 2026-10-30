@@ -1103,17 +1103,30 @@ means the daily closing balance is strictly below it. Categories are never
 pooled into a combined bank. Purpose-restricted choices are labeled, and a
 projected balance does not establish eligibility for their use.
 
-- **Add tentative use** adds an editable dated absence. Dates stay where you
-  enter them; the planner does not schedule or distribute a vacation for you.
-- In **Scheduled originals**, select existing future absence rows and choose
-  **Replace selected scheduled use** or **Remove selected scheduled use**.
-  Original transaction IDs remain visible in the scenario. Replacement
-  suppresses those originals in the scenario and adds the proposed use, so the
-  original and replacement are not counted together. Recorded rows, accruals,
-  and synthetic events cannot be targeted. Overlapping targets are errors.
-- **Delete scenario row** removes an operation and restores its originals.
-  **Reset scenario** removes all operations, preserving the name, date controls,
-  and reserve thresholds. Neither action changes the ledger.
+Use **File > Help...** (or **F1**) in Analytics for detailed offline instructions
+for the active page, including all three Planning tools. Hover over buttons for
+explanations. Help is included in source/wheel packages and installed bundles.
+
+- **Add tentative use** adds extra leave while retaining existing bookings.
+  Click a draft row's **Date** cell to open a calendar, or press Space/Enter on
+  the cell. Choose a day after cutoff through horizon; Cancel preserves the
+  original date. F2 still allows ISO date text. Choosing a date does not establish
+  available workday capacity; inspect warnings and capacity results.
+- **Replace scheduled use...** and **Remove scheduled use...** open a chooser:
+  check existing bookings and confirm. No background row selection is required;
+  existing selections are prechecked. The list shows date, category, hours,
+  status, note and original ID. Cancel adds no draft operation.
+- Replacement omits the chosen originals in the scenario and adds one editable
+  replacement, initially with their combined hours and the first booking's
+  date/category. Review those defaults, especially for multiple dates/categories.
+  Removal omits the originals in the scenario without adding new use. The
+  baseline and ledger retain the originals in both cases. Recorded rows,
+  accruals and synthetic events cannot be targeted. Already-targeted originals
+  are unavailable until their earlier draft change is edited or undone.
+- **Undo selected changes** deletes selected draft operations: added use
+  disappears; originals from Replace/Remove return to the scenario.
+  **Reset all changes** clears every operation, preserving name, date controls
+  and reserves. Neither action changes or cancels real bookings.
 
 For example, 100 hours at cutoff, an 8-hour accrual, and a scheduled 16-hour use
 give a 92-hour baseline. Adding a later 24-hour use gives 68 hours and breaches

@@ -7,12 +7,13 @@ from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from PySide6.QtCore import QDate, QObject, QRunnable, Qt, QThreadPool, QTimer, Signal, Slot
+from PySide6.QtCore import QDate, QEvent, QObject, QRunnable, Qt, QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QDateEdit,
+    QDialog,
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
@@ -22,6 +23,7 @@ from PySide6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QSplitter,
     QTableWidget,
     QTableWidgetItem,
@@ -39,7 +41,9 @@ from fedleave.planning import (
     validate_scenario,
 )
 
+from .action_help import ACTION_HELP
 from .charts import AnalyticsChartWindow, ResponsivePixmapLabel, render_planning_chart, table_widget
+from .planning_controls import ScenarioDateDialog, ScheduledUseDialog
 from .planning_model import (
     DAILY_COLUMNS,
     PlanningSession,
@@ -128,6 +132,15 @@ class PlannerWidget(QWidget):
         self.reserve_edit = QLineEdit()
         self.reserve_edit.setPlaceholderText("Optional hours")
         self.reserve_edit.setMaximumWidth(130)
+        self.name_edit.setToolTip("Name this in-memory plan. Export scenario JSON to save a copy.")
+        self.cutoff_edit.setToolTip("Closing-balance starting date. Tentative use must be strictly after this date.")
+        self.horizon_edit.setToolTip("Last inclusive projection date within this initialized leave year.")
+        self.category_combo.setToolTip(
+            "Choose the category shown in charts and tables and used for new tentative entries. Categories keep separate balances."
+        )
+        self.reserve_edit.setToolTip(
+            "Optional warning threshold for this category. A lower projected balance is reported; this does not block draft entries."
+        )
         for index, (label, widget) in enumerate(
             (
                 ("Scenario", self.name_edit),
@@ -148,12 +161,17 @@ class PlannerWidget(QWidget):
         actions = QHBoxLayout()
         self.add_button = self._button(actions, "Add tentative use", self.add_tentative)
         self.replace_button = self._button(
-            actions, "Replace selected scheduled use", lambda: self.add_selected("replace")
+            actions, "Replace scheduled use...", lambda: self.choose_scheduled("replace")
         )
-        self.remove_button = self._button(actions, "Remove selected scheduled use", lambda: self.add_selected("remove"))
-        self.delete_button = self._button(actions, "Delete scenario row", self.delete_selected)
-        self.reset_button = self._button(actions, "Reset scenario", self.reset_scenario)
+        self.remove_button = self._button(actions, "Remove scheduled use...", lambda: self.choose_scheduled("remove"))
+        self.delete_button = self._button(actions, "Undo selected changes", self.delete_selected)
+        self.reset_button = self._button(actions, "Reset all changes", self.reset_scenario)
         layout.addLayout(actions)
+        explanation = QLabel(
+            "Add creates extra tentative use. Replace/Remove let you choose existing bookings. Undo restores the selected draft change's originals; Reset clears all draft changes. File > Help explains each action."
+        )
+        explanation.setWordWrap(True)
+        layout.addWidget(explanation)
         actions = QHBoxLayout()
         self.calculate_button = self._button(actions, "Recalculate", self.recalculate)
         self.cancel_button = self._button(actions, "Cancel", self.cancel)
@@ -168,6 +186,11 @@ class PlannerWidget(QWidget):
             "Load a leave year to explore a scenario. Canonical leave records are never changed."
         )
         self.status_label.setWordWrap(True)
+        self.status_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        self.status_label.setMinimumHeight(3 * self.status_label.fontMetrics().lineSpacing())
+        status_policy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        status_policy.setHeightForWidth(True)
+        self.status_label.setSizePolicy(status_policy)
         self.status_label.setTextFormat(Qt.PlainText)
         layout.addWidget(self.status_label)
         self.progress = QProgressBar()
@@ -192,6 +215,11 @@ class PlannerWidget(QWidget):
         )
         self.scenario_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.scenario_table.cellChanged.connect(self._cell_changed)
+        self.scenario_table.cellClicked.connect(self.pick_date)
+        self.scenario_table.installEventFilter(self)
+        self.scenario_table.horizontalHeaderItem(2).setToolTip(
+            "Click a Date cell, or press Space/Enter on it, to open a calendar. F2 also allows ISO date text."
+        )
         for column, width in enumerate((175, 105, 125, 205, 100, 180, 210, 280, 190)):
             self.scenario_table.setColumnWidth(column, width)
         self.editor_tabs.addTab(self.scenario_table, "Scenario rows")
@@ -208,7 +236,7 @@ class PlannerWidget(QWidget):
         )
         self.scheduled_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.scheduled_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.editor_tabs.addTab(self.scheduled_table, "Scheduled originals (select to replace/remove)")
+        self.editor_tabs.addTab(self.scheduled_table, "Existing scheduled leave (read-only)")
         self.splitter.addWidget(self.editor_tabs)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -235,6 +263,7 @@ class PlannerWidget(QWidget):
     @staticmethod
     def _button(layout, label, callback):
         button = QPushButton(label)
+        button.setToolTip(ACTION_HELP[label])
         button.clicked.connect(callback)
         layout.addWidget(button)
         return button
@@ -322,7 +351,7 @@ class PlannerWidget(QWidget):
         self.scheduled_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.scheduled_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.editor_tabs.removeTab(index)
-        self.editor_tabs.insertTab(index, self.scheduled_table, "Scheduled originals (select to replace/remove)")
+        self.editor_tabs.insertTab(index, self.scheduled_table, "Existing scheduled leave (read-only)")
         old.deleteLater()
 
     def _clear_results(self):
@@ -367,6 +396,35 @@ class PlannerWidget(QWidget):
         if column == 6:
             self._capture_references(row)
         self._changed()
+
+    def eventFilter(self, watched, event):
+        if (
+            watched is self.scenario_table
+            and event.type() == QEvent.KeyPress
+            and event.key() in {Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter}
+            and self.scenario_table.currentColumn() == 2
+        ):
+            self.pick_date(self.scenario_table.currentRow(), 2)
+            return True
+        return super().eventFilter(watched, event)
+
+    def pick_date(self, row, column):
+        if column != 2 or row < 0 or self.session is None or self._loading:
+            return
+        item = self.scenario_table.item(row, column)
+        if item is None or not item.flags() & Qt.ItemIsEditable:
+            return
+        minimum, maximum = self.cutoff_edit.date().addDays(1), self.horizon_edit.date()
+        if minimum > maximum:
+            self.status_label.setText(
+                "No tentative date is available after cutoff through horizon. Choose an earlier cutoff or later horizon."
+            )
+            return
+        dialog = ScenarioDateDialog(item.text(), minimum, maximum, self)
+        if dialog.exec() == QDialog.Accepted:
+            item.setText(dialog.selected_date())
+            item.setToolTip("Click or press Space/Enter to choose a date. " + item.text())
+        dialog.deleteLater()
 
     def _capture_references(self, row):
         if self.session is None:
@@ -611,11 +669,33 @@ class PlannerWidget(QWidget):
                 rows.append(self._scheduled[source_index])
         return sorted(rows, key=lambda tx: (tx["date"], str(tx["id"])))
 
-    def add_selected(self, operation):
-        originals = self._selected_scheduled()
+    def choose_scheduled(self, operation):
+        if self.session is None:
+            self.status_label.setText("Load a leave year before choosing scheduled leave.")
+            return
+        self._refresh_scheduled()
+        targeted = {
+            value.strip()
+            for row in range(self.scenario_table.rowCount())
+            for value in self.scenario_table.item(row, 6).text().split(",")
+            if value.strip()
+        }
+        dialog = ScheduledUseDialog(
+            self._scheduled,
+            operation,
+            selected_ids={str(tx["id"]) for tx in self._selected_scheduled()},
+            targeted_ids=targeted,
+            parent=self,
+        )
+        if dialog.exec() == QDialog.Accepted:
+            self.add_selected(operation, originals=dialog.selected_transactions())
+        dialog.deleteLater()
+
+    def add_selected(self, operation, *, originals=None):
+        originals = self._selected_scheduled() if originals is None else originals
         if not originals or self.session is None:
             self.status_label.setText(
-                "Select original absence rows in Scheduled originals, then choose Replace or Remove."
+                "No bookings chosen. Use Replace scheduled use or Remove scheduled use to choose existing bookings."
             )
             self.editor_tabs.setCurrentWidget(self.scheduled_table)
             return

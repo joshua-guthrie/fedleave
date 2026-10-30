@@ -48,6 +48,7 @@ from .charts import (
     table_widget,
 )
 from .forecast_view import ForecastWidget
+from .help_view import AnalyticsHelpDialog
 from .planning_view import PlannerWidget
 from .seasonality import seasonality_options, seasonality_series
 
@@ -357,16 +358,28 @@ class AnalyticsWindow(QMainWindow):
         self.year_combo.currentIndexChanged.connect(self._year_changed)
         controls.addWidget(self.year_combo)
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setToolTip(
+            "Read current records again from the selected backend and datastore; scenario references are rechecked."
+        )
         self.refresh_button.clicked.connect(self.refresh_data)
         controls.addWidget(self.refresh_button)
         self.open_chart_button = QPushButton("Open Chart")
+        self.open_chart_button.setToolTip(
+            "Open the active view's chart with exact supporting data and PNG, PDF, Print and CSV exports."
+        )
         self.open_chart_button.clicked.connect(self.open_chart)
         controls.addWidget(self.open_chart_button)
         self.csv_button = QPushButton("Save Table as CSV...")
+        self.csv_button.setToolTip(
+            "Export the currently selected result table and its scope/assumptions outside the leave datastore."
+        )
         self.csv_button.clicked.connect(self.save_csv)
         controls.addWidget(self.csv_button)
         controls.addStretch(1)
         self.close_button = QPushButton("Close")
+        self.close_button.setToolTip(
+            "Close Analytics. Export any scenario you want to keep; drafts are not saved automatically."
+        )
         self.close_button.clicked.connect(self.close)
         controls.addWidget(self.close_button)
         layout.addLayout(controls)
@@ -423,10 +436,27 @@ class AnalyticsWindow(QMainWindow):
             action = QAction(label, self)
             action.triggered.connect(callback)
             file_menu.addAction(action)
+        self.help_action = QAction("Help...", self)
+        self.help_action.setShortcut("F1")
+        self.help_action.setToolTip("Open detailed offline instructions for the current Analytics or Planning tool.")
+        self.help_action.triggered.connect(self.show_help)
+        file_menu.addAction(self.help_action)
         file_menu.addSeparator()
         close_action = QAction("Close", self)
         close_action.triggered.connect(self.close)
         file_menu.addAction(close_action)
+
+    def help_section(self):
+        if self.pages.currentWidget() is self.planning_page:
+            return {self.planner: "what-if", self.forecaster: "forecast", self.budgeter: "budget"}[
+                self.planning_tabs.currentWidget()
+            ]
+        return "overview"
+
+    def show_help(self):
+        dialog = AnalyticsHelpDialog(self.help_section(), self)
+        dialog.exec()
+        dialog.deleteLater()
 
     def _build_summary_page(self) -> None:
         layout = QVBoxLayout(self.summary_page)
@@ -1223,6 +1253,12 @@ def main(argv: list[str] | None = None) -> int:
         # Installed-bundle QA: use the real sibling CLI and render the existing
         # Seasonality page without writing any ledger or creating another app.
         window.set_data(load_analytics_data(backend, data_dir, year))
+        help_dialog = AnalyticsHelpDialog("what-if", window)
+        assert help_dialog.available
+        assert "Replace scheduled use" in help_dialog.browser.toPlainText()
+        assert "Usage Forecast" in help_dialog.browser.toPlainText()
+        assert "Leave Budget" in help_dialog.browser.toPlainText()
+        help_dialog.close()
         window.pages.setCurrentIndex(1)
         assert len(window.seasonality_page.findChildren(QComboBox)) == 2
         assert window.leave_type_selector.currentData() == "all-used"

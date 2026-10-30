@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 
 from fedleave.forecast import ForecastParameters, forecast, retrospective_check
 
+from .action_help import ACTION_HELP
 from .charts import AnalyticsChartWindow, ResponsivePixmapLabel, render_forecast_chart, table_widget
 from .forecast_model import DAILY_COLUMNS, export_csv, forecast_tables, update_coverage
 from .planning_model import export_destination, write_export
@@ -191,6 +192,7 @@ class ForecastWidget(QWidget):
     @staticmethod
     def _button(layout, label, callback):
         button = QPushButton(label)
+        button.setToolTip(ACTION_HELP[label])
         button.clicked.connect(callback)
         layout.addWidget(button)
         return button

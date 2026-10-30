@@ -13,8 +13,8 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QDate, QThreadPool
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtCore import QDate, QThreadPool, QTimer
+from PySide6.QtWidgets import QApplication, QFileDialog
 
 from fedleave.planning import PlanningValidationError, export_scenario
 from fedleave_analytics.planning_view import PlannerWidget
@@ -294,6 +294,12 @@ def test_real_backend_legacy_read_only_store_survives_full_planner_lifecycle(qtb
         wait_result(qtbot, view)
         view.add_tentative()
         wait_result(qtbot, view)
+        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().accept())
+        view.pick_date(0, 2)
+        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().reject())
+        view.choose_scheduled("replace")
+        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().reject())
+        view.choose_scheduled("remove")
         definition_path = tmp_path / "scenario.json"
         monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(definition_path), "JSON"))
         view.export_json()

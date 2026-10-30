@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Make What-if Planner Date cells open a calendar and Replace/Remove open checked booking choosers, with cancellation and original-ID-safe sorting.
+- Clarify Undo/Reset actions and Planning tooltips; add contextual File > Help/F1 with detailed offline instructions bundled with Analytics.
+
 - Add Leave Budget under Analysis > Planning with annual/lot/credit deadline audits, explicit purpose eligibility, reserves, four deterministic scheduling strategies, joint dated capacity checks, and canonical before/after risk.
 - Add read-only budget tables, cumulative chart and exact CSV exports; persist only analytics strategy preferences and transfer suggestions to What-if through fresh-source validation and explicit Replace/Merge/Cancel.
 - Share allocation arithmetic and scenario preparation; isolate opt-in credit rollover simulation from default CLI balances and verify unchanged ledger bytes through budget workflows.
