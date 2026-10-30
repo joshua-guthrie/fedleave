@@ -1,2 +1,2 @@
-source_commit=1a6a42613f8e7cb9b74383edaf9baf9d7f632c21
-version=0.2.2.dev0+g1a6a4261
+source_commit=17fe0fa32fc9ea82ba64ed83278982df38591200
+version=0.2.2.dev0+g17fe0fa3
