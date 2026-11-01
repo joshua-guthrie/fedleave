@@ -592,6 +592,12 @@ class PreferencesDialog(QDialog):
         self.orientation.addItems(["Landscape", "Portrait"])
         self.orientation.setCurrentText(settings.print_orientation)
         self.pdf_folder = QLineEdit(settings.pdf_export_folder)
+        self.automatic_update_checks = QCheckBox("Check for updates automatically")
+        self.automatic_update_checks.setChecked(settings.automatic_update_checks)
+        self.automatic_update_checks.setToolTip(
+            "Check for a newer FedLeave build at most once per day. "
+            "When disabled, Help > Check for Updates remains available."
+        )
         self.expiration_reminders = QLineEdit(
             ", ".join(str(value) for value in settings.expiration_reminder_pay_periods)
         )
@@ -606,6 +612,7 @@ class PreferencesDialog(QDialog):
         form.addRow("Calendar font size", self.font_size)
         form.addRow("Print orientation", self.orientation)
         form.addRow("PDF export folder", self.pdf_folder)
+        form.addRow("Software updates", self.automatic_update_checks)
         form.addRow("Expiration reminders (pay periods)", self.expiration_reminders)
         layout.addLayout(form)
         layout.addWidget(QLabel(f"Settings file: {settings_path()}"))
@@ -626,6 +633,7 @@ class PreferencesDialog(QDialog):
         self.settings.font_size = self.font_size.value()
         self.settings.print_orientation = self.orientation.currentText()
         self.settings.pdf_export_folder = self.pdf_folder.text().strip()
+        self.settings.automatic_update_checks = self.automatic_update_checks.isChecked()
         reminders = []
         for value in self.expiration_reminders.text().split(","):
             try:
@@ -2042,7 +2050,7 @@ class MainWindow(QMainWindow):
         return now - previous >= timedelta(hours=24)
 
     def check_for_updates_periodically(self) -> None:
-        if self._update_check_is_due():
+        if self.settings.automatic_update_checks and self._update_check_is_due():
             self._perform_update_check(interactive=False)
 
     def check_for_updates(self) -> None:

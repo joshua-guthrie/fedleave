@@ -554,7 +554,7 @@ Current GUI features:
 - Analysis > Yearly Leave Comparison launches the annual, sick, credit hours, comp time, travel comp, time-off award, and overtime yearly comparison chart companion apps in their own windows
 - Tools > Import From External App > FRC-E WMS HTTP Leave Report imports the WMS HTML report and asks before replacing matching leave transactions
 - Leave chart windows include Save PNG, Save PDF, and Print actions
-- Preferences for backend path, optional data directory, display toggles, font size, and PDF folder
+- Preferences for backend path, optional data directory, display toggles, font size, PDF folder, and automatic update checks
 - Help and About dialogs
 - Print preview, printer output, and PDF export now use the same landscape month-report graphic layout as `fedleaveMonthReportGraphic`
 - Zero values suppressed in day cells, tables, and reports
@@ -687,6 +687,13 @@ Every packaged executable also embeds that source commit. The GUI and
 updated only after both platform installers pass and publish. The semantic
 project version remains manually controlled; every successful `master` push
 automatically advances the rolling build identity instead.
+
+In FedLeave Calendar, **File > Preferences > Software updates** includes
+**Check for updates automatically**, enabled by default. Clear it and choose
+**Save** to disable startup and periodic update checks; the choice persists
+across restarts in the per-user GUI settings, separately from leave data.
+**Help > Check for Updates...** remains available for a manual check. Re-enabling
+automatic checks restores the normal schedule of at most one check per day.
 
 Version `0.2.2` is the one-time migration from semantic-only update checks to
 rolling build checks. An installed `0.2.1` can discover `0.2.2` through the old

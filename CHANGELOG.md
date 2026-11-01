@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a persistent Calendar Preferences option to disable automatic software update checks while keeping manual Help > Check for Updates available.
+
 - Make What-if Planner Date cells open a calendar and Replace/Remove open checked booking choosers, with cancellation and original-ID-safe sorting.
 - Clarify Undo/Reset actions and Planning tooltips; add contextual File > Help/F1 with detailed offline instructions bundled with Analytics.
 

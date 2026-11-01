@@ -24,6 +24,7 @@ class GuiSettings:
     font_size: int = 10
     print_orientation: str = "Landscape"
     pdf_export_folder: str = ""
+    automatic_update_checks: bool = True
     last_update_check_utc: str = ""
     last_update_notified_version: str = ""
     expiration_reminder_pay_periods: list[int] = field(default_factory=lambda: [1, 3, 6, 12])
