@@ -9,7 +9,7 @@ from copy import deepcopy
 from dataclasses import asdict
 
 from fedleave.forecast import ForecastResult
-from fedleave.history import confirm_coverage, coverage_key
+from fedleave.history import confirm_coverage, coverage_key, represented_periods
 
 from .planning_model import write_export
 
@@ -91,12 +91,17 @@ WARNING_COLUMNS = [
 ]
 
 
-def update_coverage(preferences, snapshot, period_ids=None, *, confirmed=True):
+def update_coverage(preferences, snapshot, period_ids=None, *, confirmed=True, strict=True, through=None):
     """Return a new preference document; persistence belongs to the GUI adapter."""
     result = deepcopy(preferences)
     key = coverage_key(snapshot)
-    replacements = confirm_coverage(snapshot, period_ids)
-    ids = {row["period_id"] for row in replacements}
+    replacements = confirm_coverage(snapshot, period_ids, strict=strict, through=through)
+    selected = {str(value) for value in period_ids} if period_ids is not None else None
+    ids = {
+        row["period_id"]
+        for row in represented_periods(snapshot, strict=strict)
+        if selected is None or row["period_id"] in selected
+    }
     result["coverage"] = [
         row for row in result.get("coverage", []) if row.get("source_key") != key or row.get("period_id") not in ids
     ]

@@ -34,10 +34,32 @@ def coverage_key(snapshot: dict) -> str:
     return fingerprint(identity)
 
 
-def represented_periods(snapshot: dict) -> tuple[dict, ...]:
+def represented_periods(snapshot: dict, *, strict=True) -> tuple[dict, ...]:
     """Require an exact, nonoverlapping pay-period representation of the year."""
     try:
-        validate_pay_periods(snapshot)
+        if strict:
+            validate_pay_periods(snapshot)
+        else:
+            # Descriptive comparisons can align unusual actual periods without
+            # treating them as a supported accrual/rollover calendar.
+            expected = date.fromisoformat(snapshot["leave_year_start"])
+            periods = snapshot["pay_periods"]
+            count = snapshot.get("pay_period_count", len(periods))
+            if not periods or type(count) is not int or count != len(periods):
+                raise ValueError("Period count disagrees with represented periods.")
+            for index, period in enumerate(periods, 1):
+                end = date.fromisoformat(period["end_date"])
+                if (
+                    period["start_date"] != expected.isoformat()
+                    or end < expected
+                    or period["end_date"] != end.isoformat()
+                    or type(period["pay_period_number"]) is not int
+                    or period["pay_period_number"] != index
+                ):
+                    raise ValueError("Periods must be numbered, contiguous and nonoverlapping.")
+                expected = end + timedelta(days=1)
+            if snapshot["leave_year_end"] != (expected - timedelta(days=1)).isoformat():
+                raise ValueError("Represented periods do not cover the exact leave-year bounds.")
         return tuple(
             {"period_id": str(row["pay_period_number"]), "start": row["start_date"], "end": row["end_date"]}
             for row in snapshot["pay_periods"]
@@ -51,6 +73,9 @@ def represented_periods(snapshot: dict) -> tuple[dict, ...]:
 def _period_fingerprint(snapshot, period):
     transactions = []
     for row in snapshot.get("transactions", []):
+        if not isinstance(row, dict):
+            transactions.append(fingerprint({"malformed_transaction": row}))
+            continue
         if row.get("source") in {"auto_accrual", "expiration-engine"}:
             continue
         day = row.get("date")
@@ -63,25 +88,28 @@ def _period_fingerprint(snapshot, period):
     return fingerprint({**period, "transaction_fingerprints": sorted(transactions)})
 
 
-def confirm_coverage(snapshot: dict, period_ids=None) -> tuple[dict, ...]:
+def confirm_coverage(snapshot: dict, period_ids=None, *, strict=True, through=None) -> tuple[dict, ...]:
     """Build explicit assertions for a whole year or selected represented periods."""
-    periods = represented_periods(snapshot)
+    periods = represented_periods(snapshot, strict=strict)
     selected = {str(item) for item in period_ids} if period_ids is not None else {p["period_id"] for p in periods}
     if selected - {p["period_id"] for p in periods}:
         raise ValueError("A confirmation references an unrepresented pay period.")
+    if through is not None and date.fromisoformat(through).isoformat() != through:
+        raise ValueError("Coverage cutoff must be an ISO date.")
     return tuple(
         {
             "source_key": coverage_key(snapshot),
             **period,
             "fingerprint": _period_fingerprint(snapshot, period),
             "confirmed": True,
+            **({"confirmed_through": through} if through is not None and through < period["end"] else {}),
         }
         for period in periods
-        if period["period_id"] in selected
+        if period["period_id"] in selected and (through is None or period["start"] <= through)
     )
 
 
-def coverage_status(snapshot: dict, confirmations) -> tuple[tuple[dict, ...], frozenset[str]]:
+def coverage_status(snapshot: dict, confirmations, *, strict=True) -> tuple[tuple[dict, ...], frozenset[str]]:
     key = coverage_key(snapshot)
     records = {
         str(row.get("period_id")): row
@@ -89,19 +117,35 @@ def coverage_status(snapshot: dict, confirmations) -> tuple[tuple[dict, ...], fr
         if isinstance(row, dict) and row.get("source_key") == key and row.get("confirmed") is True
     }
     rows, covered = [], set()
-    for period in represented_periods(snapshot):
+    for period in represented_periods(snapshot, strict=strict):
         record = records.get(period["period_id"])
+        through = record.get("confirmed_through", period["end"]) if record else period["end"]
+        try:
+            valid_through = (
+                date.fromisoformat(through).isoformat() == through and period["start"] <= through <= period["end"]
+            )
+        except (TypeError, ValueError):
+            valid_through = False
         valid = (
             record is not None
+            and valid_through
             and record.get("start") == period["start"]
             and record.get("end") == period["end"]
             and record.get("fingerprint") == _period_fingerprint(snapshot, period)
         )
         rows.append(
-            {**period, "confirmed": valid, "state": "Confirmed" if valid else "Stale" if record else "Unconfirmed"}
+            {
+                **period,
+                "confirmed": valid and through == period["end"],
+                "state": ("Confirmed" if through == period["end"] else f"Confirmed through {through}")
+                if valid
+                else "Stale"
+                if record
+                else "Unconfirmed",
+            }
         )
         if valid:
-            covered.update(days(period["start"], period["end"]))
+            covered.update(days(period["start"], through))
     return tuple(rows), frozenset(covered)
 
 

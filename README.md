@@ -1051,14 +1051,14 @@ The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Mi
 ### Companion Application: FedLeaveAnalytics
 
 `FedLeaveAnalytics` is the read-only companion for seasonality, calendar
-heatmaps, overtime, compensatory-time, credit-hour analysis, planning and usage
-forecasts. Launch it
+heatmaps, overtime, compensatory-time, credit-hour analysis, planning, usage
+forecasts, and cumulative usage comparisons. Launch it
 directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calendar
 passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
 
 The pages are Summary, Seasonality, Calendar Heatmap, Overtime, Comp,
-and Credit, and Planning. Monthly views combine horizontal bar charts with their supporting
+and Credit, Planning, and Cumulative Usage. Monthly views combine horizontal bar charts with their supporting
 tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
 Leave Year values; double-clicking a row opens its supporting transactions.
 The application never modifies leave data or displays backend/data-directory
@@ -1092,6 +1092,76 @@ Double-click a table row to inspect the transactions supporting that result:
 FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
     --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
 ```
+
+#### Cumulative Usage Comparison
+
+Open **Analysis > Analytics... > Cumulative Usage** in Calendar, or choose the
+**Cumulative Usage** tab in Analytics. The global Leave Year selects the target;
+choose an inclusive cutoff no later than today, reference years, alignment,
+and one category or an explicit sum. Annual is the default. Sick and
+purpose-restricted leave are included only when selected; overtime and FMLA
+entitlement tracking are excluded from physical absence. Existing yearly
+balance-comparison commands retain their behavior.
+
+**Leave-year progress** aligns the actual pay-period ordinal and zero-based
+day offset. Non-January starts, different period lengths and 26/27-period years
+retain their actual mapped dates. A missing period/day is N/A, never clamped or
+flatlined. **Calendar date** maps exact month/day within the reference bounds,
+including January in the following calendar year. If a long year contains two
+occurrences, the calendar-year offset from the year start selects the equivalent
+one. Missing February 29 is N/A and is never moved to February 28.
+
+Coverage starts unconfirmed. Select a reference year row and confirm the whole
+year or selected pay periods only when its leave records are complete. For the
+target, **Confirm through cutoff** confirms only the known prefix, including a
+partial current pay period. Future dates stay unconfirmed; extending the cutoff
+requires renewed confirmation of the additional dates.
+A cumulative observation needs valid coverage from that year's actual start
+through its mapped date; an unknown/stale period makes later totals N/A.
+Confirmed zero usage is zero, while unknown history is missing. Material source
+edits require renewed confirmation. Reference/exclusion/coverage preferences
+are shared with Forecast and stored outside the ledger. Refresh reloads
+preferences changed in another open view. The initial references are the five
+most recent prior years; Exclude unusual omits a year without deleting it.
+
+Summary and chart use the same aligned cutoff. A target total of 104 hours
+versus reference totals 64/80/96 gives median 80, difference +24 hours and +30%,
+regardless of starting balances or accrual tiers. Percentiles use linear
+interpolation at `index = (n - 1) * p`. Fewer than three eligible years shows
+individual curves and median with **Limited history**, without shading. No
+observations gives N/A; a zero median gives N/A percentage. The 20–80% range
+describes the selected history, not a confidence interval.
+
+**Recorded Through Cutoff** means effective `used` rows, with unresolved past
+planned/requested statuses identified; dates do not establish attendance.
+The optional Confirmed filter uses worked/submitted/certified/reconciled for
+recorded rows. Entered future target bookings remain a separate **Scheduled
+continuation**, even under that filter. Later reference points are historical
+context and never enter the cutoff statistic. Earned hours, openings, awards,
+adjustments, corrections, expirations and forfeitures are not absence.
+
+The secondary metric, **Hours used per 100 scheduled work hours elapsed**, uses
+backend-supplied historical rosters and cached observed holidays. Otherwise it
+stays N/A unless you explicitly enable the current-schedule assumption for all
+compared years. That assumption uses configured start/end minus lunch on
+configured workdays, including non-Monday-Friday schedules; it does not
+reconstruct historical/alternating rosters. Unknown schedule/holiday context or
+a zero denominator remains N/A without hiding the primary usage-hour results.
+
+Daily alignment contains exact chart data; Year details preserves actual mapped
+dates, exposure, coverage and original IDs. Double-click a year value for its
+known included transactions. Double-click a median/range for contributing year
+totals, then a year row for transactions; a derived median is not a transaction
+sum. Sorting preserves source identity. Source transactions, Coverage and
+Warnings expose provenance, assumptions and malformed records.
+
+Save Table as CSV exports the exact table with filters, alignment, cutoff,
+selected/excluded years, coverage, schedule assumptions and missing values.
+Open Chart provides its exact daily table, CSV, PNG, PDF and Print. Loading and
+calculation run in workers; controls reuse cached snapshots, Refresh reloads
+the selected backend, and stale results are discarded after edits/cancellation.
+No comparison action changes leave data. File > Help/F1 opens the offline
+instructions at this view.
 
 #### What-if Planner
 

@@ -47,6 +47,7 @@ from .charts import (
     render_horizontal_bar_chart,
     table_widget,
 )
+from .comparison_view import ComparisonWidget
 from .forecast_view import ForecastWidget
 from .help_view import AnalyticsHelpDialog
 from .planning_view import PlannerWidget
@@ -338,7 +339,9 @@ class AnalyticsWindow(QMainWindow):
         font.setPointSize(font_size)
         self.setFont(font)
         self._build_ui()
-        if initial_view in {"planning", "forecast", "budget"}:
+        if initial_view == "comparison":
+            self.pages.setCurrentWidget(self.comparer)
+        elif initial_view in {"planning", "forecast", "budget"}:
             if initial_view == "forecast":
                 self.planning_tabs.setCurrentWidget(self.forecaster)
             elif initial_view == "budget":
@@ -407,6 +410,9 @@ class AnalyticsWindow(QMainWindow):
         layout.addWidget(self.pages, 1)
         self.setCentralWidget(root)
 
+        self.comparer = ComparisonWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.pages.addTab(self.comparer, "Cumulative Usage")
+        self.comparer.source_loaded.connect(self._planning_source_loaded)
         self._build_summary_page()
         self._build_seasonality_page()
         self._build_heatmap_page()
@@ -447,6 +453,8 @@ class AnalyticsWindow(QMainWindow):
         file_menu.addAction(close_action)
 
     def help_section(self):
+        if self.pages.currentWidget() is self.comparer:
+            return "comparison"
         if self.pages.currentWidget() is self.planning_page:
             return {self.planner: "what-if", self.forecaster: "forecast", self.budgeter: "budget"}[
                 self.planning_tabs.currentWidget()
@@ -621,6 +629,10 @@ class AnalyticsWindow(QMainWindow):
 
     @Slot()
     def refresh_data(self) -> None:
+        if self.pages.currentWidget() is self.comparer:
+            self.comparer.set_source(self.backend, self.data_dir, self.year)
+            self.comparer.load_source()
+            return
         if self.pages.currentWidget() is self.planning_page:
             view = self.planning_tabs.currentWidget()
             view.set_source(self.backend, self.data_dir, self.year)
@@ -875,6 +887,7 @@ class AnalyticsWindow(QMainWindow):
         self.planner.set_source(self.backend, self.data_dir, self.year)
         self.forecaster.set_source(self.backend, self.data_dir, self.year)
         self.budgeter.set_source(self.backend, self.data_dir, self.year)
+        self.comparer.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
 
     @Slot(object)
@@ -893,6 +906,14 @@ class AnalyticsWindow(QMainWindow):
         self.planning_tabs.setCurrentWidget(self.planner)
 
     def _page_changed(self, _index: int = -1) -> None:
+        if self.pages.currentWidget() is self.comparer:
+            self.open_chart_button.setEnabled(True)
+            self.notice_label.setText(
+                "Cumulative Usage Comparison: recorded absence through equivalent dates, with explicit coverage, alignment and schedule assumptions."
+            )
+            self.comparer.set_source(self.backend, self.data_dir, self.year)
+            self.comparer.activate()
+            return
         if self.pages.currentWidget() is self.planning_page:
             self.open_chart_button.setEnabled(True)
             self.notice_label.setText(
@@ -948,6 +969,9 @@ class AnalyticsWindow(QMainWindow):
         self._current_columns = columns
 
     def open_chart(self) -> None:
+        if self.pages.currentWidget() is self.comparer:
+            self.comparer.open_chart()
+            return
         if self.pages.currentWidget() is self.planning_page:
             self.planning_tabs.currentWidget().open_chart()
             return
@@ -1014,6 +1038,9 @@ class AnalyticsWindow(QMainWindow):
         window.show()
 
     def save_csv(self) -> None:
+        if self.pages.currentWidget() is self.comparer:
+            self.comparer.save_csv()
+            return
         if self.pages.currentWidget() is self.planning_page:
             self.planning_tabs.currentWidget().save_csv()
             return
@@ -1191,6 +1218,7 @@ class AnalyticsWindow(QMainWindow):
         self.planner.shutdown()
         self.forecaster.shutdown()
         self.budgeter.shutdown()
+        self.comparer.shutdown()
         if self._load_thread and self._load_thread.isRunning():
             # Hide promptly, retain the worker's owner, then close after its
             # bounded backend read completes. No running QThread is destroyed.
@@ -1222,7 +1250,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-folder", default="")
     parser.add_argument(
         "--view",
-        choices=["analytics", "planning", "forecast", "budget"],
+        choices=["analytics", "planning", "forecast", "budget", "comparison"],
         default="analytics",
         help="Initial view in the existing Analytics application.",
     )
@@ -1324,6 +1352,17 @@ def main(argv: list[str] | None = None) -> int:
         for strategy in ("even", "earliest", "latest", "weighted"):
             assert window.budgeter.strategy_combo.findData(strategy) >= 0
         assert "Source and allocation audit" in window.budgeter.tables
+        window.pages.setCurrentWidget(window.comparer)
+        deadline = time.monotonic() + 40
+        while window.comparer.result is None:
+            app.processEvents()
+            if time.monotonic() >= deadline:
+                raise RuntimeError(window.comparer.status_label.text())
+            QThread.msleep(5)
+        assert not window.comparer.chart_image.source_pixmap().isNull()
+        assert window.comparer.result.parameters.categories == ("annual",)
+        assert "Year details" in window.comparer.tables
+        assert "Cumulative Usage Comparison" in help_dialog.browser.toPlainText()
         window.show()
         app.processEvents()
         window.close()

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Cumulative Usage Comparison to Analytics with actual period/day or calendar-date alignment, explicit coverage, separate Scheduled overlays, exact percentiles and deltas, optional schedule normalization, source drilldowns and CSV/chart exports.
+
 - Add a persistent Calendar Preferences option to disable automatic software update checks while keeping manual Help > Check for Updates available.
 
 - Make What-if Planner Date cells open a calendar and Replace/Remove open checked booking choosers, with cancellation and original-ID-safe sorting.

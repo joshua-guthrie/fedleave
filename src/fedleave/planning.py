@@ -118,7 +118,13 @@ def fingerprint(value: Any) -> str:
         if isinstance(item, dict):
             result = {key: canonical(val) for key, val in item.items() if key not in {"accounting_warnings"}}
             if isinstance(result.get("transactions"), list):
-                result["transactions"].sort(key=lambda tx: (str(tx.get("date")), str(tx.get("id"))))
+                result["transactions"].sort(
+                    key=lambda tx: (
+                        (str(tx.get("date")), str(tx.get("id")))
+                        if isinstance(tx, dict)
+                        else ("malformed", json.dumps(tx, sort_keys=True))
+                    )
+                )
             return result
         if isinstance(item, (tuple, list)):
             return [canonical(val) for val in item]

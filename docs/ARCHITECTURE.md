@@ -298,3 +298,29 @@ Analytics File > Help/F1 opens `help_view` at the current tool's section. The
 self-contained `fedleave_analytics/help.html` is package data (wheel/sdist and
 PyInstaller collect-all), so it requires no network, website or source checkout.
 Installed companion smoke checks load the actual bundled help document.
+
+## Cumulative usage comparison
+
+`fedleave.usage_comparison` is a pure descriptive model over defensive snapshot
+copies. Canonical transaction effects select physical used rows; openings,
+accruals and disposals never enter usage. Each year's prefix totals require
+explicit, fingerprint-bound coverage from its actual start. Missing dates,
+periods, malformed usage and coverage remain null, including inside curves.
+Actual period ordinal/offset and exact calendar month/day mappings preserve
+source dates. Historical cutoff totals alone enter the comparison statistic;
+future target bookings are a separate Scheduled continuation.
+
+`history` retains strict accrual-calendar validation by default. Its opt-in
+descriptive period validation accepts unusual contiguous numbered periods for
+comparison/coverage without changing accrual, rollover or Forecast semantics.
+Coverage fingerprints and analytics preference storage are shared with Forecast.
+Historical normalization requires backend roster data or an explicit current
+schedule assumption; unavailable exposure never invalidates primary usage hours.
+
+`comparison_model` maps one immutable result to exact tables/CSV, including
+metadata, nulls and original IDs. `comparison_view` uses revision-bound workers,
+read-only backend discovery/snapshots, cached recalculation, guarded exports,
+sorted source drilldowns and existing chart save/print windows. Derived median
+drilldowns expose year observations before transactions. Analytics routes the
+existing backend, datastore, year, font, PDF folder, Refresh and Help actions.
+Installed Analytics smoke renders the new view in both platform bundles.
