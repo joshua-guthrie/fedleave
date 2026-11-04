@@ -8,12 +8,12 @@ curves; callers must not interpolate across missing coverage or alignment.
 from __future__ import annotations
 
 from copy import deepcopy
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 from .categories import CATEGORY_POLICIES
-from .history import CONFIRMED_STATUSES, coverage_key, coverage_status, days, represented_periods
-from .planning import source_identity, working_calendar
+from .history import CONFIRMED_STATUSES, analysis_calendar, coverage_key, coverage_status, days, represented_periods
+from .planning import source_identity
 from .transaction_effects import TRANSACTION_DIRECTIONS, signed_balance_effect, transaction_is_effective
 
 ABSENCE_CATEGORIES = tuple(category for category in CATEGORY_POLICIES if category not in {"overtime", "fmla"})
@@ -81,44 +81,10 @@ def percentile(values, fraction):
     return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
 
 
-def _schedule(snapshot, target, assume_current):
-    private = deepcopy(snapshot)
-    historical = private.get("calculation_context", {}).get("historical_work_schedule")
-    if assume_current:
-        private["snapshot_rules"]["defaults"].update(deepcopy(target["snapshot_rules"]["defaults"]))
-        basis = "Explicit analysis assumption: apply the target's current configured schedule to all compared years."
-    elif isinstance(historical, dict):
-        required = {"normal_workdays", "workday_start", "workday_end", "lunch_start", "lunch_end"}
-        if not required <= historical.keys():
-            return (
-                dict.fromkeys(days(snapshot["leave_year_start"], snapshot["leave_year_end"])),
-                ("Backend historical roster is incomplete; normalized usage is N/A."),
-                [
-                    {
-                        "code": "INCOMPLETE_HISTORICAL_ROSTER",
-                        "message": "Supply workdays and all tour/lunch times for historical normalization.",
-                    }
-                ],
-            )
-        private["snapshot_rules"]["defaults"].update(historical)
-        basis = "Explicit backend-supplied historical work schedule."
-    else:
-        return (
-            dict.fromkeys(days(snapshot["leave_year_start"], snapshot["leave_year_end"])),
-            (
-                "Historical roster unavailable; normalized usage is N/A. Enable the explicit current-schedule assumption if appropriate."
-            ),
-            [],
-        )
-    warnings = []
-    calendar, _ = working_calendar(private, private["leave_year_start"], private["leave_year_end"], warnings)
-    return calendar, basis, [asdict(w) for w in warnings]
-
-
 def _prepare(snapshot, target, coverage, parameters, cutoff):
     periods, covered = coverage_status(snapshot, coverage, strict=False)
     year, key = snapshot["leave_year"], coverage_key(snapshot)
-    calendar, assumption, warnings = _schedule(snapshot, target, parameters.assume_current_schedule)
+    calendar, assumption, warnings = analysis_calendar(snapshot, target, parameters.assume_current_schedule)
     rows, invalid = [], set()
     for original in snapshot.get("transactions", []):
         if not isinstance(original, dict):

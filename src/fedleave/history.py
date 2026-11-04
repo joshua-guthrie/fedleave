@@ -149,6 +149,41 @@ def coverage_status(snapshot: dict, confirmations, *, strict=True) -> tuple[tupl
     return tuple(rows), frozenset(covered)
 
 
+def analysis_calendar(snapshot, target, assume_current):
+    """Return a historical or explicitly assumed calendar without writing data."""
+    private = deepcopy(snapshot)
+    historical = private.get("calculation_context", {}).get("historical_work_schedule")
+    if assume_current:
+        private["snapshot_rules"]["defaults"].update(deepcopy(target["snapshot_rules"]["defaults"]))
+        basis = "Explicit analysis assumption: apply the target's current configured schedule to all compared years."
+    elif isinstance(historical, dict):
+        required = {"normal_workdays", "workday_start", "workday_end", "lunch_start", "lunch_end"}
+        if not required <= historical.keys():
+            return (
+                dict.fromkeys(days(snapshot["leave_year_start"], snapshot["leave_year_end"])),
+                ("Backend historical roster is incomplete; schedule-derived metrics are N/A."),
+                [
+                    {
+                        "code": "INCOMPLETE_HISTORICAL_ROSTER",
+                        "message": "Supply workdays and all tour/lunch times for historical normalization.",
+                    }
+                ],
+            )
+        private["snapshot_rules"]["defaults"].update(historical)
+        basis = "Explicit backend-supplied historical work schedule."
+    else:
+        return (
+            dict.fromkeys(days(snapshot["leave_year_start"], snapshot["leave_year_end"])),
+            (
+                "Historical roster unavailable; schedule-derived metrics are N/A. Enable the explicit current-schedule assumption if appropriate."
+            ),
+            [],
+        )
+    warnings = []
+    calendar, _ = working_calendar(private, private["leave_year_start"], private["leave_year_end"], warnings)
+    return calendar, basis, [asdict(w) for w in warnings]
+
+
 @dataclass(frozen=True)
 class HistoricalYear:
     year: int

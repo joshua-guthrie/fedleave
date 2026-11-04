@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add read-only Break Patterns to Analytics: full/partial absence, recorded and upcoming intervals, substantial-break timing, covered scheduled-workday gaps, exact distributions and audited CSV/chart exports.
+
 - Add Cumulative Usage Comparison to Analytics with actual period/day or calendar-date alignment, explicit coverage, separate Scheduled overlays, exact percentiles and deltas, optional schedule normalization, source drilldowns and CSV/chart exports.
 
 - Add a persistent Calendar Preferences option to disable automatic software update checks while keeping manual Help > Check for Updates available.
