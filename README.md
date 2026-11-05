@@ -1052,13 +1052,12 @@ The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Mi
 
 `FedLeaveAnalytics` is the read-only companion for seasonality, calendar
 heatmaps, overtime, compensatory-time, credit-hour analysis, planning, usage
-forecasts, cumulative usage, and break patterns. Launch it
-directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calendar
+forecasts, and cumulative usage. Launch it directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calendar
 passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
 
 The pages are Summary, Seasonality, Calendar Heatmap, Overtime, Comp,
-and Credit, Planning, Cumulative Usage, and Break Patterns. Monthly views combine horizontal bar charts with their supporting
+and Credit, Planning, and Cumulative Usage. Monthly views combine horizontal bar charts with their supporting
 tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
 Leave Year values; double-clicking a row opens its supporting transactions.
 The application never modifies leave data or displays backend/data-directory
@@ -1092,88 +1091,6 @@ Double-click a table row to inspect the transactions supporting that result:
 FedLeaveAnalytics --backend /path/to/fedleave --year 2026 \
     --data-dir /path/to/fedleave-data --pdf-folder /path/to/reports
 ```
-
-#### Break Patterns
-
-Open **Analysis > Analytics... > Break Patterns** in Calendar, or the **Break
-Patterns** tab in Analytics. It describes recorded leave patterns and separately
-shows upcoming scheduled breaks. It does not infer attendance or diagnose health.
-Choose one or more initialized years, a cutoff no later than today, category
-grouping, and a **Substantial break** threshold (default three fully absent
-scheduled workdays in one consecutive calendar interval). This is your analysis
-threshold, not an employment rule.
-
-The default **Discretionary time off** group contains annual, restored annual,
-comp, travel comp, credit and time-off awards. Sick remains separate context.
-Choose Sick only, All physical absence, or an explicit custom sum when useful;
-purpose-restricted categories are never silently called discretionary leave.
-FMLA entitlement tracking, overtime, earning/rollover/disposal rows, corrections
-and openings are not physical absence. Effective used rows through cutoff are
-**Recorded Through Cutoff**, including identifiable unresolved planned/requested
-statuses; dates do not prove leave was taken. The optional confirmed-status filter
-uses worked/submitted/certified/reconciled for recorded rows. Future effective
-bookings remain **Scheduled**, including under that filter.
-
-Select a year row and confirm only complete recorded coverage, either through
-cutoff or for selected periods. Coverage shares Analytics preferences with
-Forecast, outside leave data. Confirmations stop at cutoff,
-including a partial pay period; extend them as additional dates become complete.
-Unknown/stale coverage or unavailable schedules/holidays makes classification
-N/A, not zero. Known recorded hours remain available when only schedule context
-is missing. Selected ranges with missing dates remain separate covered segments;
-breaks and gaps never bridge unknown history or overlapping files.
-
-Full absence means selected used hours meet the scheduled hours for that date
-within numeric tolerance; partial absence means positive hours below the tour.
-Rows on the same date are summed first. Two four-hour annual entries make one
-eight-hour day. Four annual plus four sick hours remains a partial discretionary
-day with four sick hours of context; it becomes full only in an explicitly
-combined grouping. Raw hours above schedule are preserved and flagged; only
-coverage ratios cap at 100%.
-
-The visible schedule option applies the current configured regular tour to years
-without backend historical rosters, and discloses that analysis assumption and
-each source range. Disable it when inappropriate; unrepresented historical or
-alternating rosters remain N/A. Workday hours use configured start/end minus
-lunch on configured workdays, including Sunday–Thursday and ten-hour schedules.
-Observed nonworking holidays come from backend context; missing holiday coverage
-stays unknown. Analysis does not generate holiday caches or modify leave files.
-
-A break is a maximal interval of fully absent scheduled workdays and adjoining
-nonworking dates, with at least one fully absent workday. A scheduled date with
-partial/no selected absence interrupts it. Eight annual hours Friday and Monday
-therefore gives Friday–Monday: four calendar days, two absent workdays, 16 hours;
-it does not meet the default threshold. Monday–Wednesday full absence qualifies;
-a four-hour Tuesday interrupts it. Weekends/holidays can extend a break but never
-create one alone. Cross-year intervals join only with contiguous known coverage.
-
-An interval reaching cutoff is **Break in progress** when its observed portion
-already meets the threshold; no completed end date is invented. Upcoming
-continuations link to the recorded portion but never reset recorded metrics.
-Unknown boundaries are flagged; their lengths are observed lower bounds. Median
-completed length uses fully bounded completed intervals. Distribution tables
-separate these from ongoing/truncated observed lengths. No qualifying break
-gives N/A with **No qualifying break in covered history**, not a lifetime claim.
-
-Time since a known completed substantial break reports calendar days and
-scheduled workdays through cutoff, with N/A if intervening coverage is unknown.
-**Scheduled workdays between substantial breaks** is the largest covered gap,
-including labeled observed-range boundaries. It is not a count of days actually
-worked: sick leave, smaller breaks and partial absences remain contextual hours
-with original transaction references. Month/quarter tables show timing without
-a final-quarter-concentration metric.
-
-Choose the length distribution or timeline chart. Recorded and Upcoming tables
-stay separate; the timeline uses solid recorded bars and dashed Scheduled bars.
-Daily classification exposes schedule hours, selected/other usage, coverage,
-assumptions and original IDs. Double-click a sorted interval, gap or day for
-exact daily detail and contributing transactions. CSV exports include categories,
-cutoff, selected years, threshold, schedule/coverage assumptions, nulls and exact
-values. Open Chart provides exact supporting data plus CSV, PNG, PDF and Print.
-Workers load/compute off the Qt event loop; controls reuse cached snapshots and
-late results are discarded. Refresh reloads the selected backend while preserving
-the selected range/cutoff. No break-analysis action books leave. File > Help/F1
-opens the bundled definitions and examples.
 
 #### Cumulative Usage
 

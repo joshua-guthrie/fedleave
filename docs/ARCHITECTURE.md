@@ -317,30 +317,6 @@ and existing chart save/print windows. Analytics routes the existing backend,
 datastore, year, font, PDF folder, Refresh and Help actions. Installed
 Analytics smoke renders the view in both platform bundles.
 
-## Break patterns
-
-`fedleave.break_patterns` builds daily classifications from canonical effective
-physical usage, explicit shared coverage and backend calendar context. Full and
-partial selected hours remain separate from other-category context. The shared
-`history.analysis_calendar` supplies backend historical rosters or a disclosed
-current regular-schedule assumption, without network/storage writes.
-
-Recorded and Scheduled interval scans are independent. Unknown dates terminate
-intervals and covered gaps; an observed substantial interval reaching cutoff is
-ongoing, and future continuation never completes or resets recorded metrics.
-Unknown boundaries preserve lower-bound lengths. Completed median/distribution
-use bounded intervals; scheduled workday gaps retain smaller/contextual absence
-and never imply attendance. Cross-year joins require actual contiguous dates
-with known usage/schedule context. Source IDs stay bound to year identities.
-
-`break_model` maps one result into exact tables/CSV with scope, nulls, assumptions
-and provenance. `break_view` reuses read-only backend discovery/snapshots,
-fingerprint-bound coverage preferences, revision workers/GUI Slots and protected
-exports. `break_charts` renders both exact interval timelines and distributions
-with supporting chart tables and standard PNG/PDF/Print controls. Analytics routes
-the existing context, year, Refresh, CSV and Help; installed smoke exercises both
-charts in the existing Windows/Linux companion, with no executable added.
-
 ### Holiday and Weekend Planner
 
 `fedleave.holiday_planner` enumerates bounded workday-boundary intervals, extends

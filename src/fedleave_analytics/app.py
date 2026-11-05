@@ -39,7 +39,6 @@ from fedleave.config import get_default_data_dir
 from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
-from .break_view import BreakPatternsWidget
 from .budget_view import BudgetWidget
 from .charts import (
     AnalyticsChartWindow,
@@ -343,8 +342,6 @@ class AnalyticsWindow(QMainWindow):
         self._build_ui()
         if initial_view == "comparison":
             self.pages.setCurrentWidget(self.comparer)
-        elif initial_view == "breaks":
-            self.pages.setCurrentWidget(self.break_patterns)
         elif initial_view in {"planning", "forecast", "budget", "holidays"}:
             if initial_view == "forecast":
                 self.planning_tabs.setCurrentWidget(self.forecaster)
@@ -419,9 +416,6 @@ class AnalyticsWindow(QMainWindow):
         self.comparer = ComparisonWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
         self.pages.addTab(self.comparer, "Cumulative Usage")
         self.comparer.source_loaded.connect(self._planning_source_loaded)
-        self.break_patterns = BreakPatternsWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        self.pages.addTab(self.break_patterns, "Break Patterns")
-        self.break_patterns.source_loaded.connect(self._planning_source_loaded)
         self._build_summary_page()
         self._build_seasonality_page()
         self._build_heatmap_page()
@@ -466,8 +460,6 @@ class AnalyticsWindow(QMainWindow):
         file_menu.addAction(close_action)
 
     def help_section(self):
-        if self.pages.currentWidget() is self.break_patterns:
-            return "breaks"
         if self.pages.currentWidget() is self.comparer:
             return "comparison"
         if self.pages.currentWidget() is self.planning_page:
@@ -647,10 +639,6 @@ class AnalyticsWindow(QMainWindow):
 
     @Slot()
     def refresh_data(self) -> None:
-        if self.pages.currentWidget() is self.break_patterns:
-            self.break_patterns.set_source(self.backend, self.data_dir, self.year)
-            self.break_patterns.load_source()
-            return
         if self.pages.currentWidget() is self.comparer:
             self.comparer.set_source(self.backend, self.data_dir, self.year)
             self.comparer.load_source()
@@ -911,7 +899,6 @@ class AnalyticsWindow(QMainWindow):
         self.budgeter.set_source(self.backend, self.data_dir, self.year)
         self.holiday_planner.set_source(self.backend, self.data_dir, self.year)
         self.comparer.set_source(self.backend, self.data_dir, self.year)
-        self.break_patterns.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
 
     @Slot(object)
@@ -935,14 +922,6 @@ class AnalyticsWindow(QMainWindow):
         self.planning_tabs.setCurrentWidget(self.planner)
 
     def _page_changed(self, _index: int = -1) -> None:
-        if self.pages.currentWidget() is self.break_patterns:
-            self.open_chart_button.setEnabled(True)
-            self.notice_label.setText(
-                "Break Patterns: selected absence, recorded breaks and separately scheduled upcoming intervals. Scheduled workdays are not confirmed attendance."
-            )
-            self.break_patterns.set_source(self.backend, self.data_dir, self.year)
-            self.break_patterns.activate()
-            return
         if self.pages.currentWidget() is self.comparer:
             self.open_chart_button.setEnabled(True)
             self.notice_label.setText(
@@ -1008,9 +987,6 @@ class AnalyticsWindow(QMainWindow):
         self._current_columns = columns
 
     def open_chart(self) -> None:
-        if self.pages.currentWidget() is self.break_patterns:
-            self.break_patterns.open_chart()
-            return
         if self.pages.currentWidget() is self.comparer:
             self.comparer.open_chart()
             return
@@ -1080,9 +1056,6 @@ class AnalyticsWindow(QMainWindow):
         window.show()
 
     def save_csv(self) -> None:
-        if self.pages.currentWidget() is self.break_patterns:
-            self.break_patterns.save_csv()
-            return
         if self.pages.currentWidget() is self.comparer:
             self.comparer.save_csv()
             return
@@ -1265,7 +1238,6 @@ class AnalyticsWindow(QMainWindow):
         self.budgeter.shutdown()
         self.holiday_planner.shutdown()
         self.comparer.shutdown()
-        self.break_patterns.shutdown()
         if self._load_thread and self._load_thread.isRunning():
             # Hide promptly, retain the worker's owner, then close after its
             # bounded backend read completes. No running QThread is destroyed.
@@ -1297,7 +1269,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-folder", default="")
     parser.add_argument(
         "--view",
-        choices=["analytics", "planning", "forecast", "budget", "comparison", "breaks", "holidays"],
+        choices=["analytics", "planning", "forecast", "budget", "comparison", "holidays"],
         default="analytics",
         help="Initial view in the existing Analytics application.",
     )
@@ -1333,7 +1305,6 @@ def main(argv: list[str] | None = None) -> int:
         assert "Replace scheduled use" in help_dialog.browser.toPlainText()
         assert "Usage Forecast" in help_dialog.browser.toPlainText()
         assert "Leave Budget" in help_dialog.browser.toPlainText()
-        assert "Break Patterns" in help_dialog.browser.toPlainText()
         assert "Holiday and Weekend Planner" in help_dialog.browser.toPlainText()
         help_dialog.close()
         window.pages.setCurrentIndex(1)
@@ -1412,18 +1383,6 @@ def main(argv: list[str] | None = None) -> int:
         assert window.comparer.result.parameters.categories == ("annual",)
         assert window.comparer.result.points
         assert "Cumulative Usage" in help_dialog.browser.toPlainText()
-        window.pages.setCurrentWidget(window.break_patterns)
-        deadline = time.monotonic() + 40
-        while window.break_patterns.result is None:
-            app.processEvents()
-            if time.monotonic() >= deadline:
-                raise RuntimeError(window.break_patterns.status_label.text())
-            QThread.msleep(5)
-        assert not window.break_patterns.chart_image.source_pixmap().isNull()
-        assert window.break_patterns.result.parameters.grouping == "discretionary"
-        assert "Upcoming breaks" in window.break_patterns.tables
-        window.break_patterns.chart_combo.setCurrentIndex(1)
-        assert not window.break_patterns.chart_image.source_pixmap().isNull()
         window.pages.setCurrentWidget(window.planning_page)
         window.planning_tabs.setCurrentWidget(window.holiday_planner)
         deadline = time.monotonic() + 60

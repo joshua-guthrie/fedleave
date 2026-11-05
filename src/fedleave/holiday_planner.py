@@ -8,7 +8,6 @@ from datetime import date
 from math import isfinite
 
 from .allocation import hours_for_units, required_units, whole_units
-from .break_patterns import DISCRETIONARY_CATEGORIES
 from .budget import BudgetParameters, DatedFunding, _lot_state, _period_for, _represented
 from .credit_caps import credit_cap_limitation
 from .expirations import EXPIRING_CATEGORIES, expiration_rules
@@ -26,6 +25,8 @@ from .planning import (
     validate_scenario,
 )
 from .transaction_effects import signed_balance_effect, transaction_is_physical_absence
+
+DISCRETIONARY_CATEGORIES = ("annual", "restored_annual", "comp", "travel_comp", "credit", "time_off_award")
 
 RANKINGS = {
     "efficiency": "Leave efficiency",

@@ -26,8 +26,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from fedleave.break_patterns import DISCRETIONARY_CATEGORIES
-from fedleave.holiday_planner import RANKINGS, HolidayParameters, plan_holidays
+from fedleave.holiday_planner import DISCRETIONARY_CATEGORIES, RANKINGS, HolidayParameters, plan_holidays
 from fedleave.planning import source_identity
 
 from .budget_view import BudgetWidget
