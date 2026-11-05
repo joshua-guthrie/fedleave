@@ -51,6 +51,7 @@ from .charts import (
 from .comparison_view import ComparisonWidget
 from .forecast_view import ForecastWidget
 from .help_view import AnalyticsHelpDialog
+from .holiday_view import HolidayWidget
 from .planning_view import PlannerWidget
 from .seasonality import seasonality_options, seasonality_series
 
@@ -344,11 +345,13 @@ class AnalyticsWindow(QMainWindow):
             self.pages.setCurrentWidget(self.comparer)
         elif initial_view == "breaks":
             self.pages.setCurrentWidget(self.break_patterns)
-        elif initial_view in {"planning", "forecast", "budget"}:
+        elif initial_view in {"planning", "forecast", "budget", "holidays"}:
             if initial_view == "forecast":
                 self.planning_tabs.setCurrentWidget(self.forecaster)
             elif initial_view == "budget":
                 self.planning_tabs.setCurrentWidget(self.budgeter)
+            elif initial_view == "holidays":
+                self.planning_tabs.setCurrentWidget(self.holiday_planner)
             self.pages.setCurrentWidget(self.planning_page)
         elif auto_load:
             self.refresh_data()
@@ -432,6 +435,10 @@ class AnalyticsWindow(QMainWindow):
         self.budgeter = BudgetWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
         self.planning_tabs.addTab(self.budgeter, "Leave Budget")
         self.budgeter.transfer_ready.connect(self._transfer_budget)
+        self.holiday_planner = HolidayWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.planning_tabs.addTab(self.holiday_planner, "Holiday and Weekend Planner")
+        self.holiday_planner.source_loaded.connect(self._planning_source_loaded)
+        self.holiday_planner.transfer_ready.connect(self._transfer_holiday)
         planning_layout.addWidget(self.planning_tabs)
         self.planner.source_loaded.connect(self._planning_source_loaded)
         self.forecaster.source_loaded.connect(self._planning_source_loaded)
@@ -464,9 +471,12 @@ class AnalyticsWindow(QMainWindow):
         if self.pages.currentWidget() is self.comparer:
             return "comparison"
         if self.pages.currentWidget() is self.planning_page:
-            return {self.planner: "what-if", self.forecaster: "forecast", self.budgeter: "budget"}[
-                self.planning_tabs.currentWidget()
-            ]
+            return {
+                self.planner: "what-if",
+                self.forecaster: "forecast",
+                self.budgeter: "budget",
+                self.holiday_planner: "holidays",
+            }[self.planning_tabs.currentWidget()]
         return "overview"
 
     def show_help(self):
@@ -899,6 +909,7 @@ class AnalyticsWindow(QMainWindow):
         self.planner.set_source(self.backend, self.data_dir, self.year)
         self.forecaster.set_source(self.backend, self.data_dir, self.year)
         self.budgeter.set_source(self.backend, self.data_dir, self.year)
+        self.holiday_planner.set_source(self.backend, self.data_dir, self.year)
         self.comparer.set_source(self.backend, self.data_dir, self.year)
         self.break_patterns.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
@@ -916,6 +927,11 @@ class AnalyticsWindow(QMainWindow):
     @Slot(object, object)
     def _transfer_budget(self, snapshot, result):
         self.planner.accept_budget(snapshot, result)
+        self.planning_tabs.setCurrentWidget(self.planner)
+
+    @Slot(object, object)
+    def _transfer_holiday(self, snapshot, option):
+        self.planner.accept_option(snapshot, option, label="Holiday and Weekend Planner")
         self.planning_tabs.setCurrentWidget(self.planner)
 
     def _page_changed(self, _index: int = -1) -> None:
@@ -938,7 +954,9 @@ class AnalyticsWindow(QMainWindow):
         if self.pages.currentWidget() is self.planning_page:
             self.open_chart_button.setEnabled(True)
             self.notice_label.setText(
-                "Leave Budget: deadline-first planning suggestions, explicit purpose eligibility, shared work capacity and before/after risk. Leave records are never modified."
+                "Holiday and Weekend Planner: independent break options funded from eligible discretionary banks; no leave is booked."
+                if self.planning_tabs.currentWidget() is self.holiday_planner
+                else "Leave Budget: deadline-first planning suggestions, explicit purpose eligibility, shared work capacity and before/after risk. Leave records are never modified."
                 if self.planning_tabs.currentWidget() is self.budgeter
                 else "Usage Forecast: Scheduled, Typical Usage and Higher Usage are historical planning scenarios. Confirm historical coverage and review allocation completeness."
                 if self.planning_tabs.currentWidget() is self.forecaster
@@ -1245,6 +1263,7 @@ class AnalyticsWindow(QMainWindow):
         self.planner.shutdown()
         self.forecaster.shutdown()
         self.budgeter.shutdown()
+        self.holiday_planner.shutdown()
         self.comparer.shutdown()
         self.break_patterns.shutdown()
         if self._load_thread and self._load_thread.isRunning():
@@ -1278,7 +1297,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-folder", default="")
     parser.add_argument(
         "--view",
-        choices=["analytics", "planning", "forecast", "budget", "comparison", "breaks"],
+        choices=["analytics", "planning", "forecast", "budget", "comparison", "breaks", "holidays"],
         default="analytics",
         help="Initial view in the existing Analytics application.",
     )
@@ -1315,6 +1334,7 @@ def main(argv: list[str] | None = None) -> int:
         assert "Usage Forecast" in help_dialog.browser.toPlainText()
         assert "Leave Budget" in help_dialog.browser.toPlainText()
         assert "Break Patterns" in help_dialog.browser.toPlainText()
+        assert "Holiday and Weekend Planner" in help_dialog.browser.toPlainText()
         help_dialog.close()
         window.pages.setCurrentIndex(1)
         assert len(window.seasonality_page.findChildren(QComboBox)) == 2
@@ -1404,6 +1424,18 @@ def main(argv: list[str] | None = None) -> int:
         assert "Upcoming breaks" in window.break_patterns.tables
         window.break_patterns.chart_combo.setCurrentIndex(1)
         assert not window.break_patterns.chart_image.source_pixmap().isNull()
+        window.pages.setCurrentWidget(window.planning_page)
+        window.planning_tabs.setCurrentWidget(window.holiday_planner)
+        deadline = time.monotonic() + 60
+        while window.holiday_planner.result is None:
+            app.processEvents()
+            if time.monotonic() >= deadline:
+                raise RuntimeError(window.holiday_planner.status_label.text())
+            QThread.msleep(5)
+        assert window.holiday_planner.result.parameters.minimum_days == 4
+        assert "Options" in window.holiday_planner.tables
+        if window.holiday_planner.result.candidates:
+            assert not window.holiday_planner.chart_image.source_pixmap().isNull()
         window.show()
         app.processEvents()
         window.close()

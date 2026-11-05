@@ -274,9 +274,11 @@ def render_horizontal_bar_chart(
     rows: list[dict[str, Any]],
     label_key: str,
     series: list[tuple[str, str]],
+    *,
+    height: int = HORIZONTAL_HEIGHT,
 ) -> QPixmap:
     """Render grouped horizontal bars into an export-quality Qt pixmap."""
-    pixmap = QPixmap(WIDTH, HORIZONTAL_HEIGHT)
+    pixmap = QPixmap(WIDTH, height)
     pixmap.fill(QColor(BACKGROUND))
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
@@ -293,7 +295,7 @@ def render_horizontal_bar_chart(
         body_font.setBold(False)
         painter.setFont(body_font)
 
-        left, top, right, bottom = 190, 145, WIDTH - 65, HORIZONTAL_HEIGHT - 80
+        left, top, right, bottom = 190, 145, WIDTH - 65, height - 80
         values = [float(row.get(key) or 0) for row in rows for key, _label in series]
         minimum = min([0.0, *values])
         maximum = max([0.0, *values])

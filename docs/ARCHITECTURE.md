@@ -349,3 +349,24 @@ exports. `break_charts` renders both exact interval timelines and distributions
 with supporting chart tables and standard PNG/PDF/Print controls. Analytics routes
 the existing context, year, Refresh, CSV and Help; installed smoke exercises both
 charts in the existing Windows/Linux companion, with no executable added.
+
+### Holiday and Weekend Planner
+
+`fedleave.holiday_planner` enumerates bounded workday-boundary intervals, extends
+connected nonworking/already-away dates, deduplicates normalized endpoints and
+separates standalone non-leave intervals. It uses canonical effective physical
+usage, shared working calendars, cached holiday context and represented periods.
+Mixed-purpose dependencies require explicit display; discretionary banks alone
+fund incremental hours. Independent alternatives share immutable dated context
+through `budget.DatedFunding.independent()` and canonical lot state; mutable
+operations and failures are private to each alternative. Dated availability,
+credit usability, deadlines, increments and reserves use existing domain rules.
+Only the selected bounded top set receives full shared `project` results.
+
+`holiday_view` reuses BudgetWidget's read-only worker/revision lifecycle, with
+cooperative cancellation, per-option progress and stable sorted row identities.
+`holiday_model` supplies exact CSV/table contracts; `holiday_charts` renders the
+selected daily option with assumptions and standard chart exports. A fresh-source
+handoff uses the existing atomic scenario transfer with Replace/Merge/Cancel,
+and verifies before/after projections. No writer, new executable or backend
+subprocess per candidate is introduced.

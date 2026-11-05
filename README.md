@@ -1245,6 +1245,58 @@ the selected backend, and stale results are discarded after edits/cancellation.
 No comparison action changes leave data. File > Help/F1 opens the offline
 instructions at this view.
 
+#### Holiday and Weekend Planner
+
+Open **Analysis > Analytics... > Planning > Holiday and Weekend Planner**, or
+`FedLeaveAnalytics --view holidays`. It uses the selected backend, exact data
+directory, initialized leave year, font and PDF folder. These are independent
+planning options; no action books leave or changes calendar records.
+
+Choose an inclusive search range strictly after cutoff inside that year.
+Defaults: **four calendar days minimum**, **40 additional hours maximum**,
+**21 calendar days per interval maximum**, and the top **20 options**. Narrow
+eligible discretionary banks (annual/restored annual/comp/travel comp/credit/
+time-off awards) and enter optional daily reserve floors in hours. Purpose
+eligibility and agency approval are assumptions, not established by a balance.
+Sick, military, court and similar restricted categories never fund proposals.
+
+The configured regular workdays and tour minus lunch are an explicit schedule
+assumption. Backend-cached observed nonworking holidays and manual overrides
+apply once; actual/observed display markers do not create two holidays. Missing
+roster, holiday or pay-period context remains unknown; browsing never fetches
+holidays or writes caches. Intervals extend through connected already-off dates,
+deduplicate by normalized dates, and flag search-boundary truncation.
+
+An eight-hour Friday before a Monday holiday gives **Friday–Monday: four days
+away for eight additional hours**. Four annual hours already booked Friday
+reduce the requirement to four; a fully booked Friday is **Already scheduled**
+with zero additional hours and N/A efficiency. Efficiency is calendar days per
+additional standard-workday-equivalent; its assumed day length is shown. Raw
+hours are primary. Standalone nonworking intervals appear separately under
+**No leave required**. Other-purpose existing absence remains separate context;
+dependent mixed-purpose options are hidden until explicitly enabled.
+
+Each option uses the same baseline independently. Funding consumes eligible
+known lots by earliest deadline with stable category/earned-date/lot-ID ties,
+then nonexpiring banks and annual. It respects on-date earnings, explicit lot
+links, inclusive expirations/extensions, configured increments, credit usability,
+later bookings and reserves. Unknown provenance cannot become feasible funding.
+Default order is feasible first, more calendar days per additional hour, more
+days, fewer hours and earlier start. Also choose **Least additional leave**,
+**Longest break**, or **Use expiring leave first**. Infeasible/incomplete options
+are hidden by default; enable them to inspect dated shortfall explanations.
+
+Select a sorted row for exact days, holiday reasons, original transaction IDs,
+proposed category/lot funding, baseline/scenario minimum balances and dates,
+ending balances, reserve flags and annual use-or-lose effects. CSV includes the
+exact filters, source, units and assumptions; Open Chart has its supporting
+table, CSV, PNG, PDF and Print. Workers reuse cached context and discard stale
+results after edits/cancellation/source changes. **Open in What-if Planner**
+checks a fresh source and offers Replace/Merge/Cancel for session scenario rows
+only; unfunded options cannot be transferred as complete breaks. Export drafts
+to keep them and enter approved bookings separately in Calendar/CLI. F1 opens
+the bundled instructions.
+
 #### What-if Planner
 
 Choose **Analysis > Planning > What-if Planner...** in the calendar, or open
@@ -1263,7 +1315,7 @@ pooled into a combined bank. Purpose-restricted choices are labeled, and a
 projected balance does not establish eligibility for their use.
 
 Use **File > Help...** (or **F1**) in Analytics for detailed offline instructions
-for the active page, including all three Planning tools. Hover over buttons for
+for the active page, including all four Planning tools. Hover over buttons for
 explanations. Help is included in source/wheel packages and installed bundles.
 
 - **Add tentative use** adds extra leave while retaining existing bookings.

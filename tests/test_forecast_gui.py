@@ -178,6 +178,7 @@ def test_existing_analytics_container_routes_forecast_actions(qtbot, monkeypatch
         "What-if Planner",
         "Usage Forecast",
         "Leave Budget",
+        "Holiday and Weekend Planner",
     ]
     monkeypatch.setattr(window.forecaster, "load_source", lambda: calls.append("refresh"))
     monkeypatch.setattr(window.forecaster, "open_chart", lambda: calls.append("chart"))

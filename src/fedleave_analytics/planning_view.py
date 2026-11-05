@@ -839,15 +839,18 @@ class PlannerWidget(QWidget):
         self._install_import(candidate)
 
     def accept_budget(self, snapshot, result):
+        self.accept_option(snapshot, result, label="Leave Budget")
+
+    def accept_option(self, snapshot, result, *, label):
         """Explicit Replace/Merge/Cancel choice, followed by atomic worker validation."""
         from .budget_model import transfer_session
 
         mode, current = "replace", None
         if self.session is not None:
             question = QMessageBox(self)
-            question.setWindowTitle("Send Leave Budget to What-if")
+            question.setWindowTitle(f"Send {label} to What-if")
             question.setText(
-                "Replace the current scenario, merge budget suggestions into it, or cancel? Merge retains existing operations and adopts the budget projection assumptions and reserves; the combined result can differ from the budget alone."
+                f"Replace the current scenario, merge {label} suggestions into it, or cancel? Merge retains existing operations and adopts the option's projection assumptions and reserves; the combined result can differ from the option alone."
             )
             replace_button = question.addButton("Replace scenario", QMessageBox.AcceptRole)
             merge_button = question.addButton("Merge operations", QMessageBox.ActionRole)
@@ -865,9 +868,11 @@ class PlannerWidget(QWidget):
                     return
         self._timer.stop()
         self._set_loading(True)
-        self.status_label.setText("Validating Leave Budget transfer against the fresh source snapshot...")
+        self.status_label.setText(f"Validating {label} transfer against the fresh source snapshot...")
         today = self.today
-        self._launch("import", lambda: transfer_session(snapshot, result, today=today, current=current, mode=mode))
+        self._launch(
+            "import", lambda: transfer_session(snapshot, result, today=today, current=current, mode=mode, label=label)
+        )
 
     def _install_import(self, candidate):
         self._timer.stop()

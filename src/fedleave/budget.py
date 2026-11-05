@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
+from copy import copy, deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
 from math import isfinite
@@ -322,7 +322,7 @@ def _credit_available(work, day, periods):
     return available
 
 
-class _Funding:
+class DatedFunding:
     """Validate candidate dated use against canonical balances, including later bookings."""
 
     def __init__(self, work, unknown, params, periods, baseline):
@@ -336,6 +336,12 @@ class _Funding:
         self.operations = []
         self.failures = {}
         self.increment = time_increment(work)
+
+    def independent(self):
+        """Reuse immutable dated context for an alternative with no prior spending."""
+        candidate = copy(self)
+        candidate.operations, candidate.failures = [], {}
+        return candidate
 
     def reject(self, row, day, units, code, message, **detail):
         self.failures[(row["id"], day)] = dict(
@@ -431,9 +437,9 @@ def _schedule(rows, work, unknown, params, periods, before, warnings):
         for r in before.capacity
         if r.date > params.cutoff and _period_for(periods, r.date)
     }
-    funding = _Funding(work, unknown, params, periods, before)
+    funding = DatedFunding(work, unknown, params, periods, before)
     original_capacity = dict(capacities)
-    independent_funding = _Funding(work, unknown, params, periods, before)
+    independent_funding = DatedFunding(work, unknown, params, periods, before)
     edges = {}
     suggestions = []
     for row in rows:

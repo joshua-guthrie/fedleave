@@ -174,11 +174,11 @@ def export_csv(path, snapshot, result, view):
     write_export(path, stream.getvalue(), snapshot)
 
 
-def transfer_session(fresh, result, *, today, current=None, mode="replace"):
+def transfer_session(fresh, result, *, today, current=None, mode="replace", label="Leave Budget"):
     """Validate all material context before constructing an atomic in-memory candidate."""
     if source_identity(fresh) != result.source:
         raise ValueError(
-            "STALE_SNAPSHOT: Source records or calculation context changed. Refresh and recalculate Leave Budget before transfer."
+            f"STALE_SNAPSHOT: Source records or calculation context changed. Refresh and recalculate {label} before transfer."
         )
     definition = validate_scenario(fresh, result.scenario)
     if mode == "merge":
@@ -195,5 +195,5 @@ def transfer_session(fresh, result, *, today, current=None, mode="replace"):
     if mode == "replace" and (
         candidate.result.daily != result.after.daily or candidate.result.categories != result.after.categories
     ):
-        raise ValueError("Transfer projection differs from Leave Budget. No scenario was changed.")
+        raise ValueError(f"Transfer projection differs from {label}. No scenario was changed.")
     return candidate
