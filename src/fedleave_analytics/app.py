@@ -946,7 +946,7 @@ class AnalyticsWindow(QMainWindow):
         if self.pages.currentWidget() is self.comparer:
             self.open_chart_button.setEnabled(True)
             self.notice_label.setText(
-                "Cumulative Usage Comparison: recorded absence through equivalent dates, with explicit coverage, alignment and schedule assumptions."
+                "Cumulative Usage: effective used hours for the selected leave types across the whole leave year. Leave records are never modified."
             )
             self.comparer.set_source(self.backend, self.data_dir, self.year)
             self.comparer.activate()
@@ -1410,8 +1410,8 @@ def main(argv: list[str] | None = None) -> int:
             QThread.msleep(5)
         assert not window.comparer.chart_image.source_pixmap().isNull()
         assert window.comparer.result.parameters.categories == ("annual",)
-        assert "Year details" in window.comparer.tables
-        assert "Cumulative Usage Comparison" in help_dialog.browser.toPlainText()
+        assert window.comparer.result.points
+        assert "Cumulative Usage" in help_dialog.browser.toPlainText()
         window.pages.setCurrentWidget(window.break_patterns)
         deadline = time.monotonic() + 40
         while window.break_patterns.result is None:

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QPolygonF, QResizeEvent
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QPainter, QPen, QPixmap, QResizeEvent
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
 from PySide6.QtWidgets import (
     QDialog,
@@ -590,40 +590,21 @@ def render_forecast_chart(title, rows, reserve, cutoff, horizon, completeness):
     )
 
 
-def render_usage_comparison(result) -> QPixmap:
-    """Draw exact supplied usage observations, breaking every missing segment."""
-    from fedleave.usage_comparison import ALIGNMENTS
-
-    references = [row["year"] for row in result.history if row["selected"]]
-    series = [
-        ("recorded", "Recorded Through Cutoff", BLUE, Qt.SolidLine, 4),
-        ("scheduled", "Scheduled continuation", RED, Qt.DashLine, 4),
-        ("median", "Historical median", TEXT, Qt.DashDotLine, 3),
-        *[
-            (
-                f"reference_{year}",
-                f"Reference {year}",
-                (SERIES_COLORS[4], "#41894C", "#995A00", SERIES_COLORS[5])[i % 4],
-                (Qt.DotLine, Qt.DashLine, Qt.DashDotLine, Qt.DashDotDotLine)[i % 4],
-                2,
-            )
-            for i, year in enumerate(references)
-        ],
-    ]
-    legend_rows = (len(series) + 2) // 3
-    height, top = 600 + legend_rows * 30, 150 + legend_rows * 30
-    pixmap = QPixmap(WIDTH, height)
+def render_cumulative_usage(result) -> QPixmap:
+    """Draw the exact cumulative used-hours curve for one leave year."""
+    title = "Cumulative Usage — " + ", ".join(result.parameters.categories)
+    pixmap = QPixmap(WIDTH, HEIGHT)
     pixmap.fill(QColor(BACKGROUND))
     painter = QPainter(pixmap)
     painter.setRenderHint(QPainter.Antialiasing)
     rows = result.points
+    height, top = HEIGHT, 150
     try:
         font = QFont(painter.font())
         font.setPointSize(21)
         font.setBold(True)
         painter.setFont(font)
         painter.setPen(QColor(TEXT))
-        title = "Cumulative Usage Comparison — " + ", ".join(result.parameters.categories)
         painter.drawText(
             40, 15, WIDTH - 80, 45, Qt.AlignCenter, QFontMetrics(font).elidedText(title, Qt.ElideRight, WIDTH - 90)
         )
@@ -636,10 +617,10 @@ def render_usage_comparison(result) -> QPixmap:
             WIDTH - 70,
             35,
             Qt.AlignCenter,
-            f"{ALIGNMENTS[result.parameters.alignment]} | Cutoff {result.parameters.cutoff} | Hours | {result.summary['history_label']}",
+            f"{result.summary['start']} through {result.summary['end']} | Hours",
         )
         left, right, bottom = 100, WIDTH - 45, height - 150
-        values = [row[key] for row in rows for key, *_ in series if row.get(key) is not None]
+        values = [row["hours"] for row in rows if row.get("hours") is not None]
         maximum = max([1, *values]) * 1.08
 
         def x(index):
@@ -658,66 +639,30 @@ def render_usage_comparison(result) -> QPixmap:
         painter.drawRect(left, top, right - left, bottom - top)
         for index in sorted({round(i * max(0, len(rows) - 1) / 5) for i in range(6)}):
             painter.drawText(round(x(index)) - 85, bottom + 10, 170, 28, Qt.AlignCenter, rows[index]["date"])
-        # Shade only contiguous eligible observations, never across a missing
-        # leap day, missing period or coverage gap.
-        segment = []
-        for index in range(len(rows) + 1):
-            row = rows[index] if index < len(rows) else {}
-            if row.get("band_lower") is not None:
-                segment.append(index)
-            elif segment:
-                polygon = QPolygonF(
-                    [QPointF(x(i), y(rows[i]["band_lower"])) for i in segment]
-                    + [QPointF(x(i), y(rows[i]["band_upper"])) for i in reversed(segment)]
-                )
-                painter.setPen(Qt.NoPen)
-                painter.setBrush(QColor(79, 129, 189, 45))
-                painter.drawPolygon(polygon)
-                segment = []
-        painter.setBrush(Qt.NoBrush)
-        for i, (key, label, color, style, width) in enumerate(series):
-            xx, yy = 100 + (i % 3) * 495, 118 + (i // 3) * 30
-            painter.setPen(QPen(QColor(color), width, style))
-            painter.drawLine(xx, yy, xx + 42, yy)
-            painter.drawText(xx + 52, yy - 14, 420, 28, Qt.AlignLeft | Qt.AlignVCenter, label)
-            previous = None
-            for index, row in enumerate(rows):
-                value = row.get(key)
-                if value is None:
-                    previous = None
-                    continue
-                current = QPointF(x(index), y(value))
-                if previous is not None:
-                    painter.drawLine(previous, current)
-                else:
-                    painter.drawEllipse(current, 2, 2)
-                previous = current
-        cutoff_index = next(i for i, row in enumerate(rows) if row["date"] == result.parameters.cutoff)
-        painter.setPen(QPen(QColor(TEXT), 2, Qt.DotLine))
-        painter.drawLine(QPointF(x(cutoff_index), top), QPointF(x(cutoff_index), bottom))
-        painter.drawText(round(x(cutoff_index)) - 80, top - 30, 160, 25, Qt.AlignCenter, "Cutoff")
-        if not values:
-            painter.drawText(
-                left + 40,
-                top + 60,
-                right - left - 80,
-                bottom - top - 90,
-                Qt.AlignCenter | Qt.TextWordWrap,
-                "N/A: no complete covered observations. Confirm source coverage and review the exact tables and warnings.",
-            )
+        painter.setPen(QPen(QColor(BLUE), 4, Qt.SolidLine))
+        painter.drawLine(100, 118, 142, 118)
+        painter.drawText(152, 104, 420, 28, Qt.AlignLeft | Qt.AlignVCenter, "Cumulative used hours")
+        previous = None
+        for index, row in enumerate(rows):
+            value = row.get("hours")
+            if value is None:
+                previous = None
+                continue
+            current = QPointF(x(index), y(value))
+            if previous is not None:
+                painter.drawLine(previous, current)
+            else:
+                painter.drawEllipse(current, 2, 2)
+            previous = current
         painter.drawText(
             60,
             height - 100,
             WIDTH - 120,
             85,
             Qt.AlignCenter | Qt.TextWordWrap,
-            "Shading: selected historical 20–80% range where at least three years are eligible; not a confidence interval. "
-            "Missing points are gaps. Recorded dates do not confirm leave was taken. "
-            + (
-                "Normalization uses an explicit current-schedule assumption; see Year details."
-                if result.parameters.assume_current_schedule
-                else "Historical schedules are used only when supplied by the backend; otherwise normalized values are N/A."
-            ),
+            "Cumulative effective used hours for the selected leave types from the year start. "
+            "Accruals, openings, corrections, expirations and forfeitures are not used hours; "
+            "planned or requested dates do not confirm leave was taken.",
         )
     finally:
         painter.end()

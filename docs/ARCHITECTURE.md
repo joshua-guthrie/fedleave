@@ -299,31 +299,23 @@ self-contained `fedleave_analytics/help.html` is package data (wheel/sdist and
 PyInstaller collect-all), so it requires no network, website or source checkout.
 Installed companion smoke checks load the actual bundled help document.
 
-## Cumulative usage comparison
+## Cumulative usage
 
 `fedleave.usage_comparison` is a pure descriptive model over defensive snapshot
-copies. Canonical transaction effects select physical used rows; openings,
-accruals and disposals never enter usage. Each year's prefix totals require
-explicit, fingerprint-bound coverage from its actual start. Missing dates,
-periods, malformed usage and coverage remain null, including inside curves.
-Actual period ordinal/offset and exact calendar month/day mappings preserve
-source dates. Historical cutoff totals alone enter the comparison statistic;
-future target bookings are a separate Scheduled continuation.
-
-`history` retains strict accrual-calendar validation by default. Its opt-in
-descriptive period validation accepts unusual contiguous numbered periods for
-comparison/coverage without changing accrual, rollover or Forecast semantics.
-Coverage fingerprints and analytics preference storage are shared with Forecast.
-Historical normalization requires backend roster data or an explicit current
-schedule assumption; unavailable exposure never invalidates primary usage hours.
+copies. Canonical transaction effects select physical `used` rows; openings,
+accruals and disposals never enter usage. It returns one running total of
+effective used hours from the year start through every represented date, using
+all effective statuses (denied, cancelled and void rows are excluded). Malformed
+or out-of-year rows are skipped with warnings rather than fabricating zero
+usage. There is no cutoff, alignment, reference-year comparison or coverage
+confirmation.
 
 `comparison_model` maps one immutable result to exact tables/CSV, including
-metadata, nulls and original IDs. `comparison_view` uses revision-bound workers,
-read-only backend discovery/snapshots, cached recalculation, guarded exports,
-sorted source drilldowns and existing chart save/print windows. Derived median
-drilldowns expose year observations before transactions. Analytics routes the
-existing backend, datastore, year, font, PDF folder, Refresh and Help actions.
-Installed Analytics smoke renders the new view in both platform bundles.
+metadata and original IDs. `comparison_view` uses revision-bound workers,
+read-only backend discovery/snapshots, cached recalculation, guarded exports
+and existing chart save/print windows. Analytics routes the existing backend,
+datastore, year, font, PDF folder, Refresh and Help actions. Installed
+Analytics smoke renders the view in both platform bundles.
 
 ## Break patterns
 
@@ -331,8 +323,7 @@ Installed Analytics smoke renders the new view in both platform bundles.
 physical usage, explicit shared coverage and backend calendar context. Full and
 partial selected hours remain separate from other-category context. The shared
 `history.analysis_calendar` supplies backend historical rosters or a disclosed
-current regular-schedule assumption, without network/storage writes; Cumulative
-Usage reuses the same helper with its existing opt-in behavior unchanged.
+current regular-schedule assumption, without network/storage writes.
 
 Recorded and Scheduled interval scans are independent. Unknown dates terminate
 intervals and covered gaps; an observed substantial interval reaching cutoff is
