@@ -1057,7 +1057,8 @@ passes its selected backend, leave year, font size, PDF folder, and exact
 resolved data directory.
 
 The pages are Summary, Seasonality, Calendar Heatmap, Overtime, Comp,
-and Credit, Planning, and Cumulative Usage. Monthly views combine horizontal bar charts with their supporting
+and Credit, and Cumulative Usage. The Planning tools open in their own windows
+and are not part of the Analytics tab set. Monthly views combine horizontal bar charts with their supporting
 tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
 Leave Year values; double-clicking a row opens its supporting transactions.
 The application never modifies leave data or displays backend/data-directory
@@ -1121,7 +1122,7 @@ instructions at this view.
 
 #### Holiday and Weekend Planner
 
-Open **Analysis > Analytics... > Planning > Holiday and Weekend Planner**, or
+Open **Analysis > Planning > Holiday and Weekend Planner...**, or
 `FedLeaveAnalytics --view holidays`. It uses the selected backend, exact data
 directory, initialized leave year, font and PDF folder. These are independent
 planning options; no action books leave or changes calendar records.
@@ -1173,9 +1174,7 @@ the bundled instructions.
 
 #### What-if Planner
 
-Choose **Analysis > Planning > What-if Planner...** in the calendar, or open
-**Planning > What-if Planner** in Analytics. Both use the selected backend,
-exact data directory, initialized leave year, font size, and report folder.
+Choose **Analysis > Planning > What-if Planner...** in the calendar.
 `FedLeaveAnalytics --view planning` opens the same view directly; there is no
 separate planner executable or CLI planning command.
 
@@ -1188,7 +1187,7 @@ means the daily closing balance is strictly below it. Categories are never
 pooled into a combined bank. Purpose-restricted choices are labeled, and a
 projected balance does not establish eligibility for their use.
 
-Use **File > Help...** (or **F1**) in Analytics for detailed offline instructions
+Use **File > Help...** (or **F1**) in the planning window for detailed offline instructions
 for the active page, including all four Planning tools. Hover over buttons for
 explanations. Help is included in source/wheel packages and installed bundles.
 
@@ -1266,8 +1265,8 @@ changes, cancellation, or close.
 
 #### Usage Forecast
 
-Choose **Analysis > Planning > Usage Forecast...** in the calendar, or
-**Planning > Usage Forecast** in Analytics. The existing companion uses the
+Choose **Analysis > Planning > Usage Forecast...** in the calendar. The
+existing companion uses the
 same backend, exact datastore, selected leave year, font and PDF folder.
 Select annual only, sick only, or combined annual/sick, an inclusive
 cutoff/horizon inside the selected year, optional per-category reserves and
@@ -1356,8 +1355,7 @@ not the operational accuracy of forecasts issued at that time.
 
 #### Leave Budget by deadline
 
-Choose **Analysis > Planning > Leave Budget...** in Calendar, or **Planning >
-Leave Budget** in Analytics. The selected backend, exact datastore, year, font
+Choose **Analysis > Planning > Leave Budget...** in Calendar. The selected backend, exact datastore, year, font
 and PDF folder are reused. Set a cutoff and horizon within the initialized year,
 then explicitly select categories eligible for your intended leave purpose.
 Nothing is selected by default. Adjacent fields are optional per-category

@@ -9,10 +9,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QDate
 from PySide6.QtWidgets import QFileDialog
 
-from fedleave_analytics.app import AnalyticsWindow
 from fedleave_analytics.budget_model import export_csv, result_views, transfer_session
 from fedleave_analytics.budget_view import BudgetWidget
 from fedleave_analytics.planning_model import export_destination
+from fedleave_analytics.planning_window import PlanningWindow
 from test_budget import TODAY, run
 from test_forecast import source
 
@@ -105,16 +105,14 @@ def test_transfer_validates_complete_material_source_and_reproduces_balances(tmp
             pass
 
 
-def test_analytics_container_routes_budget_actions(qtbot, monkeypatch):
+def test_planning_window_routes_budget_actions(qtbot, monkeypatch):
     calls = []
     monkeypatch.setattr(BudgetWidget, "activate", lambda self: calls.append("activate"))
-    window = AnalyticsWindow(Path("/backend"), "/store", 2026, auto_load=False, initial_view="budget")
+    window = PlanningWindow("budget", Path("/backend"), "/store", 2026)
     qtbot.addWidget(window)
-    assert window.pages.currentWidget() is window.planning_page
-    assert window.planning_tabs.currentWidget() is window.budgeter
-    monkeypatch.setattr(window.budgeter, "load_source", lambda: calls.append("refresh"))
-    monkeypatch.setattr(window.budgeter, "open_chart", lambda: calls.append("chart"))
-    monkeypatch.setattr(window.budgeter, "save_csv", lambda: calls.append("csv"))
+    monkeypatch.setattr(window.widget, "load_source", lambda: calls.append("refresh"))
+    monkeypatch.setattr(window.widget, "open_chart", lambda: calls.append("chart"))
+    monkeypatch.setattr(window.widget, "save_csv", lambda: calls.append("csv"))
     window.refresh_data()
     window.open_chart()
     window.save_csv()

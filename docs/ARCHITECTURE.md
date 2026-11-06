@@ -179,9 +179,12 @@ knowledge; current past planned/requested rows remain unresolved.
 
 `fedleave_analytics.planning_model` owns the session and table/CSV view model;
 presentation and exports consume the result without recomputing accounting.
-`planning_view` embeds What-if Planner under the existing Analytics Planning
-area. Calendar's Analysis > Planning entry launches that companion with
-`--view planning`, preserving backend, datastore, year, font and PDF folder.
+`planning_view` hosts the What-if Planner; `planning_window` wraps each of the
+four planning tools (What-if, Forecast, Budget, Holiday) in its own window,
+separate from Analytics. Calendar's Analysis > Planning entries launch the
+companion with `--view planning|forecast|budget|holidays`, preserving backend,
+datastore, year, font and PDF folder. Budget and Holiday hand their results to
+a fresh in-process What-if window through the same transfer contract.
 Snapshot acquisition uses `years --json` followed by `snapshot --json` on the
 selected backend. Edits reuse the snapshot; file imports refresh before identity
 validation. Thread-pool jobs carry revisions; edits, source changes, cancellation,
@@ -191,7 +194,7 @@ JSON, CSV, and chart-file exports use atomic replacement outside the selected
 datastore; they cannot overwrite a canonical file through an existing hard link.
 There is no planner persistence or apply-to-ledger interface. Forecast, Budget,
 Holiday Planner, and Reserve features should reuse this snapshot/result contract
-and the Planning container rather than create competing engines or executables.
+and the standalone planning windows rather than create competing engines or executables.
 
 ## Historical usage and forecasts
 
@@ -236,8 +239,8 @@ Analytics coverage/reference exclusions use a single versioned `analytics.json`
 beside the existing GUI preferences, scoped by source, and are atomically saved
 outside the selected datastore. Calendar display/backend settings remain shared.
 `forecast_model` only maps result data to supporting rows/CSV; `forecast_view`
-handles controls, revision-bound workers and charts in the existing Planning
-container. Changing chart category only rerenders cached results. There are no
+handles controls, revision-bound workers and charts in a standalone planning
+window. Changing chart category only rerenders cached results. There are no
 new console executables, forecasting CLI commands, or ledger-application actions.
 
 
@@ -293,8 +296,9 @@ Checked bookings preserve stable source-row identities during sorting; already
 targeted originals cannot be selected again. Dialog confirmation creates ordinary
 schema-1 operations through the existing planner session, never ledger writers.
 
-`action_help` supplies short descriptions across the three Planning views.
-Analytics File > Help/F1 opens `help_view` at the current tool's section. The
+`action_help` supplies short descriptions across the four Planning views.
+File > Help/F1 in a planning window opens `help_view` at that window's tool
+section; Analytics File > Help/F1 opens the overview. The
 self-contained `fedleave_analytics/help.html` is package data (wheel/sdist and
 PyInstaller collect-all), so it requires no network, website or source checkout.
 Installed companion smoke checks load the actual bundled help document.

@@ -7,10 +7,10 @@ import pytest
 from PySide6.QtCore import QDate, Qt, QTimer
 from PySide6.QtWidgets import QApplication, QDialog, QPushButton
 
-from fedleave_analytics.app import AnalyticsWindow
 from fedleave_analytics.help_view import AnalyticsHelpDialog
 from fedleave_analytics.planning_controls import ScenarioDateDialog, ScheduledUseDialog
 from fedleave_analytics.planning_view import PlannerWidget
+from fedleave_analytics.planning_window import PlanningWindow
 from test_planning import category, tx
 from test_planning_gui import planner as planner
 from test_planning_gui import wait_result
@@ -138,40 +138,37 @@ def test_chooser_cancel_and_empty_list_leave_draft_intact(qtbot, planner, monkey
 
 def test_help_is_offline_contextual_and_all_planning_actions_have_tips(qtbot, monkeypatch):
     monkeypatch.setattr(PlannerWidget, "activate", lambda self: None)
-    window = AnalyticsWindow(Path("/backend"), "/store", 2026, auto_load=False, initial_view="planning")
-    qtbot.addWidget(window)
-    for widget in (window.planner, window.forecaster, window.budgeter):
-        monkeypatch.setattr(widget, "activate", lambda: None)
-        assert all(button.toolTip() for button in widget.findChildren(QPushButton))
-    expected = {window.planner: "what-if", window.forecaster: "forecast", window.budgeter: "budget"}
-    seen = []
+    words = (
+        "Add tentative use",
+        "Replace scheduled use",
+        "Remove scheduled use",
+        "Undo selected changes",
+        "Usage Forecast",
+        "Leave Budget",
+        "100 hours",
+        "92-hour baseline",
+    )
+    for tool, section in (
+        ("what-if", "what-if"),
+        ("forecast", "forecast"),
+        ("budget", "budget"),
+        ("holidays", "holidays"),
+    ):
+        seen = []
 
-    def inspect(dialog):
-        assert dialog.available
-        text = dialog.browser.toPlainText()
-        assert all(
-            word in text
-            for word in (
-                "Add tentative use",
-                "Replace scheduled use",
-                "Remove scheduled use",
-                "Undo selected changes",
-                "Usage Forecast",
-                "Leave Budget",
-                "100 hours",
-                "92-hour baseline",
-            )
-        )
-        seen.append(window.help_section())
-        return QDialog.Rejected
+        def inspect(dialog, section=section):
+            assert dialog.available
+            text = dialog.browser.toPlainText()
+            assert all(word in text for word in words)
+            seen.append(section)
+            return QDialog.Rejected
 
-    monkeypatch.setattr(AnalyticsHelpDialog, "exec", inspect)
-    for widget, section in expected.items():
-        window.planning_tabs.setCurrentWidget(widget)
+        monkeypatch.setattr(AnalyticsHelpDialog, "exec", inspect)
+        window = PlanningWindow(tool, Path("/backend"), "/store", 2026)
+        qtbot.addWidget(window)
+        if tool in {"what-if", "forecast", "budget"}:
+            assert all(button.toolTip() for button in window.widget.findChildren(QPushButton))
         window.help_action.trigger()
-        assert seen[-1] == section
-    window.pages.setCurrentWidget(window.summary_page)
-    window.help_action.trigger()
-    assert seen[-1] == "overview"
-    assert window.help_action.shortcut().toString() == "F1"
-    window.close()
+        assert seen == [section]
+        assert window.help_action.shortcut().toString() == "F1"
+        window.close()

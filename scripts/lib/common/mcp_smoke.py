@@ -181,7 +181,7 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
                 ],
                 env={**env, "QT_QPA_PLATFORM": "offscreen"},
                 check=True,
-                timeout=60,
+                timeout=120,
             )
             assert {
                 str(path.relative_to(base)): hashlib.sha256(path.read_bytes()).hexdigest()

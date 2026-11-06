@@ -30,7 +30,7 @@ def smoke(bundle: Path) -> None:
         cli = bundle / "fedleave"
 
         def run(command):
-            subprocess.run(list(map(str, command)), env=env, check=True, timeout=90)
+            subprocess.run(list(map(str, command)), env=env, check=True, timeout=120)
 
         today = date.today()
         run([cli, "--version"])

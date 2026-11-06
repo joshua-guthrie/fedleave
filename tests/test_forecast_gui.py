@@ -13,8 +13,8 @@ from PySide6.QtCore import QDate, Qt, QThreadPool
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QFileDialog
 
-from fedleave_analytics.app import AnalyticsWindow
 from fedleave_analytics.forecast_view import ForecastWidget
+from fedleave_analytics.planning_window import PlanningWindow
 from leave_year_support import store, tree, tx
 from test_forecast import TODAY, confirmations, references, source, summary
 
@@ -167,22 +167,14 @@ def test_late_results_after_edit_cancel_source_change_and_close_are_ignored(qtbo
     assert view.result is None
 
 
-def test_existing_analytics_container_routes_forecast_actions(qtbot, monkeypatch):
+def test_planning_window_routes_forecast_actions(qtbot, monkeypatch):
     calls = []
     monkeypatch.setattr(ForecastWidget, "activate", lambda self: calls.append("activate"))
-    window = AnalyticsWindow(Path("/backend"), "/store", 2026, auto_load=False, initial_view="forecast")
+    window = PlanningWindow("forecast", Path("/backend"), "/store", 2026)
     qtbot.addWidget(window)
-    assert window.pages.currentWidget() is window.planning_page
-    assert window.planning_tabs.currentWidget() is window.forecaster
-    assert [window.planning_tabs.tabText(i) for i in range(window.planning_tabs.count())] == [
-        "What-if Planner",
-        "Usage Forecast",
-        "Leave Budget",
-        "Holiday and Weekend Planner",
-    ]
-    monkeypatch.setattr(window.forecaster, "load_source", lambda: calls.append("refresh"))
-    monkeypatch.setattr(window.forecaster, "open_chart", lambda: calls.append("chart"))
-    monkeypatch.setattr(window.forecaster, "save_csv", lambda: calls.append("csv"))
+    monkeypatch.setattr(window.widget, "load_source", lambda: calls.append("refresh"))
+    monkeypatch.setattr(window.widget, "open_chart", lambda: calls.append("chart"))
+    monkeypatch.setattr(window.widget, "save_csv", lambda: calls.append("csv"))
     window.refresh_data()
     window.open_chart()
     window.save_csv()

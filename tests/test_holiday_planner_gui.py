@@ -10,10 +10,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import QDate, Qt, QThread
 from PySide6.QtWidgets import QFileDialog
 
-from fedleave_analytics.app import AnalyticsWindow
 from fedleave_analytics.budget_model import transfer_session
 from fedleave_analytics.holiday_model import export_csv, result_views
 from fedleave_analytics.holiday_view import HolidayWidget
+from fedleave_analytics.planning_window import PlanningWindow
 from leave_year_support import store, tree
 from test_holiday_planner import TODAY, friday, run, snapshot
 
@@ -41,22 +41,20 @@ def view(qtbot, monkeypatch):
     qtbot.waitUntil(lambda: not widget._tasks, timeout=60000)
 
 
-def test_container_routes_context_help_and_actions(qtbot, monkeypatch):
+def test_window_routes_context_help_and_actions(qtbot, monkeypatch):
     calls = []
     monkeypatch.setattr(HolidayWidget, "activate", lambda self: calls.append("activate"))
-    window = AnalyticsWindow(
+    window = PlanningWindow(
+        "holidays",
         Path("/backend"),
         "/exact/store",
         2026,
         pdf_folder="/pdf",
         font_size=12,
-        auto_load=False,
-        initial_view="holidays",
     )
     qtbot.addWidget(window)
-    view = window.holiday_planner
-    assert window.planning_tabs.currentWidget() is view
-    assert window.help_section() == "holidays"
+    view = window.widget
+    assert window.help_section_name == "holidays"
     assert (view.backend, view.data_dir, view.year, view.pdf_folder, view.font().pointSize()) == (
         Path("/backend"),
         "/exact/store",

@@ -39,7 +39,6 @@ from fedleave.config import get_default_data_dir
 from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
-from .budget_view import BudgetWidget
 from .charts import (
     AnalyticsChartWindow,
     ResponsivePixmapLabel,
@@ -48,10 +47,8 @@ from .charts import (
     table_widget,
 )
 from .comparison_view import ComparisonWidget
-from .forecast_view import ForecastWidget
 from .help_view import AnalyticsHelpDialog
-from .holiday_view import HolidayWidget
-from .planning_view import PlannerWidget
+from .planning_window import PlanningWindow
 from .seasonality import seasonality_options, seasonality_series
 
 SUMMARY_COLUMNS = [
@@ -342,14 +339,6 @@ class AnalyticsWindow(QMainWindow):
         self._build_ui()
         if initial_view == "comparison":
             self.pages.setCurrentWidget(self.comparer)
-        elif initial_view in {"planning", "forecast", "budget", "holidays"}:
-            if initial_view == "forecast":
-                self.planning_tabs.setCurrentWidget(self.forecaster)
-            elif initial_view == "budget":
-                self.planning_tabs.setCurrentWidget(self.budgeter)
-            elif initial_view == "holidays":
-                self.planning_tabs.setCurrentWidget(self.holiday_planner)
-            self.pages.setCurrentWidget(self.planning_page)
         elif auto_load:
             self.refresh_data()
 
@@ -404,40 +393,20 @@ class AnalyticsWindow(QMainWindow):
         self.seasonality_page = QWidget()
         self.heatmap_page = QWidget()
         self.lifecycle_page = QWidget()
-        self.planning_page = QWidget()
         self.pages.addTab(self.summary_page, "Summary")
         self.pages.addTab(self.seasonality_page, "Seasonality")
         self.pages.addTab(self.heatmap_page, "Calendar Heatmap")
         self.pages.addTab(self.lifecycle_page, "Overtime, Comp, and Credit")
-        self.pages.addTab(self.planning_page, "Planning")
         layout.addWidget(self.pages, 1)
         self.setCentralWidget(root)
 
         self.comparer = ComparisonWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
         self.pages.addTab(self.comparer, "Cumulative Usage")
-        self.comparer.source_loaded.connect(self._planning_source_loaded)
+        self.comparer.source_loaded.connect(self._analytics_source_loaded)
         self._build_summary_page()
         self._build_seasonality_page()
         self._build_heatmap_page()
         self._build_lifecycle_page()
-        planning_layout = QVBoxLayout(self.planning_page)
-        self.planning_tabs = QTabWidget()
-        self.planner = PlannerWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        self.planning_tabs.addTab(self.planner, "What-if Planner")
-        self.forecaster = ForecastWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        self.planning_tabs.addTab(self.forecaster, "Usage Forecast")
-        self.budgeter = BudgetWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        self.planning_tabs.addTab(self.budgeter, "Leave Budget")
-        self.budgeter.transfer_ready.connect(self._transfer_budget)
-        self.holiday_planner = HolidayWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        self.planning_tabs.addTab(self.holiday_planner, "Holiday and Weekend Planner")
-        self.holiday_planner.source_loaded.connect(self._planning_source_loaded)
-        self.holiday_planner.transfer_ready.connect(self._transfer_holiday)
-        planning_layout.addWidget(self.planning_tabs)
-        self.planner.source_loaded.connect(self._planning_source_loaded)
-        self.forecaster.source_loaded.connect(self._planning_source_loaded)
-        self.budgeter.source_loaded.connect(self._planning_source_loaded)
-        self.planning_tabs.currentChanged.connect(self._page_changed)
         self.pages.currentChanged.connect(self._page_changed)
 
         file_menu = self.menuBar().addMenu("File")
@@ -451,7 +420,7 @@ class AnalyticsWindow(QMainWindow):
             file_menu.addAction(action)
         self.help_action = QAction("Help...", self)
         self.help_action.setShortcut("F1")
-        self.help_action.setToolTip("Open detailed offline instructions for the current Analytics or Planning tool.")
+        self.help_action.setToolTip("Open detailed offline instructions for the current Analytics tool.")
         self.help_action.triggered.connect(self.show_help)
         file_menu.addAction(self.help_action)
         file_menu.addSeparator()
@@ -462,13 +431,6 @@ class AnalyticsWindow(QMainWindow):
     def help_section(self):
         if self.pages.currentWidget() is self.comparer:
             return "comparison"
-        if self.pages.currentWidget() is self.planning_page:
-            return {
-                self.planner: "what-if",
-                self.forecaster: "forecast",
-                self.budgeter: "budget",
-                self.holiday_planner: "holidays",
-            }[self.planning_tabs.currentWidget()]
         return "overview"
 
     def show_help(self):
@@ -642,11 +604,6 @@ class AnalyticsWindow(QMainWindow):
         if self.pages.currentWidget() is self.comparer:
             self.comparer.set_source(self.backend, self.data_dir, self.year)
             self.comparer.load_source()
-            return
-        if self.pages.currentWidget() is self.planning_page:
-            view = self.planning_tabs.currentWidget()
-            view.set_source(self.backend, self.data_dir, self.year)
-            view.load_source()
             return
         if self._load_thread and self._load_thread.isRunning():
             return
@@ -894,15 +851,11 @@ class AnalyticsWindow(QMainWindow):
         if selected is None or int(selected) == self.year:
             return
         self.year = int(selected)
-        self.planner.set_source(self.backend, self.data_dir, self.year)
-        self.forecaster.set_source(self.backend, self.data_dir, self.year)
-        self.budgeter.set_source(self.backend, self.data_dir, self.year)
-        self.holiday_planner.set_source(self.backend, self.data_dir, self.year)
         self.comparer.set_source(self.backend, self.data_dir, self.year)
         self.refresh_data()
 
     @Slot(object)
-    def _planning_source_loaded(self, snapshot) -> None:
+    def _analytics_source_loaded(self, snapshot) -> None:
         available = snapshot.get("planning_available_years", [self.year])
         self.year_combo.blockSignals(True)
         self.year_combo.clear()
@@ -910,16 +863,6 @@ class AnalyticsWindow(QMainWindow):
             self.year_combo.addItem(str(year), year)
         self.year_combo.setCurrentIndex(max(0, self.year_combo.findData(self.year)))
         self.year_combo.blockSignals(False)
-
-    @Slot(object, object)
-    def _transfer_budget(self, snapshot, result):
-        self.planner.accept_budget(snapshot, result)
-        self.planning_tabs.setCurrentWidget(self.planner)
-
-    @Slot(object, object)
-    def _transfer_holiday(self, snapshot, option):
-        self.planner.accept_option(snapshot, option, label="Holiday and Weekend Planner")
-        self.planning_tabs.setCurrentWidget(self.planner)
 
     def _page_changed(self, _index: int = -1) -> None:
         if self.pages.currentWidget() is self.comparer:
@@ -929,21 +872,6 @@ class AnalyticsWindow(QMainWindow):
             )
             self.comparer.set_source(self.backend, self.data_dir, self.year)
             self.comparer.activate()
-            return
-        if self.pages.currentWidget() is self.planning_page:
-            self.open_chart_button.setEnabled(True)
-            self.notice_label.setText(
-                "Holiday and Weekend Planner: independent break options funded from eligible discretionary banks; no leave is booked."
-                if self.planning_tabs.currentWidget() is self.holiday_planner
-                else "Leave Budget: deadline-first planning suggestions, explicit purpose eligibility, shared work capacity and before/after risk. Leave records are never modified."
-                if self.planning_tabs.currentWidget() is self.budgeter
-                else "Usage Forecast: Scheduled, Typical Usage and Higher Usage are historical planning scenarios. Confirm historical coverage and review allocation completeness."
-                if self.planning_tabs.currentWidget() is self.forecaster
-                else "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. Leave records are never modified."
-            )
-            view = self.planning_tabs.currentWidget()
-            view.set_source(self.backend, self.data_dir, self.year)
-            view.activate()
             return
         page = self.pages.currentIndex()
         self.open_chart_button.setEnabled(page != 0)
@@ -989,9 +917,6 @@ class AnalyticsWindow(QMainWindow):
     def open_chart(self) -> None:
         if self.pages.currentWidget() is self.comparer:
             self.comparer.open_chart()
-            return
-        if self.pages.currentWidget() is self.planning_page:
-            self.planning_tabs.currentWidget().open_chart()
             return
         if not self.data:
             return
@@ -1058,9 +983,6 @@ class AnalyticsWindow(QMainWindow):
     def save_csv(self) -> None:
         if self.pages.currentWidget() is self.comparer:
             self.comparer.save_csv()
-            return
-        if self.pages.currentWidget() is self.planning_page:
-            self.planning_tabs.currentWidget().save_csv()
             return
         if not self.data or not self._current_rows:
             QMessageBox.information(self, "Save Table", "The selected table has no rows to export.")
@@ -1233,10 +1155,6 @@ class AnalyticsWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self._closing = True
-        self.planner.shutdown()
-        self.forecaster.shutdown()
-        self.budgeter.shutdown()
-        self.holiday_planner.shutdown()
         self.comparer.shutdown()
         if self._load_thread and self._load_thread.isRunning():
             # Hide promptly, retain the worker's owner, then close after its
@@ -1271,7 +1189,7 @@ def main(argv: list[str] | None = None) -> int:
         "--view",
         choices=["analytics", "planning", "forecast", "budget", "comparison", "holidays"],
         default="analytics",
-        help="Initial view in the existing Analytics application.",
+        help="Initial view; planning options open a standalone planning window otherwise the Analytics window.",
     )
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -1287,6 +1205,13 @@ def main(argv: list[str] | None = None) -> int:
                 >= 0
             )
     data_dir = args.data_dir or str(get_default_data_dir())
+    if args.view in {"planning", "forecast", "budget", "holidays"}:
+        tool = "what-if" if args.view == "planning" else args.view
+        window = PlanningWindow(tool, backend, data_dir, year, args.font_size, args.pdf_folder)
+        if args.smoke_test:
+            return _smoke_planning(app, tool, backend, data_dir, year, args.font_size, args.pdf_folder)
+        window.show()
+        return app.exec()
     window = AnalyticsWindow(
         backend,
         data_dir,
@@ -1297,110 +1222,105 @@ def main(argv: list[str] | None = None) -> int:
         initial_view=args.view if not args.smoke_test else "analytics",
     )
     if args.smoke_test:
-        # Installed-bundle QA: use the real sibling CLI and render the existing
-        # Seasonality page without writing any ledger or creating another app.
-        window.set_data(load_analytics_data(backend, data_dir, year))
-        help_dialog = AnalyticsHelpDialog("what-if", window)
-        assert help_dialog.available
-        assert "Replace scheduled use" in help_dialog.browser.toPlainText()
-        assert "Usage Forecast" in help_dialog.browser.toPlainText()
-        assert "Leave Budget" in help_dialog.browser.toPlainText()
-        assert "Holiday and Weekend Planner" in help_dialog.browser.toPlainText()
-        help_dialog.close()
-        window.pages.setCurrentIndex(1)
-        assert len(window.seasonality_page.findChildren(QComboBox)) == 2
-        assert window.leave_type_selector.currentData() == "all-used"
-        for key in ("comp:earned", "comp:used"):
-            index = window.leave_type_selector.findData(key)
-            assert index >= 0
-            window.leave_type_selector.setCurrentIndex(index)
-            for name in SEASONALITY_GROUPINGS:
-                window.seasonality_selector.setCurrentText(name)
-                assert window._seasonality_result["selection"]["key"] == key
-                assert not window.seasonality_chart_image.source_pixmap().isNull()
-        window.pages.setCurrentWidget(window.planning_page)
-
-        def await_planning():
-            deadline = time.monotonic() + 40
-            while window.planner.session is None or window.planner.session.result is None:
-                app.processEvents()
-                if time.monotonic() >= deadline:
-                    raise RuntimeError(window.planner.status_label.text())
-                QThread.msleep(5)
-
-        await_planning()
-        assert not window.planner.chart_image.source_pixmap().isNull()
-        definition = window.planner.session.definition
-        if definition.cutoff < definition.horizon:
-            window.planner.add_tentative()
-            window.planner.recalculate()
-            await_planning()
-            assert any(event.timing == "Tentative" for event in window.planner.session.result.events)
-            window.planner.reset_scenario()
-            window.planner.recalculate()
-            await_planning()
-            assert all(row.baseline == row.scenario for row in window.planner.session.result.categories)
-        window.planning_tabs.setCurrentWidget(window.forecaster)
-
-        def await_forecast():
-            deadline = time.monotonic() + 40
-            while window.forecaster.result is None:
-                app.processEvents()
-                if time.monotonic() >= deadline:
-                    raise RuntimeError(window.forecaster.status_label.text())
-                QThread.msleep(5)
-
-        await_forecast()
-        assert not window.forecaster.chart_image.source_pixmap().isNull()
-        assert not window.forecaster.result.scenarios["scheduled"].projection.operations
-        window.forecaster.scope_combo.setCurrentIndex(2)
-        window.forecaster.recalculate()
-        await_forecast()
-        assert window.forecaster.result.parameters.categories == ("annual", "sick")
-        assert all(
-            row["category"] in {"annual", "sick"} for row in window.forecaster.result.scenarios["scheduled"].summaries
-        )
-        window.planning_tabs.setCurrentWidget(window.budgeter)
-        deadline = time.monotonic() + 40
-        while window.budgeter.result is None:
-            app.processEvents()
-            if time.monotonic() >= deadline:
-                raise RuntimeError(window.budgeter.status_label.text())
-            QThread.msleep(5)
-        assert not window.budgeter.chart_image.source_pixmap().isNull()
-        assert not window.budgeter.result.suggestions  # Purpose eligibility is never assumed.
-        for strategy in ("even", "earliest", "latest", "weighted"):
-            assert window.budgeter.strategy_combo.findData(strategy) >= 0
-        assert "Source and allocation audit" in window.budgeter.tables
-        window.pages.setCurrentWidget(window.comparer)
-        deadline = time.monotonic() + 40
-        while window.comparer.result is None:
-            app.processEvents()
-            if time.monotonic() >= deadline:
-                raise RuntimeError(window.comparer.status_label.text())
-            QThread.msleep(5)
-        assert not window.comparer.chart_image.source_pixmap().isNull()
-        assert window.comparer.result.parameters.categories == ("annual",)
-        assert window.comparer.result.points
-        assert "Cumulative Usage" in help_dialog.browser.toPlainText()
-        window.pages.setCurrentWidget(window.planning_page)
-        window.planning_tabs.setCurrentWidget(window.holiday_planner)
-        deadline = time.monotonic() + 60
-        while window.holiday_planner.result is None:
-            app.processEvents()
-            if time.monotonic() >= deadline:
-                raise RuntimeError(window.holiday_planner.status_label.text())
-            QThread.msleep(5)
-        assert window.holiday_planner.result.parameters.minimum_days == 4
-        assert "Options" in window.holiday_planner.tables
-        if window.holiday_planner.result.candidates:
-            assert not window.holiday_planner.chart_image.source_pixmap().isNull()
-        window.show()
-        app.processEvents()
-        window.close()
-        return 0
+        return _smoke_analytics(app, window, backend, data_dir, year, args.font_size, args.pdf_folder)
     window.show()
     return app.exec()
+
+
+def _await(app, predicate, message):
+    deadline = time.monotonic() + 60
+    while not predicate():
+        app.processEvents()
+        if time.monotonic() >= deadline:
+            raise RuntimeError(message)
+        QThread.msleep(5)
+
+
+def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder):
+    # Installed-bundle QA: use the real sibling CLI and render the existing
+    # Seasonality page without writing any ledger or creating another app.
+    window.set_data(load_analytics_data(backend, data_dir, year))
+    help_dialog = AnalyticsHelpDialog("what-if", window)
+    assert help_dialog.available
+    assert "Replace scheduled use" in help_dialog.browser.toPlainText()
+    assert "Usage Forecast" in help_dialog.browser.toPlainText()
+    assert "Leave Budget" in help_dialog.browser.toPlainText()
+    assert "Holiday and Weekend Planner" in help_dialog.browser.toPlainText()
+    help_dialog.close()
+    window.pages.setCurrentIndex(1)
+    assert len(window.seasonality_page.findChildren(QComboBox)) == 2
+    assert window.leave_type_selector.currentData() == "all-used"
+    for key in ("comp:earned", "comp:used"):
+        index = window.leave_type_selector.findData(key)
+        assert index >= 0
+        window.leave_type_selector.setCurrentIndex(index)
+        for name in SEASONALITY_GROUPINGS:
+            window.seasonality_selector.setCurrentText(name)
+            assert window._seasonality_result["selection"]["key"] == key
+            assert not window.seasonality_chart_image.source_pixmap().isNull()
+    window.pages.setCurrentWidget(window.comparer)
+    _await(app, lambda: window.comparer.result is not None, window.comparer.status_label.text())
+    assert not window.comparer.chart_image.source_pixmap().isNull()
+    assert window.comparer.result.parameters.categories == ("annual",)
+    assert window.comparer.result.points
+    assert "Cumulative Usage" in help_dialog.browser.toPlainText()
+    window.show()
+    app.processEvents()
+    window.close()
+    for tool in ("what-if", "forecast", "budget", "holidays"):
+        _smoke_planning(app, tool, backend, data_dir, year, font_size, pdf_folder)
+    return 0
+
+
+def _smoke_planning(app, tool, backend, data_dir, year, font_size, pdf_folder):
+    window = PlanningWindow(tool, backend, data_dir, year, font_size, pdf_folder)
+    if tool == "what-if":
+        _await(
+            app,
+            lambda: window.widget.session is not None and window.widget.session.result is not None,
+            window.widget.status_label.text(),
+        )
+        assert not window.widget.chart_image.source_pixmap().isNull()
+        definition = window.widget.session.definition
+        if definition.cutoff < definition.horizon:
+            window.widget.add_tentative()
+            window.widget.recalculate()
+            _await(app, lambda: window.widget.session.result is not None, window.widget.status_label.text())
+            assert any(event.timing == "Tentative" for event in window.widget.session.result.events)
+            window.widget.reset_scenario()
+            window.widget.recalculate()
+            _await(app, lambda: window.widget.session.result is not None, window.widget.status_label.text())
+            assert all(row.baseline == row.scenario for row in window.widget.session.result.categories)
+    elif tool == "forecast":
+        _await(app, lambda: window.widget.result is not None, window.widget.status_label.text())
+        assert not window.widget.chart_image.source_pixmap().isNull()
+        assert not window.widget.result.scenarios["scheduled"].projection.operations
+        window.widget.scope_combo.setCurrentIndex(2)
+        window.widget.recalculate()
+        _await(
+            app,
+            lambda: (
+                window.widget.result is not None and window.widget.result.parameters.categories == ("annual", "sick")
+            ),
+            window.widget.status_label.text(),
+        )
+    elif tool == "budget":
+        _await(app, lambda: window.widget.result is not None, window.widget.status_label.text())
+        assert not window.widget.chart_image.source_pixmap().isNull()
+        assert not window.widget.result.suggestions
+        for strategy in ("even", "earliest", "latest", "weighted"):
+            assert window.widget.strategy_combo.findData(strategy) >= 0
+        assert "Source and allocation audit" in window.widget.tables
+    else:  # holidays
+        _await(app, lambda: window.widget.result is not None, window.widget.status_label.text())
+        assert window.widget.result.parameters.minimum_days == 4
+        assert "Options" in window.widget.tables
+        if window.widget.result.candidates:
+            assert not window.widget.chart_image.source_pixmap().isNull()
+    window.show()
+    app.processEvents()
+    window.close()
+    return 0
 
 
 if __name__ == "__main__":
