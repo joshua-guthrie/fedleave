@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import nullcontext
 from datetime import date, timedelta
+from math import ceil
 from pathlib import Path
 from typing import Any
 
@@ -427,6 +428,108 @@ def render_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
                 painter.drawText(x, top - 26, 100, 20, Qt.AlignLeft, day.strftime("%b %Y"))
                 last_month = month_key
 
+    finally:
+        painter.end()
+    return pixmap
+
+
+def render_monthly_heatmap(title: str, rows: list[dict[str, Any]]) -> QPixmap:
+    """Render the leave year as separate monthly calendar heatmaps."""
+    parsed = sorted(((date.fromisoformat(str(row["date"])), row) for row in rows), key=lambda item: item[0])
+    months: dict[tuple[int, int], dict[date, dict[str, Any]]] = {}
+    for day, row in parsed:
+        months.setdefault((day.year, day.month), {})[day] = row
+    month_order = sorted(months)
+
+    columns = 4
+    grid_rows = max(1, ceil(len(month_order) / columns)) if month_order else 1
+    left, top, right = 60, 120, WIDTH - 60
+    gap_x, gap_y = 40, 46
+    slot_width = (right - left - (columns - 1) * gap_x) / columns
+    cell = max(16, int((slot_width - 26) / 7))
+    month_width = cell * 7
+    month_title_height = 34
+    weekday_height = 22
+    month_height = month_title_height + weekday_height + 6 * cell
+    height = top + grid_rows * month_height + max(0, grid_rows - 1) * gap_y + 50
+
+    pixmap = QPixmap(WIDTH, height)
+    pixmap.fill(QColor(BACKGROUND))
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    try:
+        painter.setPen(QColor(TEXT))
+        title_font = QFont(painter.font())
+        title_font.setPointSize(24)
+        title_font.setBold(True)
+        painter.setFont(title_font)
+        painter.drawText(60, 30, WIDTH - 120, 55, Qt.AlignCenter, title)
+        if not month_order:
+            painter.drawText(0, 0, WIDTH, height, Qt.AlignCenter, "No heatmap data")
+            return pixmap
+
+        maximum = max(float(row.get("full_day_total") or 0) for _day, row in parsed) or 1.0
+        month_font = QFont(painter.font())
+        month_font.setPointSize(15)
+        month_font.setBold(True)
+        weekday_font = QFont(painter.font())
+        weekday_font.setPointSize(9)
+        day_font = QFont(painter.font())
+        day_font.setPointSize(8)
+
+        for index, (year, month) in enumerate(month_order):
+            column, row_index = index % columns, index // columns
+            block_x = left + column * (slot_width + gap_x) + (slot_width - month_width) / 2
+            block_y = top + row_index * (month_height + gap_y)
+            month_start = date(year, month, 1)
+            month_end = date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+            grid_start = month_start - timedelta(days=month_start.weekday())
+
+            painter.setFont(month_font)
+            painter.setPen(QColor(TEXT))
+            painter.drawText(
+                int(block_x),
+                int(block_y),
+                int(month_width),
+                28,
+                Qt.AlignLeft | Qt.AlignVCenter,
+                month_start.strftime("%B %Y"),
+            )
+            painter.setFont(weekday_font)
+            for weekday_index, weekday in enumerate(("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")):
+                painter.drawText(
+                    int(block_x + weekday_index * cell),
+                    int(block_y + month_title_height - 2),
+                    cell,
+                    weekday_height,
+                    Qt.AlignCenter,
+                    weekday,
+                )
+
+            day_rows = months[(year, month)]
+            painter.setFont(day_font)
+            for day_in_month in range(1, month_end.day + 1):
+                day = date(year, month, day_in_month)
+                data = day_rows.get(day, {})
+                week = (day - grid_start).days // 7
+                x = int(block_x + day.weekday() * cell)
+                y = int(block_y + month_title_height + weekday_height + week * cell)
+                value = float(data.get("full_day_total") or 0)
+                if value <= 0:
+                    color = QColor(BACKGROUND)
+                else:
+                    color = QColor(BLUE)
+                    color.setAlphaF(0.2 + 0.8 * min(1.0, value / maximum))
+                painter.fillRect(x, y, cell - 2, cell - 2, color)
+                future = float(data.get("future_scheduled") or 0) > 0
+                painter.setPen(QPen(QColor(RED if future else BORDER), 2 if future else 1))
+                painter.drawRect(x, y, cell - 2, cell - 2)
+                dark = value > 0 and value / maximum > 0.55
+                painter.setPen(QColor(BACKGROUND if dark else TEXT))
+                painter.drawText(x + 3, y + 1, cell - 8, 15, Qt.AlignLeft | Qt.AlignTop, str(day_in_month))
+                if future:
+                    painter.setPen(QColor(BACKGROUND if dark else RED))
+                    painter.drawText(x, y, cell - 4, cell - 4, Qt.AlignRight | Qt.AlignBottom, "F")
     finally:
         painter.end()
     return pixmap

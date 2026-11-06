@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a Calendar Heatmap view selector: keep the existing continuous Year at a Glance heatmap or render the whole leave year as separate monthly calendar heatmaps with day numbers, intensity shading, and future-scheduled markers.
+
 - Give each Planning tool (What-if Planner, Usage Forecast, Leave Budget, Holiday and Weekend Planner) its own window, separate from Analytics; add a Calendar Analysis > Planning entry for the Holiday and Weekend Planner and keep Budget/Holiday handoff to a fresh What-if window.
 
 - Remove the Break Patterns analysis from Analytics; the Holiday and Weekend Planner keeps its break-option planning, and `DISCRETIONARY_CATEGORIES` now lives in `holiday_planner`.

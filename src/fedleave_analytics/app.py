@@ -44,6 +44,7 @@ from .charts import (
     ResponsivePixmapLabel,
     render_heatmap,
     render_horizontal_bar_chart,
+    render_monthly_heatmap,
     table_widget,
 )
 from .comparison_view import ComparisonWidget
@@ -496,6 +497,16 @@ class AnalyticsWindow(QMainWindow):
         self.heatmap_selector = QComboBox()
         self.heatmap_selector.currentIndexChanged.connect(self._render_heatmap)
         selector_row.addWidget(self.heatmap_selector)
+        selector_row.addSpacing(18)
+        selector_row.addWidget(QLabel("View"))
+        self.heatmap_view_selector = QComboBox()
+        self.heatmap_view_selector.addItem("Year at a Glance", "year")
+        self.heatmap_view_selector.addItem("Monthly Calendars", "month")
+        self.heatmap_view_selector.setToolTip(
+            "Show the leave year as one continuous heatmap or as separate monthly calendars."
+        )
+        self.heatmap_view_selector.currentIndexChanged.connect(self._render_heatmap_result)
+        selector_row.addWidget(self.heatmap_view_selector)
         selector_row.addStretch(1)
         layout.addLayout(selector_row)
         self.heatmap_description = QLabel()
@@ -784,15 +795,28 @@ class AnalyticsWindow(QMainWindow):
         selected_index = self.heatmap_selector.findData(current_key)
         self.heatmap_selector.setCurrentIndex(max(0, selected_index))
         self.heatmap_selector.blockSignals(False)
+        self._render_heatmap_result()
+
+    def _render_heatmap_result(self, *_args) -> None:
+        if not self.data:
+            return
         selected_key = str(self.heatmap_selector.currentData() or "all-used")
         rows = self.data["heatmap_series"][selected_key]
         title = self.heatmap_selector.currentText()
         option = next(item for item in self.data["heatmap_options"] if item["key"] == selected_key)
         activity = "used" if option["direction"] == "used" else "earned"
-        self.heatmap_description.setText(
-            f"Each cell represents hours {activity} on that date. Darker cells contain more hours."
-        )
-        pixmap = render_heatmap(f"{title} Heatmap — {self.data['year']}", rows)
+        monthly = str(self.heatmap_view_selector.currentData() or "year") == "month"
+        if monthly:
+            self.heatmap_description.setText(
+                f"Each day cell represents hours {activity} on that date in separate monthly calendars; "
+                "darker cells contain more hours."
+            )
+            pixmap = render_monthly_heatmap(f"{title} Heatmap — {self.data['year']}", rows)
+        else:
+            self.heatmap_description.setText(
+                f"Each cell represents hours {activity} on that date. Darker cells contain more hours."
+            )
+            pixmap = render_heatmap(f"{title} Heatmap — {self.data['year']}", rows)
         self.heatmap_image.set_source_pixmap(pixmap)
         self._schedule_default_chart_ratio(self.heatmap_splitter)
         table_rows = self._nonzero_heatmap_rows(rows)
@@ -927,10 +951,13 @@ class AnalyticsWindow(QMainWindow):
             selected_key = str(self.heatmap_selector.currentData() or "all-used")
             rows = self.data["heatmap_series"][selected_key]
             columns = HEATMAP_COLUMNS
-            title = f"{self.heatmap_selector.currentText()} Heatmap — {self.data['year']}"
+            monthly = str(self.heatmap_view_selector.currentData() or "year") == "month"
+            layout = "Monthly Calendars" if monthly else "Heatmap"
+            title = f"{self.heatmap_selector.currentText()} {layout} — {self.data['year']}"
             pixmap = self.heatmap_image.source_pixmap()
             rows = self._nonzero_heatmap_rows(rows)
-            self._show_chart(title, pixmap, rows, columns, f"{selected_key}-heatmap")
+            suffix = "monthly-heatmap" if monthly else "heatmap"
+            self._show_chart(title, pixmap, rows, columns, f"{selected_key}-{suffix}")
             return
         elif page == 3:
             index = self.lifecycle_tabs.currentIndex()
@@ -1258,6 +1285,14 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
             window.seasonality_selector.setCurrentText(name)
             assert window._seasonality_result["selection"]["key"] == key
             assert not window.seasonality_chart_image.source_pixmap().isNull()
+    window.pages.setCurrentIndex(2)
+    year_height = window.heatmap_image.source_pixmap().height()
+    assert year_height > 0
+    window.heatmap_view_selector.setCurrentIndex(window.heatmap_view_selector.findData("month"))
+    assert not window.heatmap_image.source_pixmap().isNull()
+    assert window.heatmap_image.source_pixmap().height() > year_height
+    window.heatmap_view_selector.setCurrentIndex(window.heatmap_view_selector.findData("year"))
+    assert window.heatmap_image.source_pixmap().height() == year_height
     window.pages.setCurrentWidget(window.comparer)
     _await(app, lambda: window.comparer.result is not None, window.comparer.status_label.text())
     assert not window.comparer.chart_image.source_pixmap().isNull()

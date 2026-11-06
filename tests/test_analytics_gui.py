@@ -1,5 +1,5 @@
 import os
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -10,7 +10,13 @@ from PySide6.QtWidgets import QApplication, QFileDialog
 
 from fedleave_analytics.analytics import analyze_leave_year
 from fedleave_analytics.app import AnalyticsWindow
-from fedleave_analytics.charts import render_bar_chart, render_heatmap, render_horizontal_bar_chart, table_widget
+from fedleave_analytics.charts import (
+    render_bar_chart,
+    render_heatmap,
+    render_horizontal_bar_chart,
+    render_monthly_heatmap,
+    table_widget,
+)
 from test_analytics import seasonal_payload, seasonal_tx
 
 
@@ -113,6 +119,7 @@ def test_chart_renderers_create_full_size_graphics():
         [("through_today", "Through Today"), ("future_scheduled", "Future Scheduled")],
     )
     heatmap = render_heatmap("Calendar Heatmap", data["heatmap"])
+    monthly = render_monthly_heatmap("Calendar Heatmap", data["heatmap"])
     horizontal = render_horizontal_bar_chart(
         "Net Leave by Month",
         [{"month": "Jan 2026", "net": -4}, {"month": "Feb 2026", "net": 8}],
@@ -124,8 +131,32 @@ def test_chart_renderers_create_full_size_graphics():
     assert bars.height() == 1000
     assert heatmap.width() == 1610
     assert heatmap.height() < 450
+    assert monthly.width() == 1610
+    assert monthly.height() > heatmap.height()
+    assert not monthly.isNull()
     assert horizontal.width() == 1610
     assert horizontal.height() == 700
+
+
+def test_monthly_heatmap_handles_partial_leave_year_and_empty_data():
+    _application()
+    start, end = date(2026, 1, 15), date(2026, 3, 10)
+    rows = [
+        {
+            "date": (start + timedelta(days=index)).isoformat(),
+            "full_day_total": float(index % 5),
+            "future_scheduled": 0.0,
+        }
+        for index in range((end - start).days + 1)
+    ]
+    partial = render_monthly_heatmap("Partial Leave Year", rows)
+    empty = render_monthly_heatmap("Empty", [])
+
+    assert partial.width() == 1610
+    assert not partial.isNull()
+    assert partial.height() < 1300
+    assert empty.width() == 1610
+    assert not empty.isNull()
 
 
 def test_table_headers_match_data_alignment_and_have_role_based_widths():
@@ -168,6 +199,20 @@ def test_dynamic_heatmaps_and_monthly_lifecycle_charts_are_populated():
         "Annual — Used",
         "Sick — Used",
     ]
+    assert [window.heatmap_view_selector.itemData(index) for index in range(window.heatmap_view_selector.count())] == [
+        "year",
+        "month",
+    ]
+    assert window.heatmap_view_selector.currentData() == "year"
+    year_height = window.heatmap_image.source_pixmap().height()
+    window.heatmap_view_selector.setCurrentIndex(window.heatmap_view_selector.findData("month"))
+    assert window.heatmap_view_selector.currentData() == "month"
+    assert window.heatmap_selector.currentData() == "all-used"
+    assert not window.heatmap_image.source_pixmap().isNull()
+    assert window.heatmap_image.source_pixmap().height() > year_height
+    assert "monthly calendars" in window.heatmap_description.text().lower()
+    window.heatmap_view_selector.setCurrentIndex(window.heatmap_view_selector.findData("year"))
+    assert window.heatmap_image.source_pixmap().height() == year_height
     window.pages.setCurrentIndex(2)
     assert window.heatmap_table.rowCount() == 2
     assert "future scheduled" not in window.heatmap_description.text().lower()

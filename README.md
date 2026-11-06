@@ -1075,7 +1075,9 @@ period, with a chart and the exact values shown together:
 ![FedLeave Analytics seasonality](examples/fedleave-analytics-seasonality.png)
 
 Calendar Heatmap shows when leave was used or time was earned. Its selector only
-offers leave types and directions that have non-zero data:
+offers leave types and directions that have non-zero data. Choose **Year at a
+Glance** for the continuous week-column heatmap, or **Monthly Calendars** to see
+the whole leave year as separate month-by-month calendar grids:
 
 ![FedLeave Analytics calendar heatmap](examples/fedleave-analytics-calendar-heatmap.png)
 
