@@ -722,7 +722,7 @@ def render_cumulative_usage(result) -> QPixmap:
             Qt.AlignCenter,
             f"{result.summary['start']} through {result.summary['end']} | Hours",
         )
-        left, right, bottom = 100, WIDTH - 45, height - 150
+        left, right, bottom = 100, WIDTH - 45, height - 60
         values = [row["hours"] for row in rows if row.get("hours") is not None]
         maximum = max([1, *values]) * 1.08
 
@@ -757,16 +757,6 @@ def render_cumulative_usage(result) -> QPixmap:
             else:
                 painter.drawEllipse(current, 2, 2)
             previous = current
-        painter.drawText(
-            60,
-            height - 100,
-            WIDTH - 120,
-            85,
-            Qt.AlignCenter | Qt.TextWordWrap,
-            "Cumulative effective used hours for the selected leave types from the year start. "
-            "Accruals, openings, corrections, expirations and forfeitures are not used hours; "
-            "planned or requested dates do not confirm leave was taken.",
-        )
     finally:
         painter.end()
     return pixmap

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove the fine-print disclaimer from the bottom of the Cumulative Usage chart; the same definitions remain in the on-screen explanation, Help, and CSV metadata.
+
 - Add a Calendar Heatmap view selector: keep the existing continuous Year at a Glance heatmap or render the whole leave year as separate monthly calendar heatmaps with day numbers, intensity shading, and future-scheduled markers.
 
 - Give each Planning tool (What-if Planner, Usage Forecast, Leave Budget, Holiday and Weekend Planner) its own window, separate from Analytics; add a Calendar Analysis > Planning entry for the Holiday and Weekend Planner and keep Budget/Holiday handoff to a fresh What-if window.
