@@ -266,6 +266,16 @@ def test_linux_bootstrap_checks_tmp_capacity_before_extracting() -> None:
     assert bootstrap.index("Temporary-space check passed") < bootstrap.index('tar -xzf "$TEMP_DIR/$ARCHIVE_NAME"')
 
 
+def test_linux_bootstrap_authenticates_sudo_through_the_terminal_when_piped() -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+
+    assert "run_privileged() {" in bootstrap
+    assert '"${SUDO[@]}" -v </dev/tty' in bootstrap
+    assert "run_privileged apt-get update" in bootstrap
+    assert bootstrap.count('"${SUDO[@]}"') == 4  # Only the tty-aware helper invokes sudo directly.
+    assert "  prepare_privileges\n  download_and_verify\n" in bootstrap
+
+
 def test_linux_bootstrap_shows_archive_download_progress_for_interactive_terminals() -> None:
     bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
 

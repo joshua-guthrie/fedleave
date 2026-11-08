@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the Linux bootstrap when piped to bash: authenticate sudo through /dev/tty before downloading and run privileged steps with terminal stdin, so sudo and sudo-rs can read the password instead of timing out on the script pipe.
+
 - Remove the Usage Forecast, Leave Budget, and Holiday and Weekend Planner tools entirely; the What-if Planner remains the only Planning tool and menu entry.
 
 - Unify the What-if Planner Scenario rows: list all eligible scheduled bookings automatically with Unchanged/Remove/Replace operations and Proposed Add/Remove rows, remove the Replace/Remove scheduled-use buttons and read-only scheduled tab, keep Replace as a category-only substitution, preserve backend add/replace/remove operations, and document legacy combined-operation handling.
