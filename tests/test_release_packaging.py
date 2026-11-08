@@ -266,6 +266,18 @@ def test_linux_bootstrap_checks_tmp_capacity_before_extracting() -> None:
     assert bootstrap.index("Temporary-space check passed") < bootstrap.index('tar -xzf "$TEMP_DIR/$ARCHIVE_NAME"')
 
 
+def test_linux_bootstrap_shows_archive_download_progress_for_interactive_terminals() -> None:
+    bootstrap = BOOTSTRAP.read_text(encoding="utf-8")
+
+    assert "download_archive() {" in bootstrap
+    assert "[[ -t 2 ]]" in bootstrap
+    assert "--progress-bar" in bootstrap
+    assert 'download_archive "$TEMP_DIR/$ARCHIVE_NAME"' in bootstrap
+    archive_download = bootstrap.index("download_archive() {")
+    checksum_download = bootstrap.index('curl -fsSL --retry 3 --output "$TEMP_DIR/$checksum_name"')
+    assert archive_download < checksum_download
+
+
 @pytest.mark.skipif(os.name == "nt", reason="Linux bootstrap is exercised on POSIX hosts")
 def test_bootstrap_installs_local_verified_release_without_python(tmp_path: Path) -> None:
     module = _load_packaging_module()

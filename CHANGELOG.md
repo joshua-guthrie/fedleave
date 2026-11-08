@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show a curl download progress bar in the Linux bootstrap installer when run from an interactive terminal; unattended and CI runs remain quiet.
+
 - Replace the Holiday and Weekend Planner bar chart with two yearly calendar heatmaps: planned future leave and the selected option's suggested leave, with observed nonworking holidays highlighted in both.
 
 - Remove the duplicate Open Chart button inside the Cumulative Usage tab; use the shared Analytics window Open Chart button, which already exports that chart.

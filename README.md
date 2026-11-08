@@ -307,8 +307,10 @@ commit-derived build version embedded in the archive, and then installs into
 `/opt/fedleave/releases/<version>`. `/opt/fedleave/current` is switched only
 after validation, and commands are linked beneath `/usr/local/bin`. The archive
 contains its own Python runtime; the destination does not need Python, `pip`, a
-virtual environment, Git, or build tools. Use `--help` to see custom
-`--install-root` and `--bin-dir` options.
+virtual environment, Git, or build tools. When attached to a terminal, the
+bootstrap shows download progress for the large archive; unattended and
+redirected runs stay quiet. Use `--help` to see custom `--install-root` and
+`--bin-dir` options.
 
 The bootstrap, archive, and checksum are also committed under `installers/`
 after every successful `master` build. The existing website-facing URLs above
