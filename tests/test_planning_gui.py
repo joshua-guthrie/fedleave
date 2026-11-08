@@ -14,7 +14,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QDate, QThreadPool, QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtWidgets import QApplication, QFileDialog, QHeaderView, QLabel
 
 from fedleave.planning import PlanningValidationError, export_scenario
 from fedleave_analytics.planning_view import PlannerWidget
@@ -98,6 +98,49 @@ def planner(qtbot):
     yield view
     view.shutdown()
     qtbot.waitUntil(lambda: not view._tasks, timeout=15000)
+
+
+def test_planner_uses_starting_date_two_result_tabs_hidden_columns_and_new_summary(planner, monkeypatch):
+    labels = {label.text() for label in planner.findChildren(QLabel)}
+    assert "Starting Date" in labels
+    assert "Cutoff" not in labels
+    assert [planner.detail_tabs.tabText(index) for index in range(planner.detail_tabs.count())] == [
+        "Summary",
+        "Daily closing balances",
+    ]
+    assert planner.detail_tabs.currentWidget() is planner.tables["Summary"]
+    for column in (0, 6, 7, 8):
+        assert planner.scenario_table.isColumnHidden(column)
+    assert not planner.scenario_table.isColumnHidden(5)
+    assert planner.scenario_table.horizontalHeader().sectionResizeMode(5) == QHeaderView.Stretch
+    summary = planner.tables["Summary"]
+    assert [summary.horizontalHeaderItem(index).text() for index in range(summary.columnCount())] == [
+        "Leave Type",
+        "Balance on 2026-07-31",
+        "Starting Balance",
+        "Min Balance",
+        "Min Balance Date",
+    ]
+    annual = next(
+        summary.item(row, 0).text()
+        for row in range(summary.rowCount())
+        if summary.item(row, 0).text() == "Annual leave"
+    )
+    assert annual == "Annual leave"
+
+    import fedleave_analytics.planning_view as module
+
+    captured = {}
+    original = module.render_planning_chart
+
+    def capture(*args, **kwargs):
+        captured.update(kwargs)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "render_planning_chart", capture)
+    planner._render_result()
+    assert "intraday order" not in captured["caption"]
+    assert "Scenario ending Annual leave balance: 92 h" in captured["caption"]
 
 
 def test_edit_add_reserve_invalid_row_and_no_backend_call_on_recalculation(qtbot, planner, monkeypatch):

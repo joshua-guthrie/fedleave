@@ -654,8 +654,7 @@ def render_planning_chart(
             WIDTH - 160,
             55,
             Qt.AlignCenter | Qt.TextWordWrap,
-            caption
-            or "Circles: scheduled absence. Squares: tentative absence. Same-day rows share a closing balance; the chart does not imply intraday order.",
+            caption or "Circles: scheduled absence. Squares: tentative absence. Same-day rows share a closing balance.",
         )
         if not any(row.get(key) is not None for row in rows for key, *_ in series):
             painter.drawText(

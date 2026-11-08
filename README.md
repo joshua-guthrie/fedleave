@@ -1227,8 +1227,11 @@ conflict. The requested hours remain visible for analysis.
 
 Charts show daily **closing** balances, a cutoff marker, an optional reserve
 line, and distinct scheduled/tentative markers. Same-day event ordering does
-not establish intraday availability. Summary, daily, event/provenance, capacity,
-lot, and warning tables use the same calculated result. A scenario can end
+not establish intraday availability. The Summary tab lists each leave type with
+its balance on the horizon date, starting balance, minimum balance, and the
+latest date on which that minimum occurs. Excused, holiday, LWOP, and any leave
+type whose baseline balance is never positive are omitted. The **Daily closing
+balances** tab uses the same calculated result. A scenario can end
 positive yet have an earlier negative balance; the first shortfall and minimum
 dates remain visible. Annual pre-cap balance, carryover, and prospective
 forfeiture appear only when the horizon reaches the actual leave-year end.

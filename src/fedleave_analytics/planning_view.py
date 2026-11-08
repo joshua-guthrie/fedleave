@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QGridLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -133,7 +134,9 @@ class PlannerWidget(QWidget):
         self.reserve_edit.setPlaceholderText("Optional hours")
         self.reserve_edit.setMaximumWidth(130)
         self.name_edit.setToolTip("Name this in-memory plan. Export scenario JSON to save a copy.")
-        self.cutoff_edit.setToolTip("Closing-balance starting date. Tentative use must be strictly after this date.")
+        self.cutoff_edit.setToolTip(
+            "Starting date for the scenario balance. Tentative use must be strictly after this date."
+        )
         self.horizon_edit.setToolTip("Last inclusive projection date within this initialized leave year.")
         self.category_combo.setToolTip(
             "Choose the category shown in charts and tables and used for new tentative entries. Categories keep separate balances."
@@ -144,7 +147,7 @@ class PlannerWidget(QWidget):
         for index, (label, widget) in enumerate(
             (
                 ("Scenario", self.name_edit),
-                ("Cutoff", self.cutoff_edit),
+                ("Starting Date", self.cutoff_edit),
                 ("Horizon", self.horizon_edit),
                 ("Category", self.category_combo),
                 ("Reserve", self.reserve_edit),
@@ -222,6 +225,9 @@ class PlannerWidget(QWidget):
         )
         for column, width in enumerate((175, 105, 125, 205, 100, 180, 210, 280, 190)):
             self.scenario_table.setColumnWidth(column, width)
+        for column in (0, 6, 7, 8):
+            self.scenario_table.setColumnHidden(column, True)
+        self.scenario_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
         self.editor_tabs.addTab(self.scenario_table, "Scenario rows")
         self.scheduled_table = table_widget(
             [],
@@ -245,14 +251,7 @@ class PlannerWidget(QWidget):
         self.splitter.addWidget(scroll)
         self.detail_tabs = QTabWidget()
         self.tables = {}
-        for title in (
-            "Summary",
-            "Daily closing balances",
-            "Events and provenance",
-            "Working-hour capacity",
-            "Expiring lots",
-            "Warnings",
-        ):
+        for title in ("Summary", "Daily closing balances"):
             table = table_widget([], [])
             self.tables[title] = table
             self.detail_tabs.addTab(table, title)
@@ -749,7 +748,8 @@ class PlannerWidget(QWidget):
         category = self.category_combo.currentData()
         self._views = self.session.rows(category)
         current = self.detail_tabs.tabText(self.detail_tabs.currentIndex())
-        for title, (rows, columns) in self._views.items():
+        for title in ("Summary", "Daily closing balances"):
+            rows, columns = self._views[title]
             old = self.tables[title]
             index = self.detail_tabs.indexOf(old)
             table = table_widget(rows, columns)
@@ -764,6 +764,16 @@ class PlannerWidget(QWidget):
         result = self.session.result
         daily = self._views["Daily closing balances"][0]
         events = self._views["Events and provenance"][0]
+        selected = next(row for row in result.categories if row.category == category)
+        summary = selected.scenario
+
+        def fmt(value):
+            return "N/A" if value is None else f"{value:g}"
+
+        caption = (
+            "Circles: scheduled absence. Squares: tentative absence. Same-day rows share a closing balance. "
+            f"Scenario ending {self.category_combo.currentText()} balance: {fmt(summary.horizon_balance)} h."
+        )
         self.chart_image.set_source_pixmap(
             render_planning_chart(
                 f"What-if Planner — {self.category_combo.currentText()} — {result.scenario_name}",
@@ -772,13 +782,9 @@ class PlannerWidget(QWidget):
                 self.session.definition.reserves.get(category),
                 result.cutoff,
                 result.horizon,
+                caption=caption,
             )
         )
-        selected = next(row for row in result.categories if row.category == category)
-        summary = selected.scenario
-
-        def fmt(value):
-            return "N/A" if value is None else f"{value:g}"
 
         text = f"Daily closing balances. Scenario horizon: {fmt(summary.horizon_balance)} h; minimum: {fmt(summary.minimum_balance)} h on {summary.minimum_date or 'N/A'}."
         if summary.first_reserve_breach:
@@ -791,7 +797,7 @@ class PlannerWidget(QWidget):
         if conflicts:
             text += f" Working-hour capacity conflict on {conflicts[0].date} ({conflicts[0].excess_hours:g} h excess); requested entries retained."
         if result.warnings:
-            text += f" {len(result.warnings)} warning(s); see Warnings. " + " ".join(
+            text += f" {len(result.warnings)} warning(s): " + " ".join(
                 warning.message for warning in result.warnings[:2]
             )
         self.status_label.setText(text)

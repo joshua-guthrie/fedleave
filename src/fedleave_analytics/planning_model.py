@@ -165,6 +165,52 @@ def load_planning_snapshot(backend: Path, data_dir: str | None, year: int) -> di
     return ReadOnlySnapshotSource(backend, data_dir).snapshot(year)
 
 
+def category_label(category: str) -> str:
+    return LABELS.get(category, category.replace("_", " ").title())
+
+
+PLANNER_SUMMARY_HIDDEN = frozenset({"excused", "holiday", "lwop"})
+
+
+def planner_summary(result) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
+    """Four-column baseline summary for the What-if Planner results tab."""
+    comparisons = {row.category: row for row in result.categories}
+    baseline_daily: dict[str, list[tuple[str, float]]] = {}
+    for row in result.daily:
+        if row.baseline is not None:
+            baseline_daily.setdefault(row.category, []).append((row.date, float(row.baseline)))
+    rows = []
+    for category in sorted(comparisons):
+        if category in PLANNER_SUMMARY_HIDDEN:
+            continue
+        points = baseline_daily.get(category, [])
+        if not any(value > 0 for _day, value in points):
+            continue
+        comparison = comparisons[category].baseline
+        if points:
+            minimum = min(value for _day, value in points)
+            minimum_date = max(day for day, value in points if abs(value - minimum) <= 1e-9)
+        else:
+            minimum, minimum_date = comparison.minimum_balance, comparison.minimum_date
+        rows.append(
+            {
+                "category": category_label(category),
+                "horizon_balance": comparison.horizon_balance,
+                "starting_balance": comparison.cutoff_balance,
+                "minimum_balance": minimum,
+                "minimum_date": minimum_date,
+            }
+        )
+    columns = [
+        ("category", "Leave Type"),
+        ("horizon_balance", f"Balance on {result.horizon}"),
+        ("starting_balance", "Starting Balance"),
+        ("minimum_balance", "Min Balance"),
+        ("minimum_date", "Min Balance Date"),
+    ]
+    return rows, columns
+
+
 def projection_summary(result):
     """Exact shared before/after summary rows for calculated projections."""
     return [
@@ -258,7 +304,7 @@ class PlanningSession:
         if self.result is None:
             return {}
         result = self.result
-        summary = projection_summary(result)
+        summary, summary_columns = planner_summary(result)
         events = [asdict(row) for row in result.events if row.category == category]
         originals = {str(row.get("id")): row for row in self.snapshot.get("transactions", [])}
         for operation in result.operations:
@@ -289,7 +335,7 @@ class PlanningSession:
         for row in capacity:
             row["tentative_by_category"] = json.dumps(row["tentative_by_category"], sort_keys=True)
         return {
-            "Summary": (summary, SUMMARY_COLUMNS),
+            "Summary": (summary, summary_columns),
             "Daily closing balances": (
                 [asdict(row) for row in result.daily if row.category == category],
                 DAILY_COLUMNS,

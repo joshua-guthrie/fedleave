@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Simplify the What-if Planner results to Summary and Daily closing balances tabs; rename the cutoff control to Starting Date, make Summary a four-column baseline view (horizon balance, starting balance, minimum balance and latest minimum date) that hides excused/holiday/LWOP and never-positive leave types, hide scenario provenance/validation columns while stretching Note, and update the chart footer with the selected category's scenario ending balance.
+
 - Show a curl download progress bar in the Linux bootstrap installer when run from an interactive terminal; unattended and CI runs remain quiet.
 
 - Replace the Holiday and Weekend Planner bar chart with two yearly calendar heatmaps: planned future leave and the selected option's suggested leave, with observed nonworking holidays highlighted in both.
