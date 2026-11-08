@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove the duplicate Open Chart button inside the Cumulative Usage tab; use the shared Analytics window Open Chart button, which already exports that chart.
+
 - Remove the fine-print disclaimer from the bottom of the Cumulative Usage chart; the same definitions remain in the on-screen explanation, Help, and CSV metadata.
 
 - Add a Calendar Heatmap view selector: keep the existing continuous Year at a Glance heatmap or render the whole leave year as separate monthly calendar heatmaps with day numbers, intensity shading, and future-scheduled markers.

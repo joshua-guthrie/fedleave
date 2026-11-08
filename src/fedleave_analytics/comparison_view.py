@@ -94,12 +94,6 @@ class ComparisonWidget(QWidget):
         )
         self._button(
             actions,
-            "Open Chart",
-            self.open_chart,
-            "Open the exact chart and data with CSV, PNG, PDF and Print controls.",
-        )
-        self._button(
-            actions,
             "Save Table as CSV...",
             self.save_csv,
             "Export the exact cumulative curve and its assumptions.",

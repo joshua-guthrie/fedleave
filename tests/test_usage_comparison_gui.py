@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QThread, QThreadPool
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtWidgets import QFileDialog, QPushButton
 
 from fedleave_analytics.app import AnalyticsWindow
 from fedleave_analytics.comparison_model import csv_document, cumulative_tables
@@ -78,6 +78,13 @@ def test_existing_analytics_routes_comparison_year_context_help_refresh_and_expo
     window.year_combo.setCurrentIndex(window.year_combo.findData(2025))
     assert window.comparer.year == 2025
     window.close()
+
+
+def test_comparison_uses_only_the_window_open_chart_button(qtbot):
+    view = ComparisonWidget(Path("/selected/backend"), "/selected/store", 2026, today=TODAY)
+    qtbot.addWidget(view)
+    assert "Open Chart" not in [button.text() for button in view.findChildren(QPushButton)]
+    view.shutdown()
 
 
 def test_controls_reuse_cached_sources_and_keep_exact_result(qtbot, comparison, monkeypatch):
