@@ -165,13 +165,25 @@ resolve_download() {
   log "Using the rolling package from the latest successful master push."
 }
 
+download_archive() {
+  local output="$1" url="$2"
+  # The rolling archive is large enough that a silent download looks frozen.
+  # Show curl's progress bar only when the user has an interactive terminal;
+  # unattended/CI runs stay quiet and readable in captured logs.
+  if [[ -t 2 ]]; then
+    curl -fL --retry 3 --progress-bar --show-error --output "$output" "$url"
+  else
+    curl -fsSL --retry 3 --output "$output" "$url"
+  fi
+}
+
 download_and_verify() {
   local checksum_name archive_version unpacked_bytes available_bytes reserve_bytes required_bytes
   checksum_name="${ARCHIVE_NAME}.sha256"
 
   TEMP_DIR="$(mktemp -d)"
   log "Downloading $ARCHIVE_NAME."
-  curl -fsSL --retry 3 --output "$TEMP_DIR/$ARCHIVE_NAME" "$DOWNLOAD_BASE_URL/$ARCHIVE_NAME"
+  download_archive "$TEMP_DIR/$ARCHIVE_NAME" "$DOWNLOAD_BASE_URL/$ARCHIVE_NAME"
   curl -fsSL --retry 3 --output "$TEMP_DIR/$checksum_name" "$DOWNLOAD_BASE_URL/$checksum_name"
 
   log "Verifying SHA-256 checksum before installation."
