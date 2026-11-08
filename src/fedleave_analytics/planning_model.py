@@ -42,31 +42,6 @@ LABELS = {
     "religious_comp": "Religious comp",
     "lwop": "Leave without pay",
 }
-SUMMARY_COLUMNS = [
-    ("category", "Category"),
-    ("reserve", "Reserve (h)"),
-    ("cutoff_balance", "Cutoff (h)"),
-    ("baseline_horizon", "Baseline horizon (h)"),
-    ("scenario_horizon", "Scenario horizon (h)"),
-    ("baseline_minimum", "Baseline minimum (h)"),
-    ("baseline_minimum_date", "Baseline minimum date"),
-    ("scenario_minimum", "Scenario minimum (h)"),
-    ("scenario_minimum_date", "Scenario minimum date"),
-    ("baseline_breach", "Baseline first reserve breach"),
-    ("baseline_reserve_shortfall", "Baseline first reserve shortfall (h)"),
-    ("scenario_breach", "Scenario first reserve breach"),
-    ("scenario_reserve_shortfall", "Scenario first reserve shortfall (h)"),
-    ("baseline_negative_date", "Baseline first negative date"),
-    ("baseline_shortfall", "Baseline first negative shortfall (h)"),
-    ("negative_date", "Scenario first negative date"),
-    ("shortfall", "Scenario first shortfall (h)"),
-    ("baseline_pre_cap", "Baseline year-end pre-cap (h)"),
-    ("scenario_pre_cap", "Scenario year-end pre-cap (h)"),
-    ("baseline_carryover", "Baseline annual carryover (h)"),
-    ("scenario_carryover", "Scenario annual carryover (h)"),
-    ("baseline_forfeiture", "Baseline prospective forfeiture (h)"),
-    ("scenario_forfeiture", "Scenario prospective forfeiture (h)"),
-]
 DAILY_COLUMNS = [
     ("date", "Date"),
     ("category", "Category"),
@@ -209,38 +184,6 @@ def planner_summary(result) -> tuple[list[dict[str, Any]], list[tuple[str, str]]
         ("minimum_date", "Min Balance Date"),
     ]
     return rows, columns
-
-
-def projection_summary(result):
-    """Exact shared before/after summary rows for calculated projections."""
-    return [
-        {
-            "category": row.category,
-            "reserve": row.reserve,
-            "cutoff_balance": row.baseline.cutoff_balance,
-            "baseline_horizon": row.baseline.horizon_balance,
-            "scenario_horizon": row.scenario.horizon_balance,
-            "baseline_minimum": row.baseline.minimum_balance,
-            "baseline_minimum_date": row.baseline.minimum_date,
-            "scenario_minimum": row.scenario.minimum_balance,
-            "scenario_minimum_date": row.scenario.minimum_date,
-            "baseline_breach": row.baseline.first_reserve_breach,
-            "baseline_reserve_shortfall": row.baseline.reserve_shortfall,
-            "scenario_breach": row.scenario.first_reserve_breach,
-            "scenario_reserve_shortfall": row.scenario.reserve_shortfall,
-            "baseline_negative_date": row.baseline.earliest_negative_date,
-            "baseline_shortfall": row.baseline.negative_shortfall,
-            "negative_date": row.scenario.earliest_negative_date,
-            "shortfall": row.scenario.negative_shortfall,
-            "baseline_pre_cap": row.baseline.annual_pre_cap_balance,
-            "scenario_pre_cap": row.scenario.annual_pre_cap_balance,
-            "baseline_carryover": row.baseline.annual_carryover,
-            "scenario_carryover": row.scenario.annual_carryover,
-            "baseline_forfeiture": row.baseline.prospective_forfeiture,
-            "scenario_forfeiture": row.scenario.prospective_forfeiture,
-        }
-        for row in result.categories
-    ]
 
 
 class PlanningSession:

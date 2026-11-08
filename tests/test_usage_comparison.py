@@ -3,8 +3,7 @@ from copy import deepcopy
 import pytest
 
 from fedleave.usage_comparison import CumulativeParameters, cumulative_usage
-from leave_year_support import tx
-from test_forecast import source
+from leave_year_support import source, tx
 
 
 def run(target=None, categories=("annual",)):

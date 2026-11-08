@@ -1214,9 +1214,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--pdf-folder", default="")
     parser.add_argument(
         "--view",
-        choices=["analytics", "planning", "forecast", "budget", "comparison", "holidays"],
+        choices=["analytics", "planning", "comparison"],
         default="analytics",
-        help="Initial view; planning options open a standalone planning window otherwise the Analytics window.",
+        help="Initial view; planning opens the standalone What-if Planner window.",
     )
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
@@ -1232,11 +1232,10 @@ def main(argv: list[str] | None = None) -> int:
                 >= 0
             )
     data_dir = args.data_dir or str(get_default_data_dir())
-    if args.view in {"planning", "forecast", "budget", "holidays"}:
-        tool = "what-if" if args.view == "planning" else args.view
-        window = PlanningWindow(tool, backend, data_dir, year, args.font_size, args.pdf_folder)
+    if args.view == "planning":
+        window = PlanningWindow("what-if", backend, data_dir, year, args.font_size, args.pdf_folder)
         if args.smoke_test:
-            return _smoke_planning(app, tool, backend, data_dir, year, args.font_size, args.pdf_folder)
+            return _smoke_planning(app, backend, data_dir, year, args.font_size, args.pdf_folder)
         window.show()
         return app.exec()
     window = AnalyticsWindow(
@@ -1271,9 +1270,6 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
     assert help_dialog.available
     assert "Scenario rows" in help_dialog.browser.toPlainText()
     assert "Replacement Leave Type" in help_dialog.browser.toPlainText()
-    assert "Usage Forecast" in help_dialog.browser.toPlainText()
-    assert "Leave Budget" in help_dialog.browser.toPlainText()
-    assert "Holiday and Weekend Planner" in help_dialog.browser.toPlainText()
     help_dialog.close()
     window.pages.setCurrentIndex(1)
     assert len(window.seasonality_page.findChildren(QComboBox)) == 2
@@ -1303,56 +1299,28 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
     window.show()
     app.processEvents()
     window.close()
-    for tool in ("what-if", "forecast", "budget", "holidays"):
-        _smoke_planning(app, tool, backend, data_dir, year, font_size, pdf_folder)
+    _smoke_planning(app, backend, data_dir, year, font_size, pdf_folder)
     return 0
 
 
-def _smoke_planning(app, tool, backend, data_dir, year, font_size, pdf_folder):
-    window = PlanningWindow(tool, backend, data_dir, year, font_size, pdf_folder)
-    if tool == "what-if":
-        _await(
-            app,
-            lambda: window.widget.session is not None and window.widget.session.result is not None,
-            window.widget.status_label.text(),
-        )
-        assert not window.widget.chart_image.source_pixmap().isNull()
-        definition = window.widget.session.definition
-        if definition.cutoff < definition.horizon:
-            window.widget.add_tentative()
-            window.widget.recalculate()
-            _await(app, lambda: window.widget.session.result is not None, window.widget.status_label.text())
-            assert any(event.timing == "Tentative" for event in window.widget.session.result.events)
-            window.widget.reset_scenario()
-            window.widget.recalculate()
-            _await(app, lambda: window.widget.session.result is not None, window.widget.status_label.text())
-            assert all(row.baseline == row.scenario for row in window.widget.session.result.categories)
-    elif tool == "forecast":
-        _await(app, lambda: window.widget.result is not None, window.widget.status_label.text())
-        assert not window.widget.chart_image.source_pixmap().isNull()
-        assert not window.widget.result.scenarios["scheduled"].projection.operations
-        window.widget.scope_combo.setCurrentIndex(2)
+def _smoke_planning(app, backend, data_dir, year, font_size, pdf_folder):
+    window = PlanningWindow("what-if", backend, data_dir, year, font_size, pdf_folder)
+    _await(
+        app,
+        lambda: window.widget.session is not None and window.widget.session.result is not None,
+        window.widget.status_label.text(),
+    )
+    assert not window.widget.chart_image.source_pixmap().isNull()
+    definition = window.widget.session.definition
+    if definition.cutoff < definition.horizon:
+        window.widget.add_tentative()
         window.widget.recalculate()
-        _await(
-            app,
-            lambda: (
-                window.widget.result is not None and window.widget.result.parameters.categories == ("annual", "sick")
-            ),
-            window.widget.status_label.text(),
-        )
-    elif tool == "budget":
-        _await(app, lambda: window.widget.result is not None, window.widget.status_label.text())
-        assert not window.widget.chart_image.source_pixmap().isNull()
-        assert not window.widget.result.suggestions
-        for strategy in ("even", "earliest", "latest", "weighted"):
-            assert window.widget.strategy_combo.findData(strategy) >= 0
-        assert "Source and allocation audit" in window.widget.tables
-    else:  # holidays
-        _await(app, lambda: window.widget.result is not None, window.widget.status_label.text())
-        assert window.widget.result.parameters.minimum_days == 4
-        assert "Options" in window.widget.tables
-        if window.widget.result.candidates:
-            assert not window.widget.chart_image.source_pixmap().isNull()
+        _await(app, lambda: window.widget.session.result is not None, window.widget.status_label.text())
+        assert any(event.timing == "Tentative" for event in window.widget.session.result.events)
+        window.widget.reset_scenario()
+        window.widget.recalculate()
+        _await(app, lambda: window.widget.session.result is not None, window.widget.status_label.text())
+        assert all(row.baseline == row.scenario for row in window.widget.session.result.categories)
     window.show()
     app.processEvents()
     window.close()

@@ -1053,14 +1053,14 @@ The chart apps are intentionally not provided for Holiday, Admin Leave, LWOP, Mi
 ### Companion Application: FedLeaveAnalytics
 
 `FedLeaveAnalytics` is the read-only companion for seasonality, calendar
-heatmaps, overtime, compensatory-time, credit-hour analysis, planning, usage
-forecasts, and cumulative usage. Launch it directly, or choose **Analysis > Analytics...** in `FedLeaveCalendar`; the calendar
-passes its selected backend, leave year, font size, PDF folder, and exact
-resolved data directory.
+heatmaps, overtime, compensatory-time, credit-hour analysis, and cumulative
+usage. Launch it directly, or choose **Analysis > Analytics...** in
+`FedLeaveCalendar`; the calendar passes its selected backend, leave year, font
+size, PDF folder, and exact resolved data directory.
 
 The pages are Summary, Seasonality, Calendar Heatmap, Overtime, Comp,
-and Credit, and Cumulative Usage. The Planning tools open in their own windows
-and are not part of the Analytics tab set. Monthly views combine horizontal bar charts with their supporting
+and Credit, and Cumulative Usage. The What-if Planner opens in its own window
+from Analysis > Planning and is not part of the Analytics tab set. Monthly views combine horizontal bar charts with their supporting
 tables. Time-based tables distinguish Through Today, Future Scheduled, and Full
 Leave Year values; double-clicking a row opens its supporting transactions.
 The application never modifies leave data or displays backend/data-directory
@@ -1124,60 +1124,6 @@ the selected backend, and stale results are discarded after edits/cancellation.
 No usage action changes leave data. File > Help/F1 opens the offline
 instructions at this view.
 
-#### Holiday and Weekend Planner
-
-Open **Analysis > Planning > Holiday and Weekend Planner...**, or
-`FedLeaveAnalytics --view holidays`. It uses the selected backend, exact data
-directory, initialized leave year, font and PDF folder. These are independent
-planning options; no action books leave or changes calendar records.
-
-Choose an inclusive search range strictly after cutoff inside that year.
-Defaults: **four calendar days minimum**, **40 additional hours maximum**,
-**21 calendar days per interval maximum**, and the top **20 options**. Narrow
-eligible discretionary banks (annual/restored annual/comp/travel comp/credit/
-time-off awards) and enter optional daily reserve floors in hours. Purpose
-eligibility and agency approval are assumptions, not established by a balance.
-Sick, military, court and similar restricted categories never fund proposals.
-
-The configured regular workdays and tour minus lunch are an explicit schedule
-assumption. Backend-cached observed nonworking holidays and manual overrides
-apply once; actual/observed display markers do not create two holidays. Missing
-roster, holiday or pay-period context remains unknown; browsing never fetches
-holidays or writes caches. Intervals extend through connected already-off dates,
-deduplicate by normalized dates, and flag search-boundary truncation.
-
-An eight-hour Friday before a Monday holiday gives **Friday–Monday: four days
-away for eight additional hours**. Four annual hours already booked Friday
-reduce the requirement to four; a fully booked Friday is **Already scheduled**
-with zero additional hours and N/A efficiency. Efficiency is calendar days per
-additional standard-workday-equivalent; its assumed day length is shown. Raw
-hours are primary. Standalone nonworking intervals appear separately under
-**No leave required**. Other-purpose existing absence remains separate context;
-dependent mixed-purpose options are hidden until explicitly enabled.
-
-Each option uses the same baseline independently. Funding consumes eligible
-known lots by earliest deadline with stable category/earned-date/lot-ID ties,
-then nonexpiring banks and annual. It respects on-date earnings, explicit lot
-links, inclusive expirations/extensions, configured increments, credit usability,
-later bookings and reserves. Unknown provenance cannot become feasible funding.
-Default order is feasible first, more calendar days per additional hour, more
-days, fewer hours and earlier start. Also choose **Least additional leave**,
-**Longest break**, or **Use expiring leave first**. Infeasible/incomplete options
-are hidden by default; enable them to inspect dated shortfall explanations.
-
-Select a sorted row for exact days, holiday reasons, original transaction IDs,
-proposed category/lot funding, baseline/scenario minimum balances and dates,
-ending balances, reserve flags and annual use-or-lose effects. CSV includes the
-exact filters, source, units and assumptions; Open Chart renders the whole leave
-year as two calendar heatmaps, one for planned future leave and one for the
-suggested option, with observed holidays highlighted, alongside its supporting
-table, CSV, PNG, PDF and Print. Workers reuse cached context and discard stale
-results after edits/cancellation/source changes. **Open in What-if Planner**
-checks a fresh source and offers Replace/Merge/Cancel for session scenario rows
-only; unfunded options cannot be transferred as complete breaks. Export drafts
-to keep them and enter approved bookings separately in Calendar/CLI. F1 opens
-the bundled instructions.
-
 #### What-if Planner
 
 Choose **Analysis > Planning > What-if Planner...** in the calendar.
@@ -1194,7 +1140,7 @@ pooled into a combined bank. Purpose-restricted choices are labeled, and a
 projected balance does not establish eligibility for their use.
 
 Use **File > Help...** (or **F1**) in the planning window for detailed offline instructions
-for the active page, including all four Planning tools. Hover over buttons for
+for the What-if Planner. Hover over buttons for
 explanations. Help is included in source/wheel packages and installed bundles.
 
 - **Scenario rows** is the single editor. Every eligible scheduled booking
@@ -1271,171 +1217,6 @@ up, synchronize, or write leave data. There is no Apply to Ledger action.
 Edits reuse the cached snapshot; **Refresh** reads current backend data and
 revalidates references. Old worker results are discarded after edits, source
 changes, cancellation, or close.
-
-#### Usage Forecast
-
-Choose **Analysis > Planning > Usage Forecast...** in the calendar. The
-existing companion uses the
-same backend, exact datastore, selected leave year, font and PDF folder.
-Select annual only, sick only, or combined annual/sick, an inclusive
-cutoff/horizon inside the selected year, optional per-category reserves and
-reference years. The default is up to five most recent prior leave years;
-Reference and Exclude unusual controls make the inclusion list explicit.
-
-**Usage Forecast is a read-only planning and analysis feature. It does not
-create, modify, or delete leave transactions. Forecast calculations use
-isolated in-memory data, and historical coverage preferences are stored
-separately from leave records.** There is no Apply Forecast action.
-
-Historical coverage starts **unconfirmed**. Select a source year to confirm
-its whole year or selected represented pay periods, inspect their dates, or
-revoke confirmation. Confirm only records you consider complete. A valid
-calendar skeleton does not prove complete recordkeeping: confirmed zero-use
-periods contribute zero; unconfirmed/stale periods are missing. Material
-source changes require renewed confirmation for affected periods; display-only
-notes do not. Coverage, reference selections and manual exclusions persist in
-a versioned analytics preferences file beside the existing GUI settings,
-scoped to the selected source and outside canonical leave data.
-
-- **Scheduled** projects effective entered leave with canonical accruals and
-  expiration rules, even when no historical estimate is available.
-- **Typical Usage** adds estimates based on the median historical rate.
-- **Higher Usage** uses the historical 80th percentile, linearly interpolated
-  at `(n - 1) * 0.8`, clamped to at least Typical. These are historical planning
-  scenarios, not confidence intervals or calibrated probabilities.
-
-Rates are recorded category hours divided by scheduled working-hour exposure
-in the corresponding calendar month within actual leave-year bounds. When
-January occurs at both leave-year edges, its historical exposure is combined;
-target segments remain distinct. Three eligible year observations are needed
-for seasonal estimates; otherwise independently eligible whole-year rates
-supply the fallback. One or two observations are labeled **Limited history**.
-No eligible history or unknown exposure gives **N/A**, never fabricated zero.
-An optional confirmed-status basis includes worked/submitted/certified/
-reconciled rows; past planned/requested records stay unresolved **Recorded
-Through Cutoff**. Future reconciled rows are not historical training data.
-
-Additional use is calculated separately for each category and target month
-segment: `max(0, estimated total - effective scheduled use)`. With Typical =
-32 hours, Higher = 40 and 24 already scheduled, add only 8 and 16 hours.
-If 48 are scheduled, retain all 48 and add zero. A July surplus cannot offset
-December demand, and annual/sick balances never offset one another.
-
-The configured tour, lunch, workdays and cached observed holidays determine
-exposure. Unless historical schedules are explicitly available, current
-settings are applied retrospectively with a visible assumption. Off-schedule
-historical use stays in source hours with a warning. Missing context produces
-unknown metrics. Combined forecasts share remaining daily work capacity after
-existing absences across all categories. Proportional category quotas, largest
-remainders and stable date ordering allocate configured time increments.
-Typical and Higher allocate independently. Leave-balance shortages do not cap
-use; earlier deficits and subsequent recovery remain visible.
-
-**Incomplete Allocation** shows allocated and unallocated demand, including
-residuals smaller than the time increment. Daily curves and allocated horizon
-balances include only dated allocated estimates. A separately labeled
-**hypothetical full-demand balance** shows undated demand's sensitivity when
-reliable; timing-dependent expiration/year-end effects make it N/A. No dates
-are invented for unallocated demand, and undated demand cannot establish a
-negative/minimum/reserve-breach date. Actual year-end carryover/use-or-lose
-appears only at the actual leave-year end.
-
-Summary, monthly explanations, daily closing balances, source transactions,
-estimated allocations, events/expiration, lot and warning tables share one
-versioned result. Monthly explanations include eligible seasonal/fallback
-years, per-year rates, exclusion reasons, scheduled use and additional demand;
-double-click for source transaction IDs and coverage details. **Save Table as
-CSV...** includes filters, hours, source/method versions, status set and
-assumptions. **Export Results JSON...** retains the complete result and any
-retrospective check. **Open Chart** uses its exact supporting daily table and
-existing CSV/PNG/PDF/Print actions. Save exports outside the leave datastore.
-Changing chart category rerenders cached results; Refresh reloads read-only
-snapshots. Stale worker results are discarded after edits, source changes,
-cancellation or close.
-
-**Retrospective usage check** evaluates prior pay-period-end cutoffs in a
-completed year using only selected earlier source years. It reports Typical
-and Higher hours of error, absolute error, MAE and sample counts alongside a
-whole-year-rate comparison; differing training populations are disclosed.
-Missing actual coverage remains unknown, and zero actual usage is not used
-as a percentage denominator. Present records do not reconstruct bookings or
-statuses known at the earlier cutoff. These checks validate usage estimation,
-not the operational accuracy of forecasts issued at that time.
-
-#### Leave Budget by deadline
-
-Choose **Analysis > Planning > Leave Budget...** in Calendar. The selected backend, exact datastore, year, font
-and PDF folder are reused. Set a cutoff and horizon within the initialized year,
-then explicitly select categories eligible for your intended leave purpose.
-Nothing is selected by default. Adjacent fields are optional per-category
-reserve hours; a selection does not establish legal eligibility.
-
-The deadline table reports annual use-or-lose, dated comp/travel comp/restored
-annual/time-off award lots, and supported credit pay-period rollover caps.
-Annual required use is `max(0, projected pre-cap balance - carryover cap)` after
-known accruals, scheduled use and other disposals. A 288-hour pre-cap balance
-with a 240-hour cap needs 48 hours; adding 16 scheduled hours reduces the
-pre-cap balance to 272 and required use to 32, without a second subtraction.
-Lot audit rows retain original/local hours, cutoff availability, canonical
-scheduled allocations, other disposals, inclusive deadlines and configured
-warn/expiration/forfeiture outcomes. Opening hours without lot provenance are
-separate N/A rows. Expired lots are past dispositions/unresolved warnings.
-Later deadlines are **Outside current horizon**, without invented pay periods.
-A midyear horizon does not claim a completed year-end annual risk calculation.
-
-All four **Scheduling strategy** choices prioritize the earliest deadline, then
-category, original earned date and lot ID:
-
-- **Even across pay periods** (default) uses equal capped quotas with stable
-  largest remainders and redistribution, then earliest dates within each period.
-- **Earliest available** fills the earliest eligible dates first.
-- **Latest available** fills the latest eligible dates before each deadline.
-- **Capacity-weighted** apportions period quotas by remaining eligible capacity,
-  then fills earliest dates within each period.
-
-The preferred strategy is saved beside GUI preferences, outside leave records.
-Strategy changes reuse the cached snapshot and preserve raw required hours.
-Suggestions respect dated bank/lot availability, future bookings, reserves,
-configured increments and remaining shared work hours across all categories.
-Current configured workdays, tour/lunch and cached observed holidays are assumed;
-actual future rosters are not reconstructed. Dates must be strictly after the
-cutoff and within represented pay periods. The current partial period is labeled.
-The unrounded required/usable-period average is separate from the rounded dated
-schedule. Missing context is N/A. Two 16-hour lots sharing only 24 available
-hours leave an eight-hour joint shortfall. Feasible partial suggestions remain
-visible when the full demand cannot fit.
-
-The cumulative chart shows required and feasibly allocated hours. Its exact
-table also reports raw shared work capacity and a dated maximum-flow capacity
-upper bound: individual earning windows and joint date capacity are checked;
-interacting bank reserves/caps are additionally checked on the actual schedule.
-A chosen-strategy shortfall does not claim every alternative schedule is
-impossible. Before/after risk is recalculated through the shared projection and
-expiration rules. States distinguish **No additional use required**, **Feasible**,
-**Partially feasible**, **Infeasible** and **Unknown/unsupported**. Unsupported
-credit policy produces a specific limitation while other categories remain usable.
-Supported credit caps are replayed once at actual period boundaries; earlier
-use/loss affects later caps. This is an explicit planning-only assumption,
-preserved on transfer; it does not change default CLI ledger accounting.
-
-Inspect deadline, suggested date/period, daily capacity, before/after balance,
-source/allocation audit and warning tabs. Double-click a row for exact details;
-dated funding checks identify the candidate date, failing balance date and
-reserve threshold. **Save Table as CSV...** exports exact
-values with source, versions, strategy, filters, units, rules and assumptions.
-**Open Chart** reuses the existing supporting table, CSV, PNG, PDF and Print
-workflow. **Send suggestions to What-if...** checks a fresh read-only snapshot
-and creates schema-versioned Add operations in memory. An existing scenario
-requires **Replace**, **Merge** or **Cancel**; merge retains its operations and
-adopts budget assumptions/reserves, so the combined projection can differ.
-Stale material records/context reject transfer until refresh/recalculation.
-
-**Suggestions are planning suggestions, not booked leave.** Opening, calculating,
-exporting, transferring and closing cannot write canonical ledger JSON. There
-is no booking/apply action, new executable, or budget CLI command. Save exports
-outside the selected datastore. Recorded Through Cutoff identifies effective
-dated rows, including unresolved past planned/requested rows; Scheduled means
-future source rows, and generated suggestions remain Estimated.
 
 #### Seasonality
 

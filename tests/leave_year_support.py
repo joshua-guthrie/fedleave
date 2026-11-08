@@ -56,3 +56,27 @@ def tree(base):
         p.relative_to(base).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() if p.is_file() else "directory"
         for p in sorted(base.rglob("*"))
     }
+
+
+def source(year=2026, *, start=None, count=26, transactions=(), balances=None):
+    start = start or f"{year}-01-01"
+    config = Config().model_dump()
+    config["defaults"].update(
+        annual_leave_accrual_hours=0,
+        sick_leave_accrual_hours=0,
+        normal_workdays=["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+    )
+    config["holidays"]["enabled"] = False
+    return {
+        "leave_year": year,
+        "leave_year_start": start,
+        "leave_year_end": (date.fromisoformat(start) + timedelta(days=count * 14 - 1)).isoformat(),
+        "pay_period_count": count,
+        "pay_periods": generate_pay_periods(date.fromisoformat(start), count),
+        "annual_leave_accrual_hours": 0,
+        "sick_leave_accrual_hours": 0,
+        "starting_balances": balances if balances is not None else {"annual": 100, "sick": 100},
+        "snapshot_rules": config,
+        "transactions": list(transactions),
+        "calculation_context": {"data_store": "test-store", "backend": "test-backend"},
+    }

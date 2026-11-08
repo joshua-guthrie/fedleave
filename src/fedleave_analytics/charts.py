@@ -670,28 +670,6 @@ def render_planning_chart(
     return pixmap
 
 
-def render_forecast_chart(title, rows, reserve, cutoff, horizon, completeness):
-    series = []
-    for key, label, color, style, position in (
-        ("scheduled", "Scheduled", BLUE, Qt.DashLine, 135),
-        ("typical", "Typical allocated", "#41894C", Qt.SolidLine, 600),
-        ("higher", "Higher allocated", RED, Qt.DotLine, 1065),
-    ):
-        if key != "scheduled" and not completeness.get(key):
-            label += " (incomplete)"
-        series.append((key, label, color, style, position))
-    return render_planning_chart(
-        title,
-        rows,
-        [],
-        reserve,
-        cutoff,
-        horizon,
-        series=series,
-        caption="Historical planning scenarios, not a confidence interval. Curves show allocated estimates only; review missing history and unallocated demand in the tables.",
-    )
-
-
 def render_cumulative_usage(result) -> QPixmap:
     """Draw the exact cumulative used-hours curve for one leave year."""
     title = "Cumulative Usage — " + ", ".join(result.parameters.categories)

@@ -1,9 +1,4 @@
-"""Standalone single-tool windows for the read-only Planning tools.
-
-Each Planning tool (What-if Planner, Usage Forecast, Leave Budget, Holiday and
-Weekend Planner) gets its own window, independent of the Analytics window.
-Budget and Holiday results can hand off to a fresh What-if window in-process.
-"""
+"""Standalone window for the read-only What-if Planner."""
 
 from __future__ import annotations
 
@@ -21,29 +16,19 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .budget_view import BudgetWidget
-from .forecast_view import ForecastWidget
 from .help_view import AnalyticsHelpDialog
-from .holiday_view import HolidayWidget
 from .planning_view import PlannerWidget
 
-TOOLS = {
-    "what-if": ("What-if Planner", "what-if"),
-    "forecast": ("Usage Forecast", "forecast"),
-    "budget": ("Leave Budget", "budget"),
-    "holidays": ("Holiday and Weekend Planner", "holidays"),
-}
-
-NOTICES = {
-    "what-if": "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. Leave records are never modified.",
-    "forecast": "Usage Forecast: Scheduled, Typical Usage and Higher Usage are historical planning scenarios. Confirm historical coverage and review allocation completeness.",
-    "budget": "Leave Budget: deadline-first planning suggestions, explicit purpose eligibility, shared work capacity and before/after risk. Leave records are never modified.",
-    "holidays": "Holiday and Weekend Planner: independent break options funded from eligible discretionary banks; no leave is booked.",
-}
+TOOL = "what-if"
+TITLE = "What-if Planner"
+NOTICE = (
+    "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. "
+    "Leave records are never modified."
+)
 
 
 class PlanningWindow(QMainWindow):
-    """Host one read-only Planning tool with shared year/refresh/export controls."""
+    """Host the read-only What-if Planner with year/refresh/export controls."""
 
     def __init__(
         self,
@@ -55,17 +40,16 @@ class PlanningWindow(QMainWindow):
         pdf_folder: str = "",
     ) -> None:
         super().__init__()
-        if tool not in TOOLS:
+        if tool != TOOL:
             raise ValueError(f"Unsupported planning tool: {tool!r}.")
         self.tool = tool
         self.backend, self.data_dir, self.year = backend, data_dir, year
         self.pdf_folder = pdf_folder
         self.font_size = font_size
-        self._child_windows: list[PlanningWindow] = []
         self._closing = False
 
-        title, self.help_section_name = TOOLS[tool]
-        self.setWindowTitle(f"FedLeave {title}")
+        self.help_section_name = TOOL
+        self.setWindowTitle(f"FedLeave {TITLE}")
         self.resize(1320, 860)
         font = self.font()
         font.setPointSize(font_size)
@@ -102,11 +86,12 @@ class PlanningWindow(QMainWindow):
         controls.addWidget(self.close_button)
         layout.addLayout(controls)
 
-        self.notice_label = QLabel(NOTICES[self.tool])
+        self.notice_label = QLabel(NOTICE)
         self.notice_label.setWordWrap(True)
         layout.addWidget(self.notice_label)
 
-        self._build_tool()
+        self.widget = PlannerWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.widget.source_loaded.connect(self._source_loaded)
         layout.addWidget(self.widget, 1)
         self.setCentralWidget(root)
 
@@ -121,26 +106,13 @@ class PlanningWindow(QMainWindow):
             file_menu.addAction(action)
         self.help_action = QAction("Help...", self)
         self.help_action.setShortcut("F1")
-        self.help_action.setToolTip("Open detailed offline instructions for this planning tool.")
+        self.help_action.setToolTip("Open detailed offline instructions for the What-if Planner.")
         self.help_action.triggered.connect(self.show_help)
         file_menu.addAction(self.help_action)
         file_menu.addSeparator()
         close_action = QAction("Close", self)
         close_action.triggered.connect(self.close)
         file_menu.addAction(close_action)
-
-    def _build_tool(self) -> None:
-        if self.tool == "what-if":
-            self.widget = PlannerWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        elif self.tool == "forecast":
-            self.widget = ForecastWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-        elif self.tool == "budget":
-            self.widget = BudgetWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-            self.widget.transfer_ready.connect(self._transfer_budget)
-        else:
-            self.widget = HolidayWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
-            self.widget.transfer_ready.connect(self._transfer_holiday)
-        self.widget.source_loaded.connect(self._source_loaded)
 
     def show_help(self):
         dialog = AnalyticsHelpDialog(self.help_section_name, self)
@@ -174,24 +146,7 @@ class PlanningWindow(QMainWindow):
     def save_csv(self) -> None:
         self.widget.save_csv()
 
-    def _open_what_if(self) -> PlanningWindow:
-        window = PlanningWindow("what-if", self.backend, self.data_dir, self.year, self.font_size, self.pdf_folder)
-        self._child_windows.append(window)
-        window.destroyed.connect(lambda: self._child_windows.remove(window) if window in self._child_windows else None)
-        window.show()
-        return window
-
-    @Slot(object, object)
-    def _transfer_budget(self, snapshot, result):
-        self._open_what_if().widget.accept_budget(snapshot, result)
-
-    @Slot(object, object)
-    def _transfer_holiday(self, snapshot, option):
-        self._open_what_if().widget.accept_option(snapshot, option, label="Holiday and Weekend Planner")
-
     def closeEvent(self, event) -> None:
         self._closing = True
-        for window in list(self._child_windows):
-            window.close()
         self.widget.shutdown()
         super().closeEvent(event)

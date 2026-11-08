@@ -84,32 +84,23 @@ def test_help_is_offline_contextual_and_all_planning_actions_have_tips(qtbot, mo
         "Unchanged",
         "Replace",
         "Proposed",
-        "Usage Forecast",
-        "Leave Budget",
         "100 hours",
         "92-hour baseline",
     )
-    for tool, section in (
-        ("what-if", "what-if"),
-        ("forecast", "forecast"),
-        ("budget", "budget"),
-        ("holidays", "holidays"),
-    ):
-        seen = []
+    seen = []
 
-        def inspect(dialog, section=section):
-            assert dialog.available
-            text = dialog.browser.toPlainText()
-            assert all(word in text for word in words)
-            seen.append(section)
-            return QDialog.Rejected
+    def inspect(dialog):
+        assert dialog.available
+        text = dialog.browser.toPlainText()
+        assert all(word in text for word in words)
+        seen.append(window.help_section_name)
+        return QDialog.Rejected
 
-        monkeypatch.setattr(AnalyticsHelpDialog, "exec", inspect)
-        window = PlanningWindow(tool, Path("/backend"), "/store", 2026)
-        qtbot.addWidget(window)
-        if tool in {"what-if", "forecast", "budget"}:
-            assert all(button.toolTip() for button in window.widget.findChildren(QPushButton))
-        window.help_action.trigger()
-        assert seen == [section]
-        assert window.help_action.shortcut().toString() == "F1"
-        window.close()
+    monkeypatch.setattr(AnalyticsHelpDialog, "exec", inspect)
+    window = PlanningWindow("what-if", Path("/backend"), "/store", 2026)
+    qtbot.addWidget(window)
+    assert all(button.toolTip() for button in window.widget.findChildren(QPushButton))
+    window.help_action.trigger()
+    assert seen == ["what-if"]
+    assert window.help_action.shortcut().toString() == "F1"
+    window.close()
