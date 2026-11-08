@@ -1166,7 +1166,9 @@ are hidden by default; enable them to inspect dated shortfall explanations.
 Select a sorted row for exact days, holiday reasons, original transaction IDs,
 proposed category/lot funding, baseline/scenario minimum balances and dates,
 ending balances, reserve flags and annual use-or-lose effects. CSV includes the
-exact filters, source, units and assumptions; Open Chart has its supporting
+exact filters, source, units and assumptions; Open Chart renders the whole leave
+year as two calendar heatmaps, one for planned future leave and one for the
+suggested option, with observed holidays highlighted, alongside its supporting
 table, CSV, PNG, PDF and Print. Workers reuse cached context and discard stale
 results after edits/cancellation/source changes. **Open in What-if Planner**
 checks a fresh source and offers Replace/Merge/Cancel for session scenario rows

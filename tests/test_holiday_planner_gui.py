@@ -1,6 +1,7 @@
 import os
 import sysconfig
 from copy import deepcopy
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from PySide6.QtCore import QDate, Qt, QThread
 from PySide6.QtWidgets import QFileDialog
 
 from fedleave_analytics.budget_model import transfer_session
+from fedleave_analytics.holiday_charts import render_holiday_option
 from fedleave_analytics.holiday_model import export_csv, result_views
 from fedleave_analytics.holiday_view import HolidayWidget
 from fedleave_analytics.planning_window import PlanningWindow
@@ -104,6 +106,20 @@ def test_cached_controls_sorted_selection_exact_exports(view, qtbot, monkeypatch
     view.reserves["annual"].setText("NaN")
     qtbot.waitUntil(lambda: "finite" in view.status_label.text(), timeout=30000)
     assert view.result is None and not view.transfer_button.isEnabled()
+
+
+def test_holiday_chart_renders_two_yearly_calendar_heatmaps(view):
+    assert view._selected is not None
+    option = view.result.candidates[view._selected]
+    image = render_holiday_option(view.snapshot, view.result, view._selected)
+
+    assert image.width() == 1610
+    assert image.height() > 1400
+    assert not image.isNull()
+    assert any(row["proposed_hours"] > 0 for row in option.days)
+    assert view.chart_image.source_pixmap().size() == image.size()
+    holiday = view.snapshot["calculation_context"]["holidays"][0]
+    assert holiday["nonworking"] and date.fromisoformat(holiday["date"]) >= date(2026, 1, 1)
 
 
 def test_transfer_reproduces_candidate_and_stale_source_rejected():

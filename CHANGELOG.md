@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replace the Holiday and Weekend Planner bar chart with two yearly calendar heatmaps: planned future leave and the selected option's suggested leave, with observed nonworking holidays highlighted in both.
+
 - Remove the duplicate Open Chart button inside the Cumulative Usage tab; use the shared Analytics window Open Chart button, which already exports that chart.
 
 - Remove the fine-print disclaimer from the bottom of the Cumulative Usage chart; the same definitions remain in the on-screen explanation, Help, and CSV metadata.

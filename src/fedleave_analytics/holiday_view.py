@@ -313,7 +313,7 @@ class HolidayWidget(BudgetWidget):
             self.tables[name] = table
             self.detail_tabs.addTab(table, name)
         if selected is not None:
-            self.chart_image.set_source_pixmap(render_holiday_option(self.result, selected))
+            self.chart_image.set_source_pixmap(render_holiday_option(self.snapshot, self.result, selected))
             self.detail_tabs.setCurrentIndex(list(self.tables).index("Selected days"))
         self.transfer_button.setEnabled(
             selected is not None and self.result.candidates[selected].metrics["unfunded_hours"] == 0
