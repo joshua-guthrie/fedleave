@@ -128,10 +128,28 @@ detect_platform() {
 configure_sudo() {
   if ((EUID == 0)); then
     SUDO=()
-  elif command -v sudo >/dev/null 2>&1; then
-    SUDO=(sudo)
-  else
+    return
+  fi
+  command -v sudo >/dev/null 2>&1 ||
     die "Administrative installation is required, but sudo is unavailable."
+  SUDO=(sudo)
+  # When this script is piped to bash, stdin is the script stream rather than
+  # the terminal. Authenticate through /dev/tty so sudo and sudo-rs can read
+  # the password instead of waiting on the pipe and timing out.
+  if (exec </dev/tty) 2>/dev/null; then
+    "${SUDO[@]}" -v </dev/tty || die "Administrator authentication failed."
+  else
+    "${SUDO[@]}" -v || die "Administrator authentication failed."
+  fi
+}
+
+run_privileged() {
+  if ((${#SUDO[@]} == 0)); then
+    "$@"
+  elif (exec </dev/tty) 2>/dev/null; then
+    "${SUDO[@]}" "$@" </dev/tty
+  else
+    "${SUDO[@]}" "$@"
   fi
 }
 
@@ -150,8 +168,8 @@ install_runtime_tools() {
     die "Missing runtime tools (${packages[*]}) and apt-get is unavailable."
   configure_sudo
   log "Installing required runtime tools: ${packages[*]}"
-  "${SUDO[@]}" apt-get update
-  "${SUDO[@]}" apt-get install -y --no-install-recommends "${packages[@]}"
+  run_privileged apt-get update
+  run_privileged apt-get install -y --no-install-recommends "${packages[@]}"
 }
 
 resolve_download() {
@@ -273,16 +291,15 @@ install_release() {
   local pending_link="$INSTALL_ROOT/.current.$$.$RANDOM"
   local cli
 
-  prepare_privileges
-  "${SUDO[@]}" install -d -m 0755 "$releases_dir" "$BIN_DIR"
+  run_privileged install -d -m 0755 "$releases_dir" "$BIN_DIR"
 
   if [[ -d "$release_dir" ]]; then
     log "Release ${RELEASE_VERSION} is already present; validating it before activation."
   else
     log "Installing the verified bundle into $release_dir."
-    "${SUDO[@]}" install -d -m 0755 "$stage_dir"
-    "${SUDO[@]}" cp -a "$extracted/." "$stage_dir/"
-    "${SUDO[@]}" mv "$stage_dir" "$release_dir"
+    run_privileged install -d -m 0755 "$stage_dir"
+    run_privileged cp -a "$extracted/." "$stage_dir/"
+    run_privileged mv "$stage_dir" "$release_dir"
   fi
 
   cli="$(find_packaged_command "$release_dir" fedleave)"
@@ -326,14 +343,14 @@ install_release() {
     fi
     # Command links target "current", not a version, so the final atomic link
     # switch activates every application at the same instant.
-    "${SUDO[@]}" ln -sfn "$INSTALL_ROOT/current/$relative" "$link"
+    run_privileged ln -sfn "$INSTALL_ROOT/current/$relative" "$link"
   done
 
   if [[ -e "$current_link" && ! -L "$current_link" ]]; then
     die "Refusing to replace non-symbolic-link path: $current_link"
   fi
-  "${SUDO[@]}" ln -s "$release_dir" "$pending_link"
-  "${SUDO[@]}" mv -Tf "$pending_link" "$current_link"
+  run_privileged ln -s "$release_dir" "$pending_link"
+  run_privileged mv -Tf "$pending_link" "$current_link"
 
   "$BIN_DIR/fedleave" --version >/dev/null 2>&1 || "$BIN_DIR/fedleave" --help >/dev/null
   log "FedLeave ${RELEASE_VERSION} installed successfully."
@@ -348,6 +365,7 @@ main() {
   install_runtime_tools
   resolve_download
   ((UNATTENDED == 1)) && log "Running in unattended mode."
+  prepare_privileges
   download_and_verify
   install_release
 }
