@@ -1,10 +1,8 @@
 """Plain-language action descriptions shared by Planning controls."""
 
 ACTION_HELP = {
-    "Add tentative use": "Add extra leave to this scenario. Existing bookings stay in place; nothing is booked in the ledger.",
-    "Replace scheduled use...": "Choose existing bookings in a dialog, then edit their replacement date, category and hours. Only the scenario changes.",
-    "Remove scheduled use...": "Choose existing bookings to omit from the scenario. They remain unchanged in the baseline and ledger.",
-    "Undo selected changes": "Delete the selected draft operations. Added use disappears; replaced or removed original bookings return to the scenario.",
+    "Add tentative use": "Add a Proposed row to this scenario. Existing bookings stay in place; nothing is booked in the ledger.",
+    "Undo selected changes": "For a Scheduled row, reset its operation to Unchanged. For a Proposed row, discard its addition. Original scheduled rows always remain visible.",
     "Reset all changes": "Clear every draft operation and restore the scheduled baseline. Keep the name, cutoff, horizon and reserve settings.",
     "Recalculate": "Recompute this draft from the cached read-only snapshot. Use File > Refresh to read current ledger data.",
     "Cancel": "Stop waiting for the current calculation/load and discard its late result. Keep draft entries and leave records unchanged.",

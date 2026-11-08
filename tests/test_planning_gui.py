@@ -14,7 +14,7 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QDate, QThreadPool, QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog, QHeaderView, QLabel
+from PySide6.QtWidgets import QApplication, QFileDialog, QLabel
 
 from fedleave.planning import PlanningValidationError, export_scenario
 from fedleave_analytics.planning_view import PlannerWidget
@@ -88,6 +88,21 @@ def wait_result(qtbot, view, horizon="2026-07-31"):
     )
 
 
+def row_with_source(planner, source, index=0):
+    rows = [
+        row for row in range(planner.scenario_table.rowCount()) if planner.scenario_table.item(row, 0).text() == source
+    ]
+    return rows[index]
+
+
+def proposed_rows(planner):
+    return [
+        row
+        for row in range(planner.scenario_table.rowCount())
+        if planner.scenario_table.item(row, 0).text() == "Proposed"
+    ]
+
+
 @pytest.fixture
 def planner(qtbot):
     view = PlannerWidget(Path("/selected/backend"), "/selected/store", 2026, today=TODAY)
@@ -100,7 +115,7 @@ def planner(qtbot):
     qtbot.waitUntil(lambda: not view._tasks, timeout=15000)
 
 
-def test_planner_uses_starting_date_two_result_tabs_hidden_columns_and_new_summary(planner, monkeypatch):
+def test_planner_uses_starting_date_unified_rows_and_two_result_tabs(planner, monkeypatch):
     labels = {label.text() for label in planner.findChildren(QLabel)}
     assert "Starting Date" in labels
     assert "Cutoff" not in labels
@@ -109,10 +124,19 @@ def test_planner_uses_starting_date_two_result_tabs_hidden_columns_and_new_summa
         "Daily closing balances",
     ]
     assert planner.detail_tabs.currentWidget() is planner.tables["Summary"]
-    for column in (0, 6, 7, 8):
-        assert planner.scenario_table.isColumnHidden(column)
-    assert not planner.scenario_table.isColumnHidden(5)
-    assert planner.scenario_table.horizontalHeader().sectionResizeMode(5) == QHeaderView.Stretch
+    assert [planner.editor_tabs.tabText(index) for index in range(planner.editor_tabs.count())] == ["Scenario rows"]
+    assert [
+        planner.scenario_table.horizontalHeaderItem(index).text()
+        for index in range(planner.scenario_table.columnCount())
+    ] == ["Source", "Date", "Leave Type", "Hours", "Operation", "Replacement Leave Type", "Note"]
+    assert not hasattr(planner, "replace_button")
+    assert not hasattr(planner, "remove_button")
+    assert not hasattr(planner, "scheduled_table")
+    scheduled = row_with_source(planner, "Scheduled")
+    assert planner.scenario_table.item(scheduled, 1).text() == "2026-07-15"
+    assert planner.scenario_table.item(scheduled, 2).text() == "Annual leave"
+    assert planner.scenario_table.cellWidget(scheduled, 4).currentData() == "unchanged"
+    assert not planner.scenario_table.cellWidget(scheduled, 5).isEnabled()
     summary = planner.tables["Summary"]
     assert [summary.horizontalHeaderItem(index).text() for index in range(summary.columnCount())] == [
         "Leave Type",
@@ -121,12 +145,6 @@ def test_planner_uses_starting_date_two_result_tabs_hidden_columns_and_new_summa
         "Min Balance",
         "Min Balance Date",
     ]
-    annual = next(
-        summary.item(row, 0).text()
-        for row in range(summary.rowCount())
-        if summary.item(row, 0).text() == "Annual leave"
-    )
-    assert annual == "Annual leave"
 
     import fedleave_analytics.planning_view as module
 
@@ -149,8 +167,9 @@ def test_edit_add_reserve_invalid_row_and_no_backend_call_on_recalculation(qtbot
 
     monkeypatch.setattr("fedleave_analytics.planning_view.load_planning_snapshot", forbidden)
     planner.add_tentative()
-    planner.scenario_table.item(0, 2).setText("2026-07-23")
-    planner.scenario_table.item(0, 4).setText("24")
+    row = proposed_rows(planner)[0]
+    planner.scenario_table.item(row, 1).setText("2026-07-23")
+    planner.scenario_table.item(row, 3).setText("24")
     planner.reserve_edit.setText("80")
     wait_result(qtbot, planner)
     annual = category(planner.session.result).scenario
@@ -158,34 +177,51 @@ def test_edit_add_reserve_invalid_row_and_no_backend_call_on_recalculation(qtbot
     assert "Reserve breached 2026-07-23" in planner.status_label.text()
     assert not planner.chart_image.source_pixmap().isNull()
     assert planner.session.modified
-    planner.scenario_table.item(0, 4).setText("NaN")
-    qtbot.waitUntil(lambda: "positive hours" in planner.scenario_table.item(0, 7).text(), timeout=10000)
+    planner.scenario_table.item(row, 3).setText("NaN")
+    qtbot.waitUntil(lambda: "positive hours" in planner.status_label.text(), timeout=10000)
     assert planner.session.result is None
     assert planner.chart_image.source_pixmap().isNull()
-    assert planner.scenario_table.item(0, 4).text() == "NaN"
+    assert planner.scenario_table.item(row, 3).text() == "NaN"
 
 
-def test_replace_remove_delete_and_reset_restore_originals_and_keep_reserve(qtbot, planner):
+def test_scheduled_replace_remove_undo_and_reset_keep_rows_visible(qtbot, planner):
     planner.reserve_edit.setText("80")
     wait_result(qtbot, planner)
-    planner.scheduled_table.selectRow(0)
-    planner.add_selected("replace")
-    planner.scenario_table.item(0, 4).setText("24")
+    scheduled = row_with_source(planner, "Scheduled")
+    operation = planner.scenario_table.cellWidget(scheduled, 4)
+    operation.setCurrentIndex(operation.findData("replace"))
+    replacement = planner.scenario_table.cellWidget(scheduled, 5)
+    assert replacement.isEnabled()
+    replacement.setCurrentIndex(replacement.findData("comp"))
     wait_result(qtbot, planner)
-    assert category(planner.session.result).scenario.horizon_balance == 84
-    assert planner.scenario_table.item(0, 6).text() == "scheduled"
-    planner.scenario_table.selectRow(0)
+    assert category(planner.session.result).scenario.horizon_balance == 108
+    assert category(planner.session.result, "comp").scenario.horizon_balance == -16
+    assert [(op.operation, op.category, op.date, op.hours) for op in planner.session.definition.operations] == [
+        ("replace", "comp", "2026-07-15", 16)
+    ]
+
+    operation.setCurrentIndex(operation.findData("unchanged"))
+    wait_result(qtbot, planner)
+    assert category(planner.session.result).scenario.horizon_balance == 92
+    assert planner.session.definition.operations == ()
+
+    operation.setCurrentIndex(operation.findData("remove"))
+    wait_result(qtbot, planner)
+    assert category(planner.session.result).scenario.horizon_balance == 108
+    assert planner.scenario_table.item(scheduled, 0).text() == "Scheduled"
+
+    planner.scenario_table.selectRow(scheduled)
     planner.delete_selected()
     wait_result(qtbot, planner)
     assert category(planner.session.result).scenario.horizon_balance == 92
-    planner.scheduled_table.selectRow(0)
-    planner.add_selected("remove")
-    wait_result(qtbot, planner)
-    assert category(planner.session.result).scenario.horizon_balance == 108
+    assert row_with_source(planner, "Scheduled") >= 0
+    assert planner.scenario_table.cellWidget(row_with_source(planner, "Scheduled"), 4).currentData() == "unchanged"
+
     planner.reset_scenario()
     wait_result(qtbot, planner)
     assert category(planner.session.result).baseline == category(planner.session.result).scenario
     assert planner.session.definition.reserves == {"annual": 80}
+    assert row_with_source(planner, "Scheduled") >= 0
 
 
 def test_import_is_atomic_roundtrips_and_keeps_explicit_lot_links(qtbot, planner):
@@ -203,23 +239,37 @@ def test_import_is_atomic_roundtrips_and_keeps_explicit_lot_links(qtbot, planner
         planner.import_document(encoded.replace('"schema_version": 1', '"schema_version": 99'), mode="replace")
     assert planner.session.definition.to_dict() == before
     assert not planner.session.modified
-    assert planner.scenario_table.item(0, 0).text() == "tentative"
+    assert proposed_rows(planner)
+    assert planner.scenario_table.cellWidget(proposed_rows(planner)[0], 4).currentData() == "add"
 
 
-def test_stale_material_reference_remains_visible_until_explicit_resolution(qtbot, planner):
-    planner.scheduled_table.selectRow(0)
-    planner.add_selected("replace")
-    wait_result(qtbot, planner)
-    changed = deepcopy(planner.session.snapshot)
-    changed["transactions"][0]["hours"] = 8
-    planner.set_snapshot(changed)
-    qtbot.waitUntil(lambda: "changed materially" in planner.status_label.text(), timeout=10000)
-    assert planner.session.result is None
-    assert planner.scenario_table.item(0, 6).text() == "scheduled"
-    planner.scenario_table.selectRow(0)
-    planner.resolve_selected()
-    wait_result(qtbot, planner)
-    assert planner.session.definition.operations[0].original_ids == ("scheduled",)
+def test_unified_rows_keep_duplicate_originals_and_stable_ids(qtbot):
+    source = snapshot()
+    first = deepcopy(source["transactions"][0])
+    first.update(id="dup-a", hours=8)
+    second = deepcopy(first)
+    second["id"] = "dup-b"
+    source["transactions"] = [first, second]
+    view = PlannerWidget(Path("/selected/backend"), "/selected/store", 2026, today=TODAY)
+    qtbot.addWidget(view)
+    try:
+        view.set_snapshot(source)
+        view.horizon_edit.setDate(QDate(2026, 7, 31))
+        wait_result(qtbot, view)
+        scheduled = [row for row in range(view.scenario_table.rowCount()) if view._row_meta(row)["kind"] == "scheduled"]
+        assert len(scheduled) == 2
+        operation = view.scenario_table.cellWidget(scheduled[0], 4)
+        operation.setCurrentIndex(operation.findData("remove"))
+        wait_result(qtbot, view)
+        assert [(op.operation, op.original_ids) for op in view.session.definition.operations] == [
+            ("remove", ("dup-a",))
+        ]
+        assert view.scenario_table.item(scheduled[1], 0).text() == "Scheduled"
+        assert view.scenario_table.cellWidget(scheduled[1], 4).currentData() == "unchanged"
+        assert view.scenario_table.item(scheduled[1], 1).text() == "2026-07-15"
+    finally:
+        view.shutdown()
+        qtbot.waitUntil(lambda: not view._tasks, timeout=15000)
 
 
 def test_file_import_refreshes_source_and_rejects_stale_refs_atomically(qtbot, planner, monkeypatch, tmp_path):
@@ -260,7 +310,8 @@ def test_imported_explicit_lot_link_survives_gui_roundtrip(qtbot, planner):
     op = operation(source, category="comp", date="2026-07-14", hours=2, earned_transaction_id="lot")
     planner.import_document(export_scenario(replace(scenario(source), operations=(op,))), mode="replace")
     wait_result(qtbot, planner)
-    assert planner.scenario_table.item(0, 8).text() == "lot"
+    proposed = proposed_rows(planner)[0]
+    assert planner._row_meta(proposed)["earned_transaction_id"] == "lot"
     assert planner.session.definition.operations[0].earned_transaction_id == "lot"
     assert planner._collect_definition()["operations"][0]["earned_transaction_id"] == "lot"
 
@@ -337,12 +388,15 @@ def test_real_backend_legacy_read_only_store_survives_full_planner_lifecycle(qtb
         wait_result(qtbot, view)
         view.add_tentative()
         wait_result(qtbot, view)
+        proposed = row_with_source(view, "Proposed")
         QTimer.singleShot(0, lambda: QApplication.activeModalWidget().accept())
-        view.pick_date(0, 2)
-        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().reject())
-        view.choose_scheduled("replace")
-        QTimer.singleShot(0, lambda: QApplication.activeModalWidget().reject())
-        view.choose_scheduled("remove")
+        view.pick_date(proposed, 1)
+        scheduled = row_with_source(view, "Scheduled")
+        operation = view.scenario_table.cellWidget(scheduled, 4)
+        operation.setCurrentIndex(operation.findData("replace"))
+        replacement = view.scenario_table.cellWidget(scheduled, 5)
+        replacement.setCurrentIndex(replacement.findData("comp"))
+        wait_result(qtbot, view)
         definition_path = tmp_path / "scenario.json"
         monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(definition_path), "JSON"))
         view.export_json()
@@ -367,3 +421,123 @@ def test_real_backend_legacy_read_only_store_survives_full_planner_lifecycle(qtb
         year_file.chmod(0o644)
         view.shutdown()
         QThreadPool.globalInstance().waitForDone(15000)
+
+
+def test_scheduled_and_proposed_operation_menus_and_proposed_remove(qtbot, planner):
+    scheduled = row_with_source(planner, "Scheduled")
+    operation = planner.scenario_table.cellWidget(scheduled, 4)
+    assert [operation.itemData(index) for index in range(operation.count())] == [
+        "unchanged",
+        "remove",
+        "replace",
+    ]
+    planner.add_tentative()
+    wait_result(qtbot, planner)
+    proposed = row_with_source(planner, "Proposed")
+    proposed_operation = planner.scenario_table.cellWidget(proposed, 4)
+    assert [proposed_operation.itemData(index) for index in range(proposed_operation.count())] == ["add", "remove"]
+    assert proposed_operation.findData("replace") < 0
+    proposed_operation.setCurrentIndex(proposed_operation.findData("remove"))
+    wait_result(qtbot, planner)
+    assert not proposed_rows(planner)
+    assert planner.session.definition.operations == ()
+
+
+def test_reset_keeps_scheduled_rows_and_discards_proposed_rows(qtbot, planner):
+    scheduled = row_with_source(planner, "Scheduled")
+    operation = planner.scenario_table.cellWidget(scheduled, 4)
+    operation.setCurrentIndex(operation.findData("remove"))
+    planner.add_tentative()
+    wait_result(qtbot, planner)
+    assert proposed_rows(planner)
+    planner.reset_scenario()
+    wait_result(qtbot, planner)
+    assert row_with_source(planner, "Scheduled") >= 0
+    assert not proposed_rows(planner)
+    assert planner.scenario_table.cellWidget(row_with_source(planner, "Scheduled"), 4).currentData() == "unchanged"
+    assert planner.session.definition.operations == ()
+
+
+def test_period_change_refreshes_rows_and_surfaces_out_of_range_edit(qtbot, planner):
+    scheduled = row_with_source(planner, "Scheduled")
+    operation = planner.scenario_table.cellWidget(scheduled, 4)
+    operation.setCurrentIndex(operation.findData("replace"))
+    replacement = planner.scenario_table.cellWidget(scheduled, 5)
+    replacement.setCurrentIndex(replacement.findData("comp"))
+    wait_result(qtbot, planner)
+    assert planner.session.definition.operations[0].category == "comp"
+
+    planner.horizon_edit.setDate(QDate(2026, 7, 14))
+    qtbot.waitUntil(lambda: "not an effective future absence" in planner.status_label.text(), timeout=10000)
+    assert not [
+        row for row in range(planner.scenario_table.rowCount()) if planner._row_meta(row)["kind"] == "scheduled"
+    ]
+    assert any(operation["operation"] == "replace" for operation in planner._preserved_operations)
+
+    planner.horizon_edit.setDate(QDate(2026, 7, 31))
+    wait_result(qtbot, planner)
+    scheduled = row_with_source(planner, "Scheduled")
+    assert planner.scenario_table.cellWidget(scheduled, 4).currentData() == "replace"
+    assert planner.scenario_table.cellWidget(scheduled, 5).currentData() == "comp"
+
+
+def test_legacy_combined_replace_is_read_only_and_preserved(qtbot):
+    source = snapshot()
+    first = deepcopy(source["transactions"][0])
+    first.update(id="dup-a", hours=8)
+    second = deepcopy(first)
+    second["id"] = "dup-b"
+    source["transactions"] = [first, second]
+    definition = replace(
+        scenario(source),
+        operations=(
+            operation(
+                source,
+                operation="replace",
+                original_ids=("dup-a", "dup-b"),
+                date="2026-07-15",
+                hours=16,
+                category="comp",
+            ),
+        ),
+    )
+    view = PlannerWidget(Path("/selected/backend"), "/selected/store", 2026, today=TODAY)
+    qtbot.addWidget(view)
+    try:
+        view.set_snapshot(source)
+        view.horizon_edit.setDate(QDate(2026, 7, 31))
+        wait_result(qtbot, view)
+        view.import_document(export_scenario(definition), mode="replace")
+        wait_result(qtbot, view)
+        scheduled = [row for row in range(view.scenario_table.rowCount()) if view._row_meta(row)["kind"] == "scheduled"]
+        assert len(scheduled) == 2
+        for row in scheduled:
+            assert view._row_meta(row)["legacy"]
+            assert view.scenario_table.cellWidget(row, 4).currentData() == "replace"
+            assert not view.scenario_table.cellWidget(row, 4).isEnabled()
+            assert view.scenario_table.cellWidget(row, 5).currentData() == "comp"
+        operations = view._collect_definition()["operations"]
+        assert len(operations) == 1
+        assert operations[0]["original_ids"] == ["dup-a", "dup-b"]
+        assert operations[0]["category"] == "comp"
+    finally:
+        view.shutdown()
+        qtbot.waitUntil(lambda: not view._tasks, timeout=15000)
+
+
+def test_no_scheduled_leave_leaves_only_the_add_workflow(qtbot):
+    source = snapshot()
+    source["transactions"] = []
+    view = PlannerWidget(Path("/selected/backend"), "/selected/store", 2026, today=TODAY)
+    qtbot.addWidget(view)
+    try:
+        view.set_snapshot(source)
+        view.horizon_edit.setDate(QDate(2026, 7, 31))
+        wait_result(qtbot, view)
+        assert view.scenario_table.rowCount() == 0
+        view.add_tentative()
+        wait_result(qtbot, view)
+        assert len(proposed_rows(view)) == 1
+    finally:
+        view.shutdown()
+        qtbot.waitUntil(lambda: not view._tasks, timeout=15000)

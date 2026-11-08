@@ -287,14 +287,17 @@ with current shared analytics preferences. No budget action can book leave.
 
 ## Planning interaction and help
 
-`planning_controls` owns passive date and scheduled-use chooser dialogs, accepting
-only dates and defensive transaction copies. Calendar picks use the current
-cutoff-exclusive/horizon-inclusive range, while cancellation preserves original
-cell text. Remove operations do not expose editable dates. Mouse click and
-Space/Enter share the same picker; existing ISO text validation remains canonical.
-Checked bookings preserve stable source-row identities during sorting; already
-targeted originals cannot be selected again. Dialog confirmation creates ordinary
-schema-1 operations through the existing planner session, never ledger writers.
+`planning_controls` owns the passive scenario-date dialog, accepting only dates
+within the cutoff-exclusive/horizon-inclusive range; cancellation preserves
+original cell text. The What-if Scenario rows table is a view of eligible
+scheduled transactions overlaid on draft operations by stable original ID:
+Scheduled rows default to Unchanged, Remove and Replace map to ordinary
+schema-1 operations, and Replace changes only the leave category while retaining
+the original date and hours. Proposed Add rows use the same table with a
+restricted Add/Remove operation menu; Proposed/Remove discards the draft Add.
+Multi-original legacy operations remain read-only and are never silently split.
+Mouse click and Space/Enter share the date picker, and no table action writes
+canonical leave records.
 
 `action_help` supplies short descriptions across the four Planning views.
 File > Help/F1 in a planning window opens `help_view` at that window's tool

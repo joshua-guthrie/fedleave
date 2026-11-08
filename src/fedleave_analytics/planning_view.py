@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from PySide6.QtCore import QDate, QEvent, QObject, QRunnable, Qt, QThreadPool, QTimer, Signal, Slot
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QBrush, QColor, QFont, QPixmap
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -35,7 +35,6 @@ from PySide6.QtWidgets import (
 
 from fedleave.planning import (
     PlanningValidationError,
-    make_operation,
     scheduled_transactions,
     source_identity,
     transaction_fingerprint,
@@ -44,10 +43,11 @@ from fedleave.planning import (
 
 from .action_help import ACTION_HELP
 from .charts import AnalyticsChartWindow, ResponsivePixmapLabel, render_planning_chart, table_widget
-from .planning_controls import ScenarioDateDialog, ScheduledUseDialog
+from .planning_controls import ScenarioDateDialog
 from .planning_model import (
     DAILY_COLUMNS,
     PlanningSession,
+    category_label,
     category_options,
     export_destination,
     load_planning_snapshot,
@@ -108,7 +108,11 @@ class PlannerWidget(QWidget):
         self._tasks = {}
         self._fingerprints = {}
         self._draft_reserves = {}
-        self._scheduled = []
+        self._preserved_operations = []
+        self._legacy_operations = []
+        self._daily_work_hours = None
+        self._pending_definition = None
+        self._pending_source_hash = None
         self._charts = []
         self._views = {}
         self._timer = QTimer(self)
@@ -126,7 +130,7 @@ class PlannerWidget(QWidget):
         for edit in (self.cutoff_edit, self.horizon_edit):
             edit.setDisplayFormat("yyyy-MM-dd")
             edit.setCalendarPopup(True)
-            edit.dateChanged.connect(self._changed)
+            edit.dateChanged.connect(self._period_changed)
         self.category_combo = QComboBox()
         for key, label in category_options():
             self.category_combo.addItem(label, key)
@@ -163,15 +167,13 @@ class PlannerWidget(QWidget):
         self.category_combo.currentIndexChanged.connect(self._category_changed)
         actions = QHBoxLayout()
         self.add_button = self._button(actions, "Add tentative use", self.add_tentative)
-        self.replace_button = self._button(
-            actions, "Replace scheduled use...", lambda: self.choose_scheduled("replace")
-        )
-        self.remove_button = self._button(actions, "Remove scheduled use...", lambda: self.choose_scheduled("remove"))
         self.delete_button = self._button(actions, "Undo selected changes", self.delete_selected)
         self.reset_button = self._button(actions, "Reset all changes", self.reset_scenario)
         layout.addLayout(actions)
         explanation = QLabel(
-            "Add creates extra tentative use. Replace/Remove let you choose existing bookings. Undo restores the selected draft change's originals; Reset clears all draft changes. File > Help explains each action."
+            "Scheduled rows default to Unchanged; choose Remove or Replace in the row's Operation column. "
+            "Add creates a Proposed row. Undo resets selected Scheduled rows or discards selected Proposed rows; "
+            "Reset clears all draft changes. File > Help explains each operation."
         )
         explanation.setWordWrap(True)
         layout.addWidget(explanation)
@@ -202,47 +204,39 @@ class PlannerWidget(QWidget):
         layout.addWidget(self.progress)
         self.splitter = QSplitter(Qt.Vertical)
         self.editor_tabs = QTabWidget()
-        self.scenario_table = QTableWidget(0, 9)
+        self.scenario_table = QTableWidget(0, 7)
         self.scenario_table.setHorizontalHeaderLabels(
             [
-                "Scenario row ID",
-                "Operation",
+                "Source",
                 "Date",
-                "Category",
-                "Hours to use",
+                "Leave Type",
+                "Hours",
+                "Operation",
+                "Replacement Leave Type",
                 "Note",
-                "Original transaction IDs",
-                "Validation",
-                "Earned lot ID (optional)",
             ]
         )
         self.scenario_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.scenario_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.scenario_table.cellChanged.connect(self._cell_changed)
         self.scenario_table.cellClicked.connect(self.pick_date)
         self.scenario_table.installEventFilter(self)
-        self.scenario_table.horizontalHeaderItem(2).setToolTip(
-            "Click a Date cell, or press Space/Enter on it, to open a calendar. F2 also allows ISO date text."
+        self.scenario_table.horizontalHeaderItem(0).setToolTip(
+            "Scheduled rows are existing bookings. Proposed rows are tentative additions."
         )
-        for column, width in enumerate((175, 105, 125, 205, 100, 180, 210, 280, 190)):
+        self.scenario_table.horizontalHeaderItem(1).setToolTip(
+            "Scheduled dates are fixed. Click a Proposed Date cell, or press Space/Enter, to open a calendar."
+        )
+        self.scenario_table.horizontalHeaderItem(4).setToolTip(
+            "Scheduled: Unchanged, Remove or Replace. Proposed: Add or Remove."
+        )
+        self.scenario_table.horizontalHeaderItem(5).setToolTip(
+            "Enabled only for a Scheduled Replace; chooses the scenario's leave category while date and hours stay fixed."
+        )
+        for column, width in enumerate((95, 120, 205, 85, 130, 210, 320)):
             self.scenario_table.setColumnWidth(column, width)
-        for column in (0, 6, 7, 8):
-            self.scenario_table.setColumnHidden(column, True)
-        self.scenario_table.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self.scenario_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Stretch)
         self.editor_tabs.addTab(self.scenario_table, "Scenario rows")
-        self.scheduled_table = table_widget(
-            [],
-            [
-                ("id", "Original ID"),
-                ("date", "Scheduled date"),
-                ("category", "Category"),
-                ("hours", "Hours"),
-                ("status", "Status"),
-                ("description", "Note"),
-            ],
-        )
-        self.scheduled_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.scheduled_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.editor_tabs.addTab(self.scheduled_table, "Existing scheduled leave (read-only)")
         self.splitter.addWidget(self.editor_tabs)
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -277,8 +271,10 @@ class PlannerWidget(QWidget):
         self.cancel()
         self.backend, self.data_dir, self.year = backend, data_dir, year
         self.session = None
-        self._scheduled = []
-        self.scheduled_table.setRowCount(0)
+        self.scenario_table.setRowCount(0)
+        self._preserved_operations = []
+        self._legacy_operations = []
+        self._daily_work_hours = None
         self.status_label.setText(
             "Source changed. Reload the selected leave year; references will be validated against that source."
         )
@@ -295,6 +291,12 @@ class PlannerWidget(QWidget):
 
     def load_source(self):
         self._timer.stop()
+        if self.session is not None:
+            try:
+                self._pending_definition = self._collect_definition()
+            except PlanningValidationError:
+                self._pending_definition = self.session.definition.to_dict()
+            self._pending_source_hash = (self._definition_source or {}).get("snapshot_fingerprint")
         self._clear_results()
         self.session = None
         self._set_loading(True)
@@ -306,12 +308,26 @@ class PlannerWidget(QWidget):
         """Install a snapshot, retaining old reference hashes for stale checks."""
         self._updating = True
         try:
-            self.session = PlanningSession(snapshot, today=self.today, saved_fingerprint=self._saved_fingerprint)
+            identity = source_identity(snapshot)
+            preserved = (
+                self._pending_definition
+                if self._pending_source_hash is not None
+                and self._pending_source_hash == identity.get("snapshot_fingerprint")
+                else None
+            )
+            try:
+                self.session = PlanningSession(
+                    snapshot,
+                    today=self.today,
+                    definition=preserved,
+                    saved_fingerprint=self._saved_fingerprint,
+                )
+            except PlanningValidationError:
+                self.session = PlanningSession(snapshot, today=self.today, saved_fingerprint=self._saved_fingerprint)
             if self._saved_fingerprint is None:
                 self._saved_fingerprint = self.session.saved_fingerprint
             initial = self._definition_source is None
-            if initial:
-                self._definition_source = source_identity(snapshot)
+            self._definition_source = identity
             start = QDate.fromString(snapshot["leave_year_start"], "yyyy-MM-dd")
             end = QDate.fromString(snapshot["leave_year_end"], "yyyy-MM-dd")
             for edit in (self.cutoff_edit, self.horizon_edit):
@@ -321,37 +337,11 @@ class PlannerWidget(QWidget):
                 self.horizon_edit.setDate(end)
         finally:
             self._updating = False
-        self._refresh_scheduled()
+            self._pending_definition = None
+            self._pending_source_hash = None
+        self._rebuild_rows(self.session.definition.operations)
         self.source_loaded.emit(snapshot)
         self.recalculate()
-
-    def _refresh_scheduled(self):
-        if self.session is None:
-            return
-        scheduled = scheduled_transactions(
-            self.session.snapshot,
-            self.cutoff_edit.date().toString("yyyy-MM-dd"),
-            self.horizon_edit.date().toString("yyyy-MM-dd"),
-        )
-        if scheduled == self._scheduled:
-            return
-        self._scheduled = scheduled
-        columns = [
-            ("id", "Original ID"),
-            ("date", "Scheduled date"),
-            ("category", "Category"),
-            ("hours", "Hours"),
-            ("status", "Status"),
-            ("description", "Note"),
-        ]
-        old = self.scheduled_table
-        index = self.editor_tabs.indexOf(old)
-        self.scheduled_table = table_widget(self._scheduled, columns)
-        self.scheduled_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.scheduled_table.setSelectionMode(QAbstractItemView.ExtendedSelection)
-        self.editor_tabs.removeTab(index)
-        self.editor_tabs.insertTab(index, self.scheduled_table, "Existing scheduled leave (read-only)")
-        old.deleteLater()
 
     def _clear_results(self):
         if self.session:
@@ -389,29 +379,43 @@ class PlannerWidget(QWidget):
         self.reserve_edit.blockSignals(False)
         self._render_result()
 
+    def _row_meta(self, row):
+        item = self.scenario_table.item(row, 0)
+        return item.data(Qt.UserRole) if item else None
+
+    def _find_row(self, key):
+        for row in range(self.scenario_table.rowCount()):
+            meta = self._row_meta(row)
+            if meta and meta.get("key") == key:
+                return row
+        return -1
+
     def _cell_changed(self, row, column):
         if self._updating:
             return
-        if column == 6:
-            self._capture_references(row)
-        self._changed()
+        meta = self._row_meta(row)
+        if meta and meta.get("kind") == "proposed" and column in {1, 3, 6}:
+            self._changed()
 
     def eventFilter(self, watched, event):
         if (
             watched is self.scenario_table
             and event.type() == QEvent.KeyPress
             and event.key() in {Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter}
-            and self.scenario_table.currentColumn() == 2
+            and self.scenario_table.currentColumn() == 1
         ):
-            self.pick_date(self.scenario_table.currentRow(), 2)
+            self.pick_date(self.scenario_table.currentRow(), 1)
             return True
         return super().eventFilter(watched, event)
 
     def pick_date(self, row, column):
-        if column != 2 or row < 0 or self.session is None or self._loading:
+        if column != 1 or row < 0 or self.session is None or self._loading:
+            return
+        meta = self._row_meta(row)
+        if not meta or meta.get("kind") != "proposed":
             return
         item = self.scenario_table.item(row, column)
-        if item is None or not item.flags() & Qt.ItemIsEditable:
+        if item is None:
             return
         minimum, maximum = self.cutoff_edit.date().addDays(1), self.horizon_edit.date()
         if minimum > maximum:
@@ -425,38 +429,124 @@ class PlannerWidget(QWidget):
             item.setToolTip("Click or press Space/Enter to choose a date. " + item.text())
         dialog.deleteLater()
 
-    def _capture_references(self, row):
-        if self.session is None:
-            return
-        row_id = self.scenario_table.item(row, 0).text()
-        ids = [value.strip() for value in self.scenario_table.item(row, 6).text().split(",") if value.strip()]
-        originals = {str(tx.get("id")): tx for tx in self.session.snapshot.get("transactions", [])}
-        self._fingerprints[row_id] = {key: transaction_fingerprint(originals[key]) for key in ids if key in originals}
+    def _operation_dict(self, operation):
+        return {
+            "row_id": operation.row_id,
+            "operation": operation.operation,
+            "date": operation.date,
+            "category": operation.category,
+            "hours": operation.hours,
+            "note": operation.note,
+            "original_ids": list(operation.original_ids),
+            "original_fingerprints": deepcopy(operation.original_fingerprints),
+            "earned_transaction_id": operation.earned_transaction_id,
+        }
 
-    def _collect_definition(self):
+    def _collect_operations(self):
         if self.session is None:
             raise PlanningValidationError([{"field": "snapshot", "message": "Load the selected leave year first."}])
-        rows = []
+        operations = []
+        represented = set()
         for row in range(self.scenario_table.rowCount()):
-
-            def item(column):
-                return self.scenario_table.item(row, column).text()
-
-            row_id = item(0)
-            operation = self.scenario_table.cellWidget(row, 1).currentData()
-            rows.append(
+            meta = self._row_meta(row)
+            if meta is None:
+                continue
+            if meta["kind"] == "scheduled":
+                original = meta["original"]
+                original_id = meta["original_id"]
+                represented.add(original_id)
+                if meta.get("legacy"):
+                    continue
+                operation = self.scenario_table.cellWidget(row, 4).currentData()
+                if operation == "unchanged":
+                    continue
+                row_id = meta.get("row_id") or "scheduled-" + uuid4().hex[:12]
+                meta["row_id"] = row_id
+                self.scenario_table.item(row, 0).setData(Qt.UserRole, meta)
+                fingerprints = {original_id: transaction_fingerprint(original)}
+                if operation == "remove":
+                    operations.append(
+                        {
+                            "row_id": row_id,
+                            "operation": "remove",
+                            "date": None,
+                            "category": None,
+                            "hours": 0,
+                            "note": str(original.get("description", "")),
+                            "original_ids": [original_id],
+                            "original_fingerprints": fingerprints,
+                            "earned_transaction_id": None,
+                        }
+                    )
+                    continue
+                if operation == "replace":
+                    replacement = self.scenario_table.cellWidget(row, 5).currentData()
+                    if not replacement:
+                        raise PlanningValidationError(
+                            [{"row_id": row_id, "field": "category", "message": "Choose a replacement leave type."}]
+                        )
+                    if replacement == original.get("category"):
+                        raise PlanningValidationError(
+                            [
+                                {
+                                    "row_id": row_id,
+                                    "field": "category",
+                                    "message": "Replacement leave type must differ from the scheduled leave type.",
+                                }
+                            ]
+                        )
+                    operations.append(
+                        {
+                            "row_id": row_id,
+                            "operation": "replace",
+                            "date": original["date"],
+                            "category": replacement,
+                            "hours": original["hours"],
+                            "note": str(original.get("description", "")),
+                            "original_ids": [original_id],
+                            "original_fingerprints": fingerprints,
+                            "earned_transaction_id": None,
+                        }
+                    )
+                continue
+            operation = self.scenario_table.cellWidget(row, 4).currentData()
+            if operation == "remove":
+                continue
+            category = self.scenario_table.cellWidget(row, 2).currentData()
+            if not category:
+                raise PlanningValidationError(
+                    [{"row_id": meta["row_id"], "field": "category", "message": "Choose a leave type."}]
+                )
+            operations.append(
                 {
-                    "row_id": row_id,
-                    "operation": operation,
-                    "date": item(2),
-                    "category": self.scenario_table.cellWidget(row, 3).currentData(),
-                    "hours": item(4),
-                    "note": item(5),
-                    "original_ids": [value.strip() for value in item(6).split(",") if value.strip()],
-                    "original_fingerprints": deepcopy(self._fingerprints.get(row_id, {})),
-                    "earned_transaction_id": item(8).strip() or None,
+                    "row_id": meta["row_id"],
+                    "operation": "add",
+                    "date": self.scenario_table.item(row, 1).text(),
+                    "category": category,
+                    "hours": self.scenario_table.item(row, 3).text(),
+                    "note": self.scenario_table.item(row, 6).text(),
+                    "original_ids": [],
+                    "original_fingerprints": {},
+                    "earned_transaction_id": meta.get("earned_transaction_id"),
                 }
             )
+        row_ids = {operation["row_id"] for operation in operations}
+        for operation in self._legacy_operations:
+            normalized = self._operation_dict(operation)
+            if normalized["row_id"] in row_ids:
+                continue
+            row_ids.add(normalized["row_id"])
+            operations.append(normalized)
+        for operation in self._preserved_operations:
+            normalized = self._operation_dict(operation)
+            if represented & set(normalized.get("original_ids", ())) or normalized["row_id"] in row_ids:
+                continue
+            row_ids.add(normalized["row_id"])
+            operations.append(normalized)
+        return operations
+
+    def _collect_definition(self):
+        rows = self._collect_operations()
         return {
             "schema_version": 1,
             "name": self.name_edit.text(),
@@ -478,7 +568,6 @@ class PlannerWidget(QWidget):
             self._show_errors(exc.errors)
             return
         snapshot, today = deepcopy(self.session.snapshot), self.today
-        self._refresh_scheduled()
         self._clear_results()
         self.status_label.setText("Calculating baseline and scenario from the same snapshot...")
 
@@ -505,10 +594,7 @@ class PlannerWidget(QWidget):
         definition, result = value
         self.session.set_definition(definition)
         self.session.result = result
-        self._updating = True
-        for row in range(self.scenario_table.rowCount()):
-            self.scenario_table.item(row, 7).setText("Valid input")
-        self._updating = False
+        self._clear_row_errors()
         self.modified_label.setText(
             "Modified since last export/import"
             if self.session.modified
@@ -531,18 +617,30 @@ class PlannerWidget(QWidget):
             self._clear_results()
             self._show_errors(errors)
 
+    def _clear_row_errors(self):
+        self._updating = True
+        for row in range(self.scenario_table.rowCount()):
+            self._apply_row_style(row)
+        self._updating = False
+
     def _show_errors(self, errors):
         self.status_label.setText(
             "Invalid input: "
             + "; ".join(f"{item.get('row_id') or item.get('field')}: {item['message']}" for item in errors)
         )
+        by_row = {}
+        for item in errors:
+            by_row.setdefault(str(item.get("row_id") or ""), []).append(f"{item.get('field')}: {item['message']}")
         self._updating = True
         for row in range(self.scenario_table.rowCount()):
-            row_id = self.scenario_table.item(row, 0).text()
-            messages = [f"{item.get('field')}: {item['message']}" for item in errors if item.get("row_id") == row_id]
-            item = self.scenario_table.item(row, 7)
-            item.setText("; ".join(messages))
-            item.setToolTip(item.text())
+            meta = self._row_meta(row)
+            messages = by_row.get(str(meta.get("row_id") or "")) if meta else None
+            source = self.scenario_table.item(row, 0)
+            if messages and source is not None:
+                source.setToolTip("; ".join(messages))
+                source.setForeground(QBrush(QColor("#B00020")))
+            else:
+                self._apply_row_style(row)
         self._updating = False
 
     def cancel(self):
@@ -569,8 +667,6 @@ class PlannerWidget(QWidget):
             self.reserve_edit,
             self.editor_tabs,
             self.add_button,
-            self.replace_button,
-            self.remove_button,
             self.delete_button,
             self.reset_button,
             self.resolve_button,
@@ -580,66 +676,246 @@ class PlannerWidget(QWidget):
         ):
             widget.setEnabled(not loading)
 
-    def _append_operation(self, operation, *, notify=True):
-        self._updating = True
-        row = self.scenario_table.rowCount()
-        self.scenario_table.insertRow(row)
-        original = next((tx for tx in self._scheduled if str(tx.get("id")) in operation.original_ids), {})
-        values = {
-            0: operation.row_id,
-            2: operation.date or original.get("date", ""),
-            4: str(operation.hours),
-            5: operation.note,
-            6: ", ".join(operation.original_ids),
-            7: "",
-            8: operation.earned_transaction_id or "",
-        }
-        for column, value in values.items():
-            item = QTableWidgetItem(value)
-            if column in {0, 7}:
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            item.setToolTip(value)
-            self.scenario_table.setItem(row, column, item)
-        operation_combo = QComboBox()
-        for key, label in (("add", "Add"), ("replace", "Replace"), ("remove", "Remove")):
-            operation_combo.addItem(label, key)
-        operation_combo.setCurrentIndex(operation_combo.findData(operation.operation))
-        operation_combo.currentIndexChanged.connect(
-            lambda _index, row_id=operation.row_id: self._operation_changed(row_id)
-        )
-        self.scenario_table.setCellWidget(row, 1, operation_combo)
-        category_combo = QComboBox()
-        for key, label in category_options():
-            category_combo.addItem(label, key)
-        category_combo.setCurrentIndex(
-            max(
-                0,
-                category_combo.findData(
-                    operation.category or original.get("category") or self.category_combo.currentData()
-                ),
-            )
-        )
-        category_combo.currentIndexChanged.connect(self._changed)
-        self.scenario_table.setCellWidget(row, 3, category_combo)
-        self._fingerprints[operation.row_id] = deepcopy(operation.original_fingerprints)
-        self._updating = False
-        self._operation_changed(operation.row_id, notify=notify)
+    def _period_changed(self, *_args):
+        if self._updating or self._closed or self.session is None:
+            return
+        try:
+            operations = self._collect_operations()
+        except PlanningValidationError:
+            operations = [self._operation_dict(operation) for operation in self.session.definition.operations]
+        self._rebuild_rows(operations)
+        self._changed()
 
-    def _operation_changed(self, row_id, *, notify=True):
-        for row in range(self.scenario_table.rowCount()):
-            if self.scenario_table.item(row, 0).text() != row_id:
-                continue
-            removal = self.scenario_table.cellWidget(row, 1).currentData() == "remove"
-            self._updating = True
-            for column in (2, 4):
-                item = self.scenario_table.item(row, column)
-                item.setFlags(item.flags() & ~Qt.ItemIsEditable if removal else item.flags() | Qt.ItemIsEditable)
-            self.scenario_table.cellWidget(row, 3).setEnabled(not removal)
-            if removal:
-                self.scenario_table.item(row, 4).setText("0")
+    def _operation_dict(self, operation):
+        if isinstance(operation, dict):
+            return deepcopy(operation)
+        return {
+            "row_id": operation.row_id,
+            "operation": operation.operation,
+            "date": operation.date,
+            "category": operation.category,
+            "hours": operation.hours,
+            "note": operation.note,
+            "original_ids": list(operation.original_ids),
+            "original_fingerprints": deepcopy(operation.original_fingerprints),
+            "earned_transaction_id": operation.earned_transaction_id,
+        }
+
+    def _rebuild_rows(self, operations):
+        if self.session is None:
+            return
+        normalized = [self._operation_dict(operation) for operation in operations]
+        cutoff = self.cutoff_edit.date().toString("yyyy-MM-dd")
+        horizon = self.horizon_edit.date().toString("yyyy-MM-dd")
+        scheduled = sorted(
+            scheduled_transactions(self.session.snapshot, cutoff, horizon),
+            key=lambda transaction: (
+                str(transaction.get("date", "")),
+                str(transaction.get("category", "")),
+                str(transaction.get("id", "")),
+                float(transaction.get("hours", 0) or 0),
+            ),
+        )
+        single, legacy, legacy_operations, adds, preserved = {}, {}, [], [], []
+        for operation in normalized:
+            original_ids = tuple(operation.get("original_ids", ()))
+            if operation.get("operation") == "add":
+                adds.append(operation)
+            elif len(original_ids) > 1:
+                for original_id in original_ids:
+                    legacy[original_id] = operation
+                if operation["row_id"] not in {row["row_id"] for row in legacy_operations}:
+                    legacy_operations.append(operation)
+            elif len(original_ids) == 1:
+                single[original_ids[0]] = operation
+            else:
+                preserved.append(operation)
+        scheduled_ids = {str(transaction["id"]) for transaction in scheduled}
+        for original_id, operation in single.items():
+            if original_id not in scheduled_ids:
+                preserved.append(operation)
+        self._preserved_operations = preserved
+        self._legacy_operations = legacy_operations
+        rows = []
+        for transaction in scheduled:
+            original_id = str(transaction["id"])
+            operation = single.get(original_id)
+            legacy_operation = legacy.get(original_id)
+            selected = operation or legacy_operation
+            state = selected.get("operation", "unchanged") if selected else "unchanged"
+            rows.append(
+                {
+                    "kind": "scheduled",
+                    "key": original_id,
+                    "original_id": original_id,
+                    "original": transaction,
+                    "row_id": selected.get("row_id") if selected else None,
+                    "operation": state,
+                    "replacement": selected.get("category") if state == "replace" else None,
+                    "legacy": legacy_operation is not None,
+                    "date": str(transaction.get("date", "")),
+                    "category": str(transaction.get("category", "")),
+                    "hours": transaction.get("hours", ""),
+                    "note": str(transaction.get("description", "")),
+                    "earned_transaction_id": None,
+                }
+            )
+        for operation in sorted(
+            adds,
+            key=lambda item: (str(item.get("date") or ""), str(item.get("category") or ""), item["row_id"]),
+        ):
+            rows.append(
+                {
+                    "kind": "proposed",
+                    "key": operation["row_id"],
+                    "row_id": operation["row_id"],
+                    "operation": "add",
+                    "date": str(operation.get("date") or ""),
+                    "category": str(operation.get("category") or ""),
+                    "hours": operation.get("hours", ""),
+                    "note": str(operation.get("note") or ""),
+                    "earned_transaction_id": operation.get("earned_transaction_id"),
+                    "legacy": False,
+                }
+            )
+        self._render_rows(rows)
+
+    @staticmethod
+    def _read_only(item):
+        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+        return item
+
+    def _render_rows(self, rows):
+        self._updating = True
+        try:
+            self.scenario_table.setRowCount(0)
+            for row in rows:
+                self._render_row(row)
+        finally:
             self._updating = False
-            break
-        if notify:
+        for index in range(self.scenario_table.rowCount()):
+            self._apply_row_style(index)
+
+    def _render_row(self, row):
+        index = self.scenario_table.rowCount()
+        self.scenario_table.insertRow(index)
+        scheduled = row["kind"] == "scheduled"
+        source = self._read_only(QTableWidgetItem("Scheduled" if scheduled else "Proposed"))
+        source.setData(
+            Qt.UserRole,
+            {
+                key: row.get(key)
+                for key in ("kind", "key", "original_id", "original", "row_id", "legacy", "earned_transaction_id")
+            },
+        )
+        source.setToolTip(
+            "Existing Scheduled leave; the baseline always keeps this booking."
+            if scheduled
+            else "Proposed leave in this session-only scenario; nothing is booked."
+        )
+        self.scenario_table.setItem(index, 0, source)
+        date_item = QTableWidgetItem(row["date"])
+        if scheduled:
+            self._read_only(date_item)
+        else:
+            date_item.setToolTip(
+                "Click or press Space/Enter to choose a date after the Starting Date through the horizon."
+            )
+        self.scenario_table.setItem(index, 1, date_item)
+        if scheduled:
+            leave_item = self._read_only(QTableWidgetItem(category_label(row["category"])))
+            leave_item.setData(Qt.UserRole, row["category"])
+            self.scenario_table.setItem(index, 2, leave_item)
+        else:
+            leave_combo = QComboBox()
+            for key, label in category_options():
+                leave_combo.addItem(label, key)
+            leave_combo.setCurrentIndex(max(0, leave_combo.findData(row["category"])))
+            leave_combo.currentIndexChanged.connect(self._row_widget_changed)
+            self.scenario_table.setCellWidget(index, 2, leave_combo)
+        hours_item = QTableWidgetItem(str(row["hours"]))
+        if scheduled:
+            self._read_only(hours_item)
+        self.scenario_table.setItem(index, 3, hours_item)
+        operation_combo = QComboBox()
+        if scheduled:
+            for key, label in (("unchanged", "Unchanged"), ("remove", "Remove"), ("replace", "Replace")):
+                operation_combo.addItem(label, key)
+        else:
+            for key, label in (("add", "Add"), ("remove", "Remove")):
+                operation_combo.addItem(label, key)
+        operation_combo.setCurrentIndex(max(0, operation_combo.findData(row["operation"])))
+        if row.get("legacy"):
+            operation_combo.setEnabled(False)
+            operation_combo.setToolTip(
+                "Legacy combined operation. Use Reset all changes or edit/import the scenario JSON to change it."
+            )
+        operation_combo.currentIndexChanged.connect(lambda _index, key=row["key"]: self._operation_changed(key))
+        self.scenario_table.setCellWidget(index, 4, operation_combo)
+        replacement_combo = QComboBox()
+        replacement_combo.addItem("—", None)
+        for key, label in category_options():
+            replacement_combo.addItem(label, key)
+        replacement_combo.setCurrentIndex(max(0, replacement_combo.findData(row.get("replacement"))))
+        replacement_combo.setEnabled(bool(scheduled and row["operation"] == "replace" and not row.get("legacy")))
+        replacement_combo.currentIndexChanged.connect(self._row_widget_changed)
+        self.scenario_table.setCellWidget(index, 5, replacement_combo)
+        note_item = QTableWidgetItem(row["note"])
+        if scheduled:
+            self._read_only(note_item)
+        self.scenario_table.setItem(index, 6, note_item)
+
+    def _apply_row_style(self, row):
+        meta = self._row_meta(row)
+        if meta is None:
+            return
+        operation_combo = self.scenario_table.cellWidget(row, 4)
+        operation = operation_combo.currentData() if operation_combo is not None else None
+        for column in (1, 2, 3, 6):
+            item = self.scenario_table.item(row, column)
+            if item is None:
+                continue
+            font = QFont(item.font())
+            font.setStrikeOut(operation == "remove")
+            item.setFont(font)
+            item.setForeground(QBrush(QColor("#6B6B6B" if operation == "remove" else "#000000")))
+        source = self.scenario_table.item(row, 0)
+        if source is not None:
+            font = QFont(source.font())
+            font.setBold(meta["kind"] == "proposed")
+            source.setFont(font)
+            source.setForeground(QBrush(QColor("#1F4E79" if meta["kind"] == "proposed" else "#000000")))
+        replacement = self.scenario_table.cellWidget(row, 5)
+        if replacement is not None:
+            font = QFont(replacement.font())
+            font.setBold(operation == "replace")
+            replacement.setFont(font)
+
+    def _operation_changed(self, key):
+        if self._updating:
+            return
+        row = self._find_row(key)
+        if row < 0:
+            return
+        meta = self._row_meta(row)
+        operation_combo = self.scenario_table.cellWidget(row, 4)
+        if meta is None or operation_combo is None:
+            return
+        operation = operation_combo.currentData()
+        if meta["kind"] == "proposed" and operation == "remove":
+            self._updating = True
+            self.scenario_table.removeRow(row)
+            self._updating = False
+            self._changed()
+            return
+        replacement = self.scenario_table.cellWidget(row, 5)
+        if replacement is not None:
+            replacement.setEnabled(meta["kind"] == "scheduled" and operation == "replace" and not meta.get("legacy"))
+        self._apply_row_style(row)
+        self._changed()
+
+    def _row_widget_changed(self, *_args):
+        if not self._updating:
             self._changed()
 
     def add_tentative(self):
@@ -647,99 +923,101 @@ class PlannerWidget(QWidget):
             self._show_errors([{"field": "snapshot", "message": "Load a leave year first."}])
             return
         cutoff = self.cutoff_edit.date().toPython()
-        hours = self.session.result.assumptions.get("daily_work_hours") if self.session.result else ""
-        operation = make_operation(
-            self.session.snapshot,
-            row_id="tentative-" + uuid4().hex[:12],
-            operation="add",
-            date=(cutoff + timedelta(days=1)).isoformat(),
-            category=self.category_combo.currentData(),
-            hours=hours if hours is not None else "",
-        )
-        self._append_operation(operation)
-        self.editor_tabs.setCurrentWidget(self.scenario_table)
-
-    def _selected_scheduled(self):
-        rows = []
-        for selected in self.scheduled_table.selectionModel().selectedRows():
-            item = self.scheduled_table.item(selected.row(), 0)
-            source_index = item.data(Qt.UserRole + 1)
-            if isinstance(source_index, int) and 0 <= source_index < len(self._scheduled):
-                rows.append(self._scheduled[source_index])
-        return sorted(rows, key=lambda tx: (tx["date"], str(tx["id"])))
-
-    def choose_scheduled(self, operation):
-        if self.session is None:
-            self.status_label.setText("Load a leave year before choosing scheduled leave.")
-            return
-        self._refresh_scheduled()
-        targeted = {
-            value.strip()
-            for row in range(self.scenario_table.rowCount())
-            for value in self.scenario_table.item(row, 6).text().split(",")
-            if value.strip()
-        }
-        dialog = ScheduledUseDialog(
-            self._scheduled,
-            operation,
-            selected_ids={str(tx["id"]) for tx in self._selected_scheduled()},
-            targeted_ids=targeted,
-            parent=self,
-        )
-        if dialog.exec() == QDialog.Accepted:
-            self.add_selected(operation, originals=dialog.selected_transactions())
-        dialog.deleteLater()
-
-    def add_selected(self, operation, *, originals=None):
-        originals = self._selected_scheduled() if originals is None else originals
-        if not originals or self.session is None:
+        if cutoff >= self.horizon_edit.date().toPython():
             self.status_label.setText(
-                "No bookings chosen. Use Replace scheduled use or Remove scheduled use to choose existing bookings."
+                "No tentative date is available after the Starting Date through the horizon. Choose an earlier Starting Date or later horizon."
             )
-            self.editor_tabs.setCurrentWidget(self.scheduled_table)
             return
-        first = originals[0]
-        op = make_operation(
-            self.session.snapshot,
-            row_id="tentative-" + uuid4().hex[:12],
-            operation=operation,
-            date=first["date"] if operation == "replace" else None,
-            category=first["category"] if operation == "replace" else None,
-            hours=sum(float(tx["hours"]) for tx in originals) if operation == "replace" else 0,
-            original_ids=tuple(str(tx["id"]) for tx in originals),
+        try:
+            operations = self._collect_operations()
+        except PlanningValidationError:
+            operations = [self._operation_dict(operation) for operation in self.session.definition.operations]
+        hours = self._daily_work_hours if self._daily_work_hours is not None else ""
+        operations.append(
+            {
+                "row_id": "tentative-" + uuid4().hex[:12],
+                "operation": "add",
+                "date": (cutoff + timedelta(days=1)).isoformat(),
+                "category": self.category_combo.currentData(),
+                "hours": hours if hours is not None else "",
+                "note": "",
+                "original_ids": [],
+                "original_fingerprints": {},
+                "earned_transaction_id": None,
+            }
         )
-        self._append_operation(op)
+        self._rebuild_rows(operations)
         self.editor_tabs.setCurrentWidget(self.scenario_table)
+        self._changed()
 
     def delete_selected(self):
         selected = sorted({index.row() for index in self.scenario_table.selectionModel().selectedRows()}, reverse=True)
         if not selected and self.scenario_table.currentRow() >= 0:
             selected = [self.scenario_table.currentRow()]
+        if not selected:
+            return
+        cleared_legacy = set()
         self._updating = True
         for row in selected:
-            self._fingerprints.pop(self.scenario_table.item(row, 0).text(), None)
-            self.scenario_table.removeRow(row)
+            meta = self._row_meta(row)
+            if meta is None:
+                continue
+            if meta["kind"] == "proposed":
+                self.scenario_table.removeRow(row)
+                continue
+            if meta.get("legacy"):
+                cleared_legacy.add(str(meta.get("row_id")))
+            operation_combo = self.scenario_table.cellWidget(row, 4)
+            if operation_combo is not None:
+                operation_combo.setCurrentIndex(max(0, operation_combo.findData("unchanged")))
+            replacement = self.scenario_table.cellWidget(row, 5)
+            if replacement is not None:
+                replacement.setCurrentIndex(0)
+                replacement.setEnabled(False)
+            self._apply_row_style(row)
         self._updating = False
+        if cleared_legacy:
+            self._legacy_operations = [
+                operation for operation in self._legacy_operations if str(operation.get("row_id")) not in cleared_legacy
+            ]
+            try:
+                operations = self._collect_operations()
+            except PlanningValidationError:
+                operations = []
+            self._rebuild_rows(operations)
         self._changed()
 
     def reset_scenario(self):
         self._updating = True
-        self.scenario_table.setRowCount(0)
         self._fingerprints.clear()
+        self._preserved_operations = []
+        self._legacy_operations = []
+        self._daily_work_hours = None
         if self.session:
+            self.session.reset()
             self._definition_source = source_identity(self.session.snapshot)
         self._updating = False
+        operations = (
+            [self._operation_dict(operation) for operation in self.session.definition.operations]
+            if self.session
+            else []
+        )
+        self._rebuild_rows(operations)
         self._changed()
 
     def resolve_selected(self):
         selected = self.scenario_table.selectionModel().selectedRows()
         if not selected:
             self.status_label.setText(
-                "Select scenario rows to accept their listed originals from the current snapshot. Review Scheduled originals first."
+                "Select Scenario rows to revalidate their originals against the current snapshot."
             )
             return
-        for index in selected:
-            self._capture_references(index.row())
+        try:
+            operations = self._collect_operations()
+        except PlanningValidationError as exc:
+            self._show_errors(exc.errors)
+            return
+        self._rebuild_rows(operations)
         self._changed()
 
     def _render_result(self):
@@ -762,6 +1040,7 @@ class PlannerWidget(QWidget):
                 self.detail_tabs.setCurrentIndex(index)
                 break
         result = self.session.result
+        self._daily_work_hours = result.assumptions.get("daily_work_hours")
         daily = self._views["Daily closing balances"][0]
         events = self._views["Events and provenance"][0]
         selected = next(row for row in result.categories if row.category == category)
@@ -899,9 +1178,7 @@ class PlannerWidget(QWidget):
         self.scenario_table.setRowCount(0)
         self._fingerprints.clear()
         self._updating = False
-        self._refresh_scheduled()
-        for operation in definition.operations:
-            self._append_operation(operation, notify=False)
+        self._rebuild_rows(definition.operations)
         self.modified_label.setText("Unchanged since import")
         self.source_loaded.emit(candidate.snapshot)
         self._category_changed()

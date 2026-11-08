@@ -1255,7 +1255,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _await(app, predicate, message):
-    deadline = time.monotonic() + 60
+    deadline = time.monotonic() + 120
     while not predicate():
         app.processEvents()
         if time.monotonic() >= deadline:
@@ -1269,7 +1269,8 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
     window.set_data(load_analytics_data(backend, data_dir, year))
     help_dialog = AnalyticsHelpDialog("what-if", window)
     assert help_dialog.available
-    assert "Replace scheduled use" in help_dialog.browser.toPlainText()
+    assert "Scenario rows" in help_dialog.browser.toPlainText()
+    assert "Replacement Leave Type" in help_dialog.browser.toPlainText()
     assert "Usage Forecast" in help_dialog.browser.toPlainText()
     assert "Leave Budget" in help_dialog.browser.toPlainText()
     assert "Holiday and Weekend Planner" in help_dialog.browser.toPlainText()

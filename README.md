@@ -1197,26 +1197,26 @@ Use **File > Help...** (or **F1**) in the planning window for detailed offline i
 for the active page, including all four Planning tools. Hover over buttons for
 explanations. Help is included in source/wheel packages and installed bundles.
 
-- **Add tentative use** adds extra leave while retaining existing bookings.
-  Click a draft row's **Date** cell to open a calendar, or press Space/Enter on
-  the cell. Choose a day after cutoff through horizon; Cancel preserves the
-  original date. F2 still allows ISO date text. Choosing a date does not establish
-  available workday capacity; inspect warnings and capacity results.
-- **Replace scheduled use...** and **Remove scheduled use...** open a chooser:
-  check existing bookings and confirm. No background row selection is required;
-  existing selections are prechecked. The list shows date, category, hours,
-  status, note and original ID. Cancel adds no draft operation.
-- Replacement omits the chosen originals in the scenario and adds one editable
-  replacement, initially with their combined hours and the first booking's
-  date/category. Review those defaults, especially for multiple dates/categories.
-  Removal omits the originals in the scenario without adding new use. The
-  baseline and ledger retain the originals in both cases. Recorded rows,
-  accruals and synthetic events cannot be targeted. Already-targeted originals
-  are unavailable until their earlier draft change is edited or undone.
-- **Undo selected changes** deletes selected draft operations: added use
-  disappears; originals from Replace/Remove return to the scenario.
-  **Reset all changes** clears every operation, preserving name, date controls
-  and reserves. Neither action changes or cancels real bookings.
+- **Scenario rows** is the single editor. Every eligible scheduled booking
+  appears automatically as a **Scheduled** row with the operation **Unchanged**.
+  Set the row's Operation to **Remove** to omit that original from the scenario,
+  or **Replace** to substitute only its leave category through **Replacement
+  Leave Type**. Original date and hours stay fixed, and the baseline and ledger
+  retain every original. Removed or replaced Scheduled rows stay visible.
+- **Add tentative use** creates a **Proposed** row with editable Date, Leave
+  Type, Hours and Note. Proposed rows offer only **Add** or **Remove**; Remove
+  discards that tentative addition. Click a Proposed Date cell to open a
+  calendar, or press Space/Enter on it. Choose a day after the Starting Date
+  through the horizon; Cancel preserves the original date. F2 still allows ISO
+  date text. Choosing a date does not establish available workday capacity;
+  inspect warnings and capacity results.
+- **Undo selected changes** resets selected Scheduled rows to Unchanged and
+  discards selected Proposed rows. **Reset all changes** returns every
+  Scheduled row to Unchanged, removes all Proposed rows, and preserves name,
+  Starting Date, horizon and reserves. Scheduled originals never disappear;
+  neither action changes or cancels real bookings. Legacy scenarios that
+  combine several originals in one operation are shown read-only with an
+  explanation; use Reset all changes or edit/import the scenario JSON.
 
 For example, 100 hours at cutoff, an 8-hour accrual, and a scheduled 16-hour use
 give a 92-hour baseline. Adding a later 24-hour use gives 68 hours and breaches
