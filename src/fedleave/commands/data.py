@@ -440,9 +440,13 @@ def import_data(
         if not isinstance(holiday_cache, dict):
             raise ValueError("holiday_cache must be an object")
         for name, cache in holiday_cache.items():
-            if "/" in str(name) or "\\" in str(name) or not isinstance(cache, dict):
+            # A Windows drive-relative name or ADS must never replace this root.
+            if any(character in str(name) for character in ("/", "\\", ":")) or not isinstance(cache, dict):
                 raise ValueError(f"Invalid holiday cache entry: {name}")
             write_items.append((base / "holiday_cache" / f"{name}.json", cache))
+
+        if any(not path.resolve().is_relative_to(base.resolve()) for path, _ in write_items):
+            raise ValueError("Import target escapes the selected datastore")
 
         if merge:
             merged_items: list[tuple[Path, dict]] = []

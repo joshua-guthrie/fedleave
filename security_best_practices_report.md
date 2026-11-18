@@ -29,7 +29,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Fixed |
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Fixed |
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Pending |
-| SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Pending |
+| SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Fixed |
 | SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Pending |
 | SEC-006 | Low established application exposure; affected Pillow resolution | No fixed minimum for advisory matches | Pillow 13.0.0 minimum and rendering validation | Pending |
 | SEC-007 | Low established application exposure; affected icalendar resolution | No fixed minimum for complexity advisory | icalendar 7.1.3 minimum and import validation | Pending |
@@ -98,7 +98,13 @@ Source remediation pending.
 
 ### SEC-010 — Imported cache keys could change the Windows destination drive
 
-Source remediation pending.
+Archive validation rejected separators but allowed colons. A key such as `C:outside` joined to a datastore on a different drive can replace the intended drive/root under Windows pathlib semantics. The real import path passed an escaped target to its write sink in a path-semantics probe. Native Windows file creation was not demonstrated. Filesystem permissions/overwrite rules still apply; no restricted-MCP write-root bypass is claimed. Classification: CWE-22.
+
+[Validation](src/fedleave/commands/data.py#L386) now rejects colon, slash and backslash consistently on both platforms and preflights every canonical target before creating any configuration, directories or data. Safe Unicode names and merge/overwrite behavior remain supported.
+
+[Tests](tests/test_import_path_security.py) cover rejection before all writes, safe names and escaping cache-directory links. A native Windows test maps only a disposable directory to a second drive and cleans that mapping afterward. The focused import/export/storage suite passed 20 tests before the native addition; Windows execution awaits CI.
+
+**Commit verification:** 20 passed, 1 skipped in 0.84s.
 
 ## Low severity
 
