@@ -35,7 +35,7 @@ from .chart_style import (
 from .cli_helpers import load_read_snapshot as load_leave_year
 from .cli_helpers import parse_iso_date
 from .config import get_default_data_dir as resolve_default_data_dir
-from .executable_search import is_executable, iter_executable_candidates
+from .executable_search import is_executable, iter_executable_candidates, validate_backend
 from .ledger import calculate_balances
 from .project_info import HELP_EPILOG
 
@@ -122,14 +122,14 @@ def comparison_date_for_year(as_of: date, year: int) -> date:
 
 def _executable_names(app_name: str) -> tuple[str, ...]:
     if sys.platform.startswith("win"):
-        return (f"{app_name}.exe", f"{app_name}.bat", f"{app_name}.cmd")
+        return (f"{app_name}.exe",)
     return (app_name,)
 
 
 def find_companion_app(app_name: str, explicit: str | None = None) -> Path:
     """Locate a bundled or PATH-visible companion executable."""
     if explicit:
-        path = Path(explicit).expanduser()
+        path = validate_backend(explicit)
         if is_executable(path):
             return path
         raise FileNotFoundError(f"{app_name} executable was not found or is not executable: {path}")
@@ -142,7 +142,7 @@ def find_companion_app(app_name: str, explicit: str | None = None) -> Path:
 
     for executable_name in _executable_names(app_name):
         path_hit = shutil.which(executable_name)
-        if path_hit:
+        if path_hit and is_executable(Path(path_hit)):
             return Path(path_hit)
 
     details = "\n".join(f"  - {candidate}" for candidate in searched)

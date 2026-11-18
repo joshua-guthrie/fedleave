@@ -26,7 +26,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-002 | High; restricted MCP peer with network-init permission | Holiday URLs bypassed local-file read roots | Validate the actual download URL and suppress parser-content errors | Fixed |
 | SEC-005 | High, conditional; shared privileged Linux deployment | Extracted unprivileged ownership survived installation | Normalize staged ownership/modes/ACLs and activate fresh verified bytes | Fixed |
 | SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Fixed |
-| SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Pending |
+| SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Fixed |
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Pending |
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Pending |
 | SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Pending |
@@ -58,7 +58,7 @@ The bootstrap extracted as the caller and used privileged `cp -a`, preserving ca
 
 Tests cover user-local installation, external links, old tampered releases and archive metadata. A [privileged CI test](tests/test_linux_system_install_security.py) uses a disposable `/var/lib` tree with real root/nonroot identities, never the application's install or datastore. Distribution invokes it explicitly with sudo. The earlier fixed isolated guest showed root ownership in both caller modes, denied ordinary-user modification and did not execute the old modified release. That fixture uses GNU tools and a small privilege helper; supported Debian/Ubuntu sudo/PAM and Distribution acceptance remain CI work.
 
-**Commit verification:** 24 passed, 1 skipped in 2.30s.
+**Commit verification:** 24 passed in 2.30s, one privileged CI test skipped locally. The final isolated Linux guest retest confirmed root ownership and denied ordinary-user writes for both caller modes.
 
 ## Medium severity
 
@@ -74,7 +74,13 @@ The shared [cell encoder](src/fedleave_analytics/csv_export.py#L7) now prefixes 
 
 ### SEC-001 — Windows desktop backends accepted batch launchers
 
-Source remediation pending.
+Discovery/explicit overrides accepted `.bat`/`.cmd`; PATH fallback could reintroduce them. Comments were argv elements, but Windows may introduce a shell for batch execution even with `shell=False`. Selection was demonstrated; native command execution was inferred from [Python's subprocess documentation](https://docs.python.org/3.11/library/subprocess.html#security-considerations), not reproduced locally. Normal shipped native `.exe` use was not identified as affected. Classification: conditional CWE-78.
+
+The shared [validator](src/fedleave/executable_search.py#L27), companion finders and direct Analytics/snapshot/report boundaries now require an existing `.exe` on Windows, case-insensitively, including bare-name/PATH resolution and the resolved target of a link. Linux executable scripts still work. Explicit unsupported selections produce a useful error. Comments remain literal user data.
+
+[Tests](tests/test_windows_backend_security.py) reject batch variants before process creation across public callers. Linux scripts and related callers passed in the 69-test focused suite. A native Windows test uses the installed CLI and hostile-looking literal comments; Windows fake-backend contract tests now build a genuine native test executable. Package smoke coverage also checks literal comment preservation. Native Windows results are tracked by CI.
+
+**Commit verification:** 70 passed, 1 skipped in 35.55s.
 
 ### SEC-008 — Exports could overwrite linked canonical data
 

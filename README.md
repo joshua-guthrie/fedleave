@@ -530,6 +530,7 @@ FedLeave Calendar is a cross-platform PySide6 desktop GUI for the `fedleave` bac
 
 The GUI does not read or edit leave JSON files directly. Reads and writes go through the selected `fedleave` executable. Day edits call `fedleave set-day --authoritative --json`, then the month is reloaded from the backend.
 In packaged builds, the GUI looks for `fedleave` in the sibling `fedleave` application directory inside the same platform tree, or in any explicit backend path you configure.
+On Windows, select the installed `fedleave.exe` as a custom backend. Batch (`.bat`/`.cmd`) backends are rejected because Windows can interpret their arguments through a shell. Linux executable scripts remain supported.
 
 Screenshots:
 

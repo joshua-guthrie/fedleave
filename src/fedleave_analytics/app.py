@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
 )
 
 from fedleave.config import get_default_data_dir
+from fedleave.executable_search import validate_backend
 from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
@@ -230,6 +231,10 @@ def _payload_value(data: dict[str, Any], path: str) -> Any:
 
 def load_analytics_data(backend: Path, data_dir: str | None, year: int) -> dict[str, Any]:
     """Load one leave year through the CLI boundary and derive analytics."""
+    try:
+        backend = validate_backend(backend)
+    except ValueError as exc:
+        raise RuntimeError(str(exc)) from exc
     command = [str(backend), "list", "--year", str(year), "--json"]
     if data_dir:
         command.extend(["--data-dir", data_dir])

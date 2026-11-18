@@ -19,7 +19,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
-from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.executable_search import is_executable, iter_executable_candidates, validate_backend
 from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave.project_info import HELP_EPILOG
 
@@ -236,10 +236,11 @@ def find_fedleave(explicit: Path | None = None) -> Path:
     """Locate the backend in explicit, bundled, source, or PATH locations."""
     searched: list[Path] = []
     if explicit is not None:
-        candidate = explicit.resolve()
+        try:
+            candidate = validate_backend(explicit).resolve()
+        except ValueError as exc:
+            raise FedleaveMissingError(str(exc)) from exc
         searched.append(candidate)
-        if sys.platform.startswith("win") and candidate.is_file():
-            return candidate
         if is_executable(candidate):
             return candidate
         raise FedleaveMissingError(f"fedleave executable not found or not executable: {candidate}")
@@ -249,8 +250,8 @@ def find_fedleave(explicit: Path | None = None) -> Path:
         if is_executable(candidate):
             return candidate
 
-    path_hit = shutil.which("fedleave")
-    if path_hit:
+    path_hit = shutil.which("fedleave.exe" if sys.platform.startswith("win") else "fedleave")
+    if path_hit and is_executable(Path(path_hit)):
         return Path(path_hit)
 
     details = "\n".join(f"  - {path}" for path in searched)
@@ -262,6 +263,7 @@ def find_fedleave(explicit: Path | None = None) -> Path:
 
 
 def run_fedleave(fedleave: Path, args: list[str]) -> dict[str, Any]:
+    fedleave = validate_backend(fedleave)
     result = subprocess.run(
         [str(fedleave), *args],
         text=True,

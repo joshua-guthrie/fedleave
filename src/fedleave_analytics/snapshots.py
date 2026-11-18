@@ -8,6 +8,8 @@ import sys
 from copy import deepcopy
 from pathlib import Path
 
+from fedleave.executable_search import validate_backend
+
 
 class ReadOnlySnapshotSource:
     def __init__(self, backend: Path, data_dir: str | None):
@@ -17,7 +19,11 @@ class ReadOnlySnapshotSource:
         self._snapshots = {}
 
     def _run(self, args):
-        command = [str(self.backend), *args, *(["--data-dir", self.data_dir] if self.data_dir else [])]
+        try:
+            backend = validate_backend(self.backend)
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
+        command = [str(backend), *args, *(["--data-dir", self.data_dir] if self.data_dir else [])]
         kwargs = {"capture_output": True, "text": True, "check": False, "timeout": 30}
         if sys.platform.startswith("win"):
             kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)

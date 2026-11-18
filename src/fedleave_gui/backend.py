@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from fedleave.config import get_default_data_dir
-from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.executable_search import is_executable, iter_executable_candidates, validate_backend
 
 
 class BackendError(RuntimeError):
@@ -45,7 +45,10 @@ class BackendOptions:
 
 def _find_companion_app(app_name: str, *, explicit: str | None = None, description: str) -> Path:
     if explicit:
-        path = Path(explicit).expanduser()
+        try:
+            path = validate_backend(explicit)
+        except ValueError as exc:
+            raise BackendMissingError(str(exc)) from exc
         if is_executable(path):
             return path
         raise BackendMissingError(f"{description} executable was not found.")
@@ -56,8 +59,8 @@ def _find_companion_app(app_name: str, *, explicit: str | None = None, descripti
         if is_executable(candidate):
             return candidate
 
-    path_hit = shutil.which(app_name)
-    if path_hit:
+    path_hit = shutil.which(f"{app_name}.exe" if sys.platform.startswith("win") else app_name)
+    if path_hit and is_executable(Path(path_hit)):
         return Path(path_hit)
 
     details = "\n".join(f"  - {candidate}" for candidate in searched)

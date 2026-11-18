@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Iterator
@@ -13,14 +14,29 @@ def is_executable(candidate: Path) -> bool:
     if not candidate.is_file():
         return False
     if sys.platform.startswith("win"):
-        return candidate.suffix.lower() in {".exe", ".bat", ".cmd"}
+        return candidate.suffix.lower() == candidate.resolve().suffix.lower() == ".exe"
     return os.access(candidate, os.X_OK)
 
 
 def _executable_names(app_name: str) -> tuple[str, ...]:
     if sys.platform.startswith("win"):
-        return (f"{app_name}.exe", f"{app_name}.bat", f"{app_name}.cmd")
+        return (f"{app_name}.exe",)
     return (app_name,)
+
+
+def validate_backend(path: Path | str) -> Path:
+    """Windows batch files introduce a shell even with subprocess shell=False."""
+    candidate = Path(path).expanduser()
+    if sys.platform.startswith("win"):
+        if candidate.parent == Path(".") and not candidate.is_absolute() and not is_executable(candidate):
+            name = candidate.name if candidate.suffix else candidate.with_suffix(".exe").name
+            located = shutil.which(name) if Path(name).suffix.lower() == ".exe" else None
+            if located:
+                candidate = Path(located)
+        if not is_executable(candidate):
+            raise ValueError("Windows backends require an existing native .exe; select the installed fedleave.exe.")
+        return candidate.resolve()
+    return candidate
 
 
 def _candidate_roots() -> Iterator[Path]:

@@ -1,5 +1,6 @@
 """Exercise the GUI-to-CLI subprocess contract and bundle discovery rules."""
 
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -9,6 +10,15 @@ import pytest
 import fedleave.executable_search as executable_search
 import fedleave_gui.backend as backend_module
 from fedleave_gui.backend import BackendOptions, FedleaveBackend
+
+_NATIVE_FAKE_DIR = None
+
+
+@pytest.fixture(scope="module", autouse=True)
+def native_fake_backend_directory(tmp_path_factory):
+    global _NATIVE_FAKE_DIR
+    if sys.platform.startswith("win"):
+        _NATIVE_FAKE_DIR = tmp_path_factory.mktemp("native fake backend")
 
 
 def _fake_fedleave(path: Path) -> Path:
@@ -101,9 +111,32 @@ else:
         encoding="utf-8",
     )
     if sys.platform.startswith("win"):
-        wrapper = path.with_suffix(".cmd")
-        wrapper.write_text(f'@python "{script}" %*\n', encoding="utf-8")
-        return wrapper
+        # Keep a real child-process contract without reintroducing cmd.exe.
+        assert _NATIVE_FAKE_DIR is not None
+        executable = _NATIVE_FAKE_DIR / "fake-fedleave.exe"
+        if not executable.exists():
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "PyInstaller",
+                    "--noconfirm",
+                    "--onefile",
+                    "--name",
+                    "fake-fedleave",
+                    "--distpath",
+                    str(_NATIVE_FAKE_DIR),
+                    "--workpath",
+                    str(_NATIVE_FAKE_DIR / "work"),
+                    "--specpath",
+                    str(_NATIVE_FAKE_DIR),
+                    str(script),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=180,
+            )
+        return executable
 
     script.chmod(0o755)
     return script

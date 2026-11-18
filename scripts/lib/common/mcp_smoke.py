@@ -62,10 +62,14 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
             await call("fedleave_init", {"year": 2026, "leave_year_start": "2026-01-11"})
             balance = await call("fedleave_balance", {"year": 2026, "as_of": "2026-07-01"})
             assert balance["format"] == "json" and "balances" in balance["data"]
+            literal_comment = 'literal " & echo SENTINEL > SHOULD_NOT_EXIST & | %VALUE% !VALUE! ^ Unicode café'
             added = await call(
-                "fedleave_add", {"date": "2026-07-01", "category": "annual", "used": 2, "description": "MCP smoke"}
+                "fedleave_add", {"date": "2026-07-01", "category": "annual", "used": 2, "description": literal_comment}
             )
             transaction_id = added["data"]["transaction_id"]
+            literal_round_trip = await call("fedleave_list", {"year": 2026})
+            assert any(row.get("description") == literal_comment for row in literal_round_trip["data"]["transactions"])
+            assert not (root / "SHOULD_NOT_EXIST").exists()
             await call(
                 "fedleave_reconcile",
                 {
@@ -125,6 +129,7 @@ async def smoke(command: str, args: list[str], expected_names=None, *, restricte
             listed = await call("fedleave_list", {"year": 2026})
             descriptions = {t.get("description") for t in listed["data"]["transactions"]}
             assert {"packaged-agent-0", "packaged-agent-1"} <= descriptions
+            assert not (root / "SHOULD_NOT_EXIST").exists()
             if restricted:
                 denied = await client.call_tool("fedleave_void", {"id": transaction_id})
                 assert denied.is_error and denied.structured_content["error"] == "permission_denied"
