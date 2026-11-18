@@ -13,6 +13,7 @@ dependencies = [
   "icalendar",
   "mcp==2.3.0",
   "Pillow",
+  "opentelemetry-api>=1.45.2,<2",
   "portalocker==3.2.0",
   "pydantic>=2,<3",
   "python-dateutil",

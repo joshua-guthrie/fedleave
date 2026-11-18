@@ -28,7 +28,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Fixed |
 | SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Fixed |
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Fixed |
-| SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Pending |
+| SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Fixed |
 | SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Fixed |
 | SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Fixed |
 | SEC-006 | Low established application exposure; affected Pillow resolution | No fixed minimum for advisory matches | Pillow 13.0.0 minimum and rendering validation | Pending |
@@ -94,7 +94,13 @@ All affected writers use [one GUI-independent boundary](src/fedleave/exporting.p
 
 ### SEC-009 — MCP metadata reached a vulnerable OpenTelemetry parser
 
-Source remediation pending.
+MCP 2.3.0 installs tracing middleware without needing an exporter. Source OpenTelemetry API 1.45.1 parsed `_meta.traceparent` before CLI execution. A bounded 8-KiB malformed whitespace input delayed a real read-only MCP ping to about 598 ms versus about 3 ms normally. CLI deadlines/read-only policy did not bound the in-process parse. No indefinite hang or external service attack was attempted. Classification: CWE-1333; [GHSA-mf5v-w3w3-f6cg](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg).
+
+[Dependencies](pyproject.toml) now require `opentelemetry-api>=1.45.2,<2`, compatible with pinned MCP. Local resolution is 1.45.2. The original actual-wire probe now completes its bounded cases in approximately 1–3 ms, including the largest case. Permanent [stdio metadata coverage](tests/test_mcp_protocol.py) exercises absent, valid, oversized and malformed context through uncached catalog requests, asserts denied writes and leaves the datastore absent. Version tests enforce the fixed parser without brittle timing thresholds.
+
+Both inspected earlier installers already contained 1.45.2. This finding applies to permitted source resolutions, not those packages.
+
+**Commit verification:** 17 passed in 52.70s.
 
 ### SEC-010 — Imported cache keys could change the Windows destination drive
 

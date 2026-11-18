@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import json
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
-from mcp import Client
+from mcp import Client, StdioServerParameters, types
 
 from fedleave.mcp.catalog import discover
 from fedleave.mcp.policy import Policy
@@ -23,6 +24,32 @@ def test_official_sdk_subprocess_stdio_round_trip(restricted):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     asyncio.run(module.smoke(sys.executable, ["-m", "fedleave.mcp"], discover(), restricted=restricted))
+
+
+def test_stdio_metadata_parser_accepts_bounded_edge_cases_without_datastore_writes(tmp_path):
+    policy = tmp_path / "policy.json"
+    store = tmp_path / "data"
+    policy.write_text(json.dumps({"mode": "read_only", "data_dir": str(store)}))
+
+    async def run():
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "fedleave.mcp", "--config", str(policy)],
+            env={**os.environ, "OTEL_PROPAGATORS": "tracecontext"},
+        )
+        async with Client(params, read_timeout_seconds=30) as client:
+            valid = "00-" + "1" * 32 + "-" + "2" * 16 + "-01"
+            # Keep resource use bounded; version checks enforce the fixed parser
+            # without introducing fragile workstation performance assertions.
+            for context in (None, valid, "x" * 8192, valid + "-" + " " * 8192 + "\nx"):
+                meta = types.RequestParamsMeta(traceparent=context) if context is not None else None
+                catalog = await client.list_tools(meta=meta, cache_mode="refresh")
+                assert {tool.name for tool in catalog.tools} == set(discover())
+            denied = await client.call_tool("fedleave_add", {"date": "2026-07-01", "category": "annual", "used": 1})
+            assert denied.is_error and denied.structured_content["error"] == "permission_denied"
+
+    asyncio.run(asyncio.wait_for(run(), timeout=90))
+    assert not store.exists()
 
 
 def test_analytics_smoke_resolves_source_scripts_and_installed_siblings(tmp_path, monkeypatch):
