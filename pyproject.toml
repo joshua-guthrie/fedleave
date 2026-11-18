@@ -18,7 +18,9 @@ dependencies = [
   "pydantic>=2,<3",
   "python-dateutil",
   "rich",
-  "typer>=0.12,<1",
+  # MCP derives strict schemas from the Click-compatible metadata removed in 0.29.
+  # 0.27.3 also includes terminal-control escaping fixes.
+  "typer>=0.27.3,<0.29",
 ]
 
 [project.optional-dependencies]
@@ -70,7 +72,7 @@ FedLeaveCalendar = "fedleave_gui.__main__:main"
 FedLeaveAnalytics = "fedleave_analytics.app:main"
 
 [build-system]
-requires = ["setuptools>=65.0", "wheel"]
+requires = ["setuptools>=84.1.0", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]

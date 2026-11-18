@@ -86,11 +86,11 @@ The shared [validator](src/fedleave/executable_search.py#L27), companion finders
 
 CSV, Calendar/Analytics PNG/PDF and month PDF writers opened destinations directly. Final writer review also reproduced the same overwrite through the print dialogs' file output in six actual Qt cases. Hard/symbolic links could turn a report save into ledger truncation. CLI month PNG also used a predictable temporary name; a planted link redirected staging writes. Actual Qt/Pillow/CSV paths reproduced these effects on synthetic ledgers. An unsafe selected destination or shared writable export directory was required; no remote write was established. Classification: CWE-59.
 
-All affected writers use [one GUI-independent boundary](src/fedleave/exporting.py#L12), including print-to-file and month print-preview output. Ordinary native printer jobs retain their existing rendering path. It rejects selected-datastore destinations and final symlinks, renders inside a private randomly named staging directory on the destination filesystem, closes handles and atomically replaces the external directory entry. Replacing an external hard link preserves the ledger inode. Failed rendering closes printer handles before cleaning staging and preserves the previous report. Atomic create-only publication preserves concurrent creators.
+All affected writers use [one GUI-independent boundary](src/fedleave/exporting.py#L12), including print-to-file and month print-preview output. Ordinary native printer jobs retain their existing rendering path. It rejects selected-datastore destinations and final symlinks, renders inside a private randomly named staging directory on the destination filesystem, closes handles and atomically replaces the external directory entry. Replacing an external hard link preserves the ledger inode. Failed rendering closes printer handles before cleaning staging and preserves the previous report. Atomic create-only publication preserves concurrent creators. Windows source exports require a Python patch release that creates private temporary directories (3.11.10 or 3.12.4 and later in each series).
 
 [Regressions](tests/test_export_security.py) exercise real chart PNG/PDF combinations, month PDF, CSV aliases, legacy staging links, direct datastore targets, failure cleanup, print-to-file and create-only races. The native Windows test also inspects actual staging ACLs; POSIX tests check private directory permissions. Related exporter suites passed; printer tests retain layout assertions while checking staging. This protects the identified link attacks; it is not an OS sandbox against arbitrary concurrent ancestor-directory replacement. Native Windows link semantics remain CI acceptance work.
 
-**Commit verification:** 61 passed in 8.91s.
+**Commit verification:** 61 passed in 8.91s in the initial export and rendering checks. The final compatibility changes passed 30 focused export and print tests.
 
 ### SEC-009 — MCP metadata reached a vulnerable OpenTelemetry parser
 
@@ -137,3 +137,18 @@ Local icalendar 7.1.2 matched [GHSA-cv84-9p8j-fj68 / CVE-2026-55099](https://git
 The minimum is now `icalendar>=7.1.3`; local resolution is 7.3.0. Holiday parsing, file import, configuration and MCP tests remain. URL validation and size limits are separate defenses; they do not follow merely from a library upgrade.
 
 **Commit verification:** 24 passed in 2.69s.
+
+## Dependency and release controls
+
+[The inventory helper](scripts/lib/common/dependency_inventory.py) records exact public package names/versions using the suite's build interpreter. Complete build inventories include tools. Runtime-only inventories traverse the application plus GUI extras and transitive platform markers/extras. Local paths, URLs and credentials are excluded from advisory requests. FedLeave itself is excluded from PyPI queries because its source is the review subject.
+
+CI checks resolved runtime requirements using maintained `pip-audit` and OSV. Distribution checks exact build-environment requirements before packaging/publication and retains `DEPENDENCIES.json`/`.txt` in each suite. Findings/service failures fail the gate; no broad exclusions were added. The builder explicitly upgrades build-system requirements (setuptools 84.1.0 and wheel 0.46.2 minimums), preventing an old reused venv from retaining affected tools. This is a Python package inventory, not a complete native/vendored-code SBOM. Fresh-build testing also exposed Typer 0.29 removing the Click metadata required for MCP discovery. The project now uses `typer>=0.27.3,<0.29` (resolved 0.28.0), retaining the terminal-control fixes in 0.27.3 while preserving the integration. See the [primary release notes](https://typer.tiangolo.com/release-notes/#0290).
+
+The earlier Linux package contained vendored wheel 0.45.1 matching GHSA-8rrh-rw8j-w5fx, without an identified application route unpacking untrusted wheels. Updated build tools address maintenance residue where available; complete vendored/native coverage remains open. Absent branch protection/rulesets were recorded as a governance observation, outside the ten application findings. No repository settings were changed.
+
+## Validation and release acceptance
+
+- Current source verification: 1032 passed, 3 skipped in 172.33s (0:02:52); formatting, lint, typing, ShellCheck, and source and wheel builds passed.
+- The earlier remediated Linux bundle passed MCP and Analytics smoke tests. This host exceeds the release GLIBC 2.35 gate. Distribution builds the supported Linux package on Ubuntu 22.04.
+- The refreshed OSV scan covered all 46 resolved source runtime packages and returned no known matches. The earlier build scan covered 55 packages with no known matches at the time. Distribution scans the dependency versions resolved for each release build.
+- Native Windows source tests run in [CI](https://github.com/joshua-guthrie/fedleave/actions/workflows/ci.yml). Both platform packages must pass [Distribution](https://github.com/joshua-guthrie/fedleave/actions/workflows/distribution.yml), which publishes the [stable beta assets](https://github.com/joshua-guthrie/fedleave/releases/tag/beta) and records the source commit in [installers/BUILD.txt](installers/BUILD.txt). Public download URLs are unchanged.

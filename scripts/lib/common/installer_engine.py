@@ -246,6 +246,16 @@ class InstallerEngine:
         )
         self.log(f"Building shared suite with {len(targets)} entry points")
         self._run(self._build_suite_command(py_exe, config_path, work_dir, platform_dist))
+        self._run(
+            [
+                str(py_exe),
+                str(self.repo_root / "scripts" / "lib" / "common" / "dependency_inventory.py"),
+                "--output",
+                str(platform_dist / "DEPENDENCIES.json"),
+                "--requirements",
+                str(platform_dist / "DEPENDENCIES.txt"),
+            ]
+        )
 
         self._deduplicate_linux_bundle(platform_dist)
         self._validate_build(platform_dist, targets)
@@ -542,7 +552,9 @@ class InstallerEngine:
         self.log("Installing build dependencies")
         pip_options = ["--no-index"] if self.options.offline else []
         editable_options = ["--no-build-isolation"] if self.options.offline else []
-        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "--upgrade", "pip"])
+        pyproject = tomllib.loads((self.repo_root / "pyproject.toml").read_text(encoding="utf-8"))
+        build_requirements = pyproject["build-system"]["requires"]
+        self._run([str(py_exe), "-m", "pip", "install", *pip_options, "--upgrade", "pip", *build_requirements])
         self._run(
             [
                 str(py_exe),

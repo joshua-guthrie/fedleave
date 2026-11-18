@@ -41,6 +41,21 @@ jobs:
       - name: Generate strict CLI to MCP parity inventory
         run: python -m fedleave.mcp --inventory > mcp-inventory.json
 
+      - name: Record tested runtime dependencies
+        run: python scripts/lib/common/dependency_inventory.py --runtime-only --output source-dependencies.json --requirements source-dependencies.txt
+
+      - name: Check resolved runtime advisories
+        run: |
+          python -m pip install "pip-audit>=2.10,<3"
+          python -m pip_audit --strict --disable-pip --no-deps --vulnerability-service osv -r source-dependencies.txt
+
+      - name: Upload runtime dependency inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-dependencies-${{ runner.os }}
+          path: source-dependencies.*
+
       - name: Upload MCP parity inventory
         uses: actions/upload-artifact@v4
         with:

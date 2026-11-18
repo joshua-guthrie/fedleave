@@ -65,6 +65,11 @@ jobs:
       - name: Verify complete Windows bundle
         run: python installer/package.py validate-bundle --platform windows --bundle-dir dist/fedleave-Windows
 
+      - name: Check resolved Windows build and runtime advisories
+        run: |
+          python -m pip install "pip-audit>=2.10,<3"
+          python -m pip_audit --strict --disable-pip --no-deps --vulnerability-service osv -r dist/fedleave-Windows/DEPENDENCIES.txt
+
       - name: Remove duplicate build workspace
         shell: pwsh
         run: Remove-Item -Recurse -Force .build
@@ -171,6 +176,11 @@ jobs:
 
       - name: Enforce Linux GLIBC compatibility baseline
         run: python installer/package.py audit-linux-abi --bundle-dir dist/fedleave-Ubuntu --max-glibc 2.35
+
+      - name: Check resolved Linux build and runtime advisories
+        run: |
+          python -m pip install "pip-audit>=2.10,<3"
+          python -m pip_audit --strict --disable-pip --no-deps --vulnerability-service osv -r dist/fedleave-Ubuntu/DEPENDENCIES.txt
 
       - name: Remove duplicate build workspace
         run: rm -rf .build
