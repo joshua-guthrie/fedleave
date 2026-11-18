@@ -10,7 +10,6 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -20,6 +19,7 @@ from typing import Any
 from PIL import Image, ImageDraw, ImageFont
 
 from fedleave.executable_search import is_executable, iter_executable_candidates, validate_backend
+from fedleave.exporting import export_file
 from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave.project_info import HELP_EPILOG
 
@@ -893,25 +893,17 @@ def render_png(data: ReportData, output: Path, width: int) -> None:
 
 
 def write_output(data: ReportData, options: Options) -> None:
-    output = options.output_file.resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
+    output = options.output_file.expanduser().absolute()
     suffix = output.suffix.lower()
     try:
-        if suffix == ".svg":
-            content = render_svg(data, options.resolution)
-            with tempfile.NamedTemporaryFile(
-                "w", encoding="utf-8", delete=False, dir=str(output.parent), suffix=".tmp"
-            ) as handle:
-                handle.write(content)
-                temp_name = handle.name
-            Path(temp_name).replace(output)
-        elif suffix == ".png":
-            render_svg(data, options.resolution)
-            temp = output.with_name(f".{output.name}.{os.getpid()}.tmp")
-            render_png(data, temp, options.resolution)
-            temp.replace(output)
-        else:
+        if suffix not in {".svg", ".png"}:
             raise OutputError("Only .png and .svg output files are supported.")
+        with export_file(output, options.data_dir, overwrite=options.overwrite) as temporary:
+            if suffix == ".svg":
+                temporary.write_text(render_svg(data, options.resolution), encoding="utf-8")
+            else:
+                render_svg(data, options.resolution)
+                render_png(data, temporary, options.resolution)
     except MonthReportError:
         raise
     except Exception as exc:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import os
 import re
@@ -36,6 +37,7 @@ from PySide6.QtWidgets import (
 
 from fedleave.config import get_default_data_dir
 from fedleave.executable_search import validate_backend
+from fedleave.exporting import export_file, write_export_text
 from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
@@ -1007,7 +1009,16 @@ class AnalyticsWindow(QMainWindow):
     ) -> None:
         clean_slug = re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")
         base_name = f"fedleave-{clean_slug}-{self.data['year'] if self.data else self.year}"
-        window = AnalyticsChartWindow(title, pixmap, rows, columns, self.pdf_folder, base_name)
+        data_dir = get_default_data_dir(Path(self.data_dir).expanduser() if self.data_dir else None)
+        window = AnalyticsChartWindow(
+            title,
+            pixmap,
+            rows,
+            columns,
+            self.pdf_folder,
+            base_name,
+            export_target=lambda path: export_file(path, data_dir),
+        )
         self._chart_windows.append(window)
         window.destroyed.connect(lambda: self._chart_windows.remove(window) if window in self._chart_windows else None)
         window.show()
@@ -1029,7 +1040,7 @@ class AnalyticsWindow(QMainWindow):
         if not path:
             return
         try:
-            with Path(path).open("w", newline="", encoding="utf-8") as handle:
+            with io.StringIO(newline="") as handle:
                 writer = SpreadsheetWriter(handle)
                 if seasonality:
                     writer.writerows(seasonality["metadata"])
@@ -1038,7 +1049,10 @@ class AnalyticsWindow(QMainWindow):
                 writer.writerow([label for _key, label in self._current_columns])
                 for row in self._current_rows:
                     writer.writerow([row.get(key) for key, _label in self._current_columns])
-        except OSError as exc:
+                selected = getattr(self, "data_dir", None)
+                data_dir = get_default_data_dir(Path(selected).expanduser() if selected else None)
+                write_export_text(path, handle.getvalue(), data_dir)
+        except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "Save Table", f"Could not save CSV to {path}.\n\n{exc}")
 
     def _seasonality_drilldown(self, row_index: int, _column: int) -> None:

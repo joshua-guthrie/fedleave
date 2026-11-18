@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtPrintSupport import QPrintDialog, QPrinter
@@ -17,6 +19,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from fedleave.exporting import export_file, render_print_job
+
 
 class LeaveChartDialog(QDialog):
     """Show one full-quality chart with viewport fitting and export actions."""
@@ -26,6 +30,8 @@ class LeaveChartDialog(QDialog):
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self._pixmap = pixmap
         self._base_name = "-".join(part for part in title.lower().split()) or "leave-chart"
+        backend = getattr(parent, "backend", None)
+        self._data_dir = backend.data_directory() if backend else None
         self.setWindowTitle(f"{title} Chart")
         self.resize(1120, 840)
 
@@ -77,8 +83,12 @@ class LeaveChartDialog(QDialog):
         )
         if not path:
             return
-        if not self._pixmap.save(path, "PNG"):
-            QMessageBox.warning(self, "Save Chart", f"Could not save PNG to {path}.")
+        try:
+            with export_file(Path(path), self._data_dir) as destination:
+                if not self._pixmap.save(str(destination), "PNG"):
+                    raise OSError(f"Could not save PNG to {path}.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Save Chart", str(exc))
 
     def save_pdf(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
@@ -89,16 +99,26 @@ class LeaveChartDialog(QDialog):
         )
         if not path:
             return
-        printer = QPrinter(QPrinter.HighResolution)
-        printer.setOutputFormat(QPrinter.PdfFormat)
-        printer.setOutputFileName(path)
-        self._print_document(printer)
+        try:
+            with export_file(Path(path), self._data_dir) as destination:
+                printer = QPrinter(QPrinter.HighResolution)
+                printer.setOutputFormat(QPrinter.PdfFormat)
+                printer.setOutputFileName(str(destination))
+                try:
+                    self._print_document(printer)
+                finally:
+                    del printer
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Save Chart", str(exc))
 
     def print_chart(self) -> None:
         printer = QPrinter(QPrinter.HighResolution)
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.Accepted:
-            self._print_document(printer)
+            try:
+                render_print_job(printer, self._print_document, self._data_dir)
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(self, "Print Chart", str(exc))
 
     def _print_document(self, printer: QPrinter) -> None:
         painter = QPainter(printer)

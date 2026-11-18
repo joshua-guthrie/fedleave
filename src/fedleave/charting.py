@@ -36,6 +36,7 @@ from .cli_helpers import load_read_snapshot as load_leave_year
 from .cli_helpers import parse_iso_date
 from .config import get_default_data_dir as resolve_default_data_dir
 from .executable_search import is_executable, iter_executable_candidates, validate_backend
+from .exporting import export_file
 from .ledger import calculate_balances
 from .project_info import HELP_EPILOG
 
@@ -350,6 +351,8 @@ def render_balance_chart(
     output: Path,
     dims: ChartDimensions,
     y_step: Decimal,
+    *,
+    data_dir: Path | None = None,
 ) -> None:
     """Render a pay-period balance line to a PNG file."""
     image = Image.new("RGB", (dims.width, dims.height), BACKGROUND)
@@ -407,8 +410,8 @@ def render_balance_chart(
         y = dims.plot_bottom + 16
         image.paste(rendered, (x, y), rendered)
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, format="PNG")
+    with export_file(output, data_dir or get_default_data_dir()) as destination:
+        image.save(destination, format="PNG")
 
 
 def comparison_chart_points(
@@ -462,6 +465,8 @@ def render_comparison_chart(
     dims: ChartDimensions,
     y_step: Decimal,
     x_label: str,
+    *,
+    data_dir: Path | None = None,
 ) -> None:
     """Render year-over-year values to a smoothed PNG line chart."""
     image = Image.new("RGB", (dims.width, dims.height), BACKGROUND)
@@ -525,8 +530,8 @@ def render_comparison_chart(
         fill=TEXT,
     )
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, format="PNG")
+    with export_file(output, data_dir or get_default_data_dir()) as destination:
+        image.save(destination, format="PNG")
 
 
 def run_fedleave(args: list[str]) -> Any:
@@ -579,9 +584,9 @@ def run_chart_app(spec: LeaveChartSpec) -> None:
         raise SystemExit(str(exc)) from exc
     y_max = max(Decimal("10"), round_up_to_nearest_ten(max_balance))
     y_step = y_tick_step(y_max)
-    output = output_path.resolve()
+    output = output_path.absolute()
     dims = ChartDimensions(width_pixels=args.resolution, y_max=y_max)
-    render_balance_chart(spec.title, points, output, dims, y_step)
+    render_balance_chart(spec.title, points, output, dims, y_step, data_dir=data_dir)
 
     print(
         json.dumps(
@@ -656,9 +661,9 @@ def run_comparison_chart_app(spec: ComparisonChartSpec) -> None:
     y_axis = payload.get("y_axis", {}) if isinstance(payload.get("y_axis"), dict) else {}
     y_max = Decimal(str(y_axis.get("max", 10)))
     y_step = comparison_y_tick_step(y_max)
-    output = output_path.resolve()
+    output = output_path.absolute()
     dims = ChartDimensions(width_pixels=args.resolution, y_max=y_max)
-    render_comparison_chart(spec.title, points, output, dims, y_step, as_of)
+    render_comparison_chart(spec.title, points, output, dims, y_step, as_of, data_dir=data_dir)
 
     print(
         json.dumps(

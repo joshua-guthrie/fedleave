@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from fedleave.chart_style import draw_historical_and_future_line
 from fedleave.executable_search import is_executable, iter_executable_candidates
+from fedleave.exporting import export_file
 from fedleave.project_info import HELP_EPILOG
 
 # Chart rendering constants (base dimensions)
@@ -282,7 +283,14 @@ def draw_diamond(draw: ImageDraw.ImageDraw, x: float, y: float, radius: int = 9)
     draw.polygon(pts, fill=BLUE, outline=BLUE)
 
 
-def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensions, y_max: Decimal) -> None:
+def render(
+    points: list[tuple[date, Decimal]],
+    output: Path,
+    dims: ChartDimensions,
+    y_max: Decimal,
+    *,
+    data_dir: Path | None = None,
+) -> None:
     """
     Render sick leave balance chart to PNG file.
 
@@ -356,8 +364,8 @@ def render(points: list[tuple[date, Decimal]], output: Path, dims: ChartDimensio
         image.paste(rendered, (x, y), rendered)
 
     # Save
-    output.parent.mkdir(parents=True, exist_ok=True)
-    image.save(output, format="PNG")
+    with export_file(output, data_dir or get_default_data_dir()) as destination:
+        image.save(destination, format="PNG")
 
 
 def main() -> None:
@@ -394,12 +402,12 @@ def main() -> None:
         args.year = infer_leave_year(data_dir)
 
     points, snapshot, max_balance = sick_leave_balance_points(args.year, data_dir)
-    output = output_path.resolve()
+    output = output_path.absolute()
     dims = ChartDimensions(width_pixels=args.resolution)
 
     # Round up max to next hundred for Y-axis
     y_max = round_up_to_hundred(max_balance)
-    render(points, output, dims, y_max)
+    render(points, output, dims, y_max, data_dir=data_dir)
 
     print(
         json.dumps(

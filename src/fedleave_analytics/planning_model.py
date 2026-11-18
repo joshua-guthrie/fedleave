@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import tempfile
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, replace
@@ -12,6 +11,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from fedleave.exporting import export_file
 from fedleave.planning import (
     GENERAL_CATEGORIES,
     METHOD_VERSION,
@@ -113,21 +113,9 @@ def export_destination(path: Path, snapshot: dict):
     Replacing the output inode also avoids modifying an existing hard link to
     a ledger, even if that link was placed outside the datastore.
     """
-    destination = path.expanduser().resolve()
     data_store = snapshot.get("calculation_context", {}).get("data_store")
-    if data_store and destination.is_relative_to(Path(data_store).expanduser().resolve()):
-        raise ValueError("Choose an export location outside the selected leave datastore.")
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w", dir=destination.parent, suffix=destination.suffix, delete=False
-        ) as handle:
-            temporary = Path(handle.name)
+    with export_file(path, data_store) as temporary:
         yield temporary
-        temporary.replace(destination)
-    finally:
-        if temporary and temporary.exists():
-            temporary.unlink()
 
 
 def write_export(path: Path, text: str, snapshot: dict) -> None:

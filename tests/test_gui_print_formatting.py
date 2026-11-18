@@ -104,7 +104,11 @@ def test_save_pdf_delegates_to_print_document(monkeypatch, tmp_path):
 
     printer = captured["printer"]
     assert isinstance(printer, QPrinter)
-    assert printer.outputFileName() == str(tmp_path / "month.pdf")
+    staged = Path(printer.outputFileName())
+    assert staged.suffix == ".pdf"
+    assert staged.parent.name.startswith(".fedleave-export-")
+    assert staged.parent.parent == tmp_path
+    assert (tmp_path / "month.pdf").exists()
     assert printer.outputFormat() == QPrinter.PdfFormat
 
 

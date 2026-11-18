@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from contextlib import nullcontext
 from datetime import date, timedelta
 from math import ceil
 from pathlib import Path
@@ -26,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from fedleave.chart_style import BACKGROUND, BLUE, BORDER, GRID_MAJOR, RED, TEXT
+from fedleave.exporting import export_file, render_print_job
 
 SERIES_COLORS = [BLUE, "#82A9D1", RED, "#D99694", "#8064A2", "#4BACC6"]
 WIDTH = 1610
@@ -801,7 +801,7 @@ class AnalyticsChartWindow(QMainWindow):
         )
         if path:
             try:
-                with self._export_target(path) if self._export_target else nullcontext(path) as destination:
+                with self._export_target(path) if self._export_target else export_file(path) as destination:
                     if not self._pixmap.save(str(destination), "PNG"):
                         raise OSError(f"Could not save PNG to {path}.")
             except (OSError, ValueError) as exc:
@@ -814,12 +814,14 @@ class AnalyticsChartWindow(QMainWindow):
         if not path:
             return
         try:
-            with self._export_target(path) if self._export_target else nullcontext(path) as destination:
+            with self._export_target(path) if self._export_target else export_file(path) as destination:
                 printer = QPrinter(QPrinter.HighResolution)
                 printer.setOutputFormat(QPrinter.PdfFormat)
                 printer.setOutputFileName(str(destination))
-                self._print_document(printer)
-                del printer
+                try:
+                    self._print_document(printer)
+                finally:
+                    del printer
         except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "Save Graphic", str(exc))
 
@@ -828,13 +830,7 @@ class AnalyticsChartWindow(QMainWindow):
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.Accepted:
             try:
-                output = printer.outputFileName()
-                if output and self._export_target:
-                    with self._export_target(output) as destination:
-                        printer.setOutputFileName(str(destination))
-                        self._print_document(printer)
-                else:
-                    self._print_document(printer)
+                render_print_job(printer, self._print_document, export_target=self._export_target)
             except (OSError, ValueError) as exc:
                 QMessageBox.warning(self, "Print Graphic", str(exc))
 

@@ -27,7 +27,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-005 | High, conditional; shared privileged Linux deployment | Extracted unprivileged ownership survived installation | Normalize staged ownership/modes/ACLs and activate fresh verified bytes | Fixed |
 | SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Fixed |
 | SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Fixed |
-| SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Pending |
+| SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Fixed |
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Pending |
 | SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Pending |
 | SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Pending |
@@ -84,7 +84,13 @@ The shared [validator](src/fedleave/executable_search.py#L27), companion finders
 
 ### SEC-008 — Exports could overwrite linked canonical data
 
-Source remediation pending.
+CSV, Calendar/Analytics PNG/PDF and month PDF writers opened destinations directly. Final writer review also reproduced the same overwrite through the print dialogs' file output in six actual Qt cases. Hard/symbolic links could turn a report save into ledger truncation. CLI month PNG also used a predictable temporary name; a planted link redirected staging writes. Actual Qt/Pillow/CSV paths reproduced these effects on synthetic ledgers. An unsafe selected destination or shared writable export directory was required; no remote write was established. Classification: CWE-59.
+
+All affected writers use [one GUI-independent boundary](src/fedleave/exporting.py#L12), including print-to-file and month print-preview output. Ordinary native printer jobs retain their existing rendering path. It rejects selected-datastore destinations and final symlinks, renders inside a private randomly named staging directory on the destination filesystem, closes handles and atomically replaces the external directory entry. Replacing an external hard link preserves the ledger inode. Failed rendering closes printer handles before cleaning staging and preserves the previous report. Atomic create-only publication preserves concurrent creators.
+
+[Regressions](tests/test_export_security.py) exercise real chart PNG/PDF combinations, month PDF, CSV aliases, legacy staging links, direct datastore targets, failure cleanup, print-to-file and create-only races. The native Windows test also inspects actual staging ACLs; POSIX tests check private directory permissions. Related exporter suites passed; printer tests retain layout assertions while checking staging. This protects the identified link attacks; it is not an OS sandbox against arbitrary concurrent ancestor-directory replacement. Native Windows link semantics remain CI acceptance work.
+
+**Commit verification:** 61 passed in 8.91s.
 
 ### SEC-009 — MCP metadata reached a vulnerable OpenTelemetry parser
 

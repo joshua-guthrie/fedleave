@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
 )
 
 from fedleave.config import get_default_data_dir
+from fedleave.exporting import export_file, render_print_job
 from fedleave.payperiods import calculate_pay_date
 from fedleave.project_info import OFFICIAL_PROJECT_URL
 from fedleave_month_report_graphic.report import BASE_WIDTH as MONTH_REPORT_WIDTH
@@ -2264,14 +2265,21 @@ class MainWindow(QMainWindow):
 
     def print_preview(self) -> None:
         preview = QPrintPreviewDialog(self)
-        preview.paintRequested.connect(self._print_document)
+        preview.paintRequested.connect(self._print_job)
         preview.exec()
 
     def print_month(self) -> None:
         printer = QPrinter(QPrinter.HighResolution)
         dialog = QPrintDialog(printer, self)
         if dialog.exec() == QDialog.Accepted:
-            self._print_document(printer)
+            self._print_job(printer)
+
+    def _print_job(self, printer: QPrinter) -> None:
+        try:
+            backend = getattr(self, "backend", None)
+            render_print_job(printer, self._print_document, backend.data_directory() if backend else None)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Print Month", str(exc))
 
     def save_pdf(self) -> None:
         folder = self.settings.pdf_export_folder or str(Path.home())
@@ -2279,10 +2287,18 @@ class MainWindow(QMainWindow):
         path, _ = QFileDialog.getSaveFileName(self, "Save Month as PDF", default, "PDF files (*.pdf)")
         if not path:
             return
-        printer = QPrinter(QPrinter.HighResolution)
-        printer.setOutputFormat(QPrinter.PdfFormat)
-        printer.setOutputFileName(path)
-        self._print_document(printer)
+        try:
+            backend = getattr(self, "backend", None)
+            with export_file(path, backend.data_directory() if backend else None) as destination:
+                printer = QPrinter(QPrinter.HighResolution)
+                printer.setOutputFormat(QPrinter.PdfFormat)
+                printer.setOutputFileName(str(destination))
+                try:
+                    self._print_document(printer)
+                finally:
+                    del printer
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Save Month", str(exc))
 
     def show_help(self) -> None:
         self._show_html_file("fedleave-calendar-help.html", "Help Contents")
