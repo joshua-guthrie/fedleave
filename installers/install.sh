@@ -17,6 +17,7 @@ ARCHIVE_NAME=""
 DOWNLOAD_BASE_URL=""
 UNATTENDED=0
 TEMP_DIR=""
+STAGING_DIR=""
 SUDO=()
 
 log() {
@@ -29,6 +30,9 @@ die() {
 }
 
 cleanup() {
+  if [[ -n "$STAGING_DIR" ]]; then
+    run_privileged rm -rf -- "$STAGING_DIR"
+  fi
   if [[ -n "$TEMP_DIR" && -d "$TEMP_DIR" ]]; then
     rm -rf -- "$TEMP_DIR"
   fi
@@ -265,6 +269,63 @@ prepare_privileges() {
   else
     SUDO=()
   fi
+  INSTALL_ROOT="$(readlink -m -- "$INSTALL_ROOT")"
+  BIN_DIR="$(readlink -m -- "$BIN_DIR")"
+  if is_system_install; then
+    verify_system_ancestors "$INSTALL_ROOT"
+    verify_system_ancestors "$BIN_DIR"
+    if ! command -v setfacl >/dev/null 2>&1; then
+      command -v apt-get >/dev/null 2>&1 || die "System installation requires the acl package."
+      run_privileged apt-get update
+      run_privileged apt-get install -y --no-install-recommends acl
+    fi
+  fi
+}
+
+is_system_install() {
+  ((EUID == 0 || ${#SUDO[@]} > 0))
+}
+
+verify_system_ancestors() {
+  local path="$1" mode
+  while :; do
+    if [[ -e "$path" || -L "$path" ]]; then
+      [[ ! -L "$path" && -d "$path" ]] || die "Unsafe system installation directory: $path"
+      mode="$(stat -c %a -- "$path")"
+      # POSIX ACL write permissions are bounded by the group-class mode mask.
+      if [[ "$(stat -c %u -- "$path")" != 0 ]] || (( (8#$mode & 0022) != 0 )); then
+        die "System installation requires root-owned, non-writable ancestors: $path"
+      fi
+    fi
+    [[ "$path" == / ]] && break
+    path="$(dirname -- "$path")"
+  done
+}
+
+verify_bundle_paths() {
+  local root="$1" path resolved
+  [[ ! -L "$root" ]] || die "Bundle root must not be a symbolic link."
+  run_privileged find "$root" -type l -print0 | while IFS= read -r -d '' path; do
+    resolved="$(run_privileged readlink -m -- "$path")"
+    [[ "$resolved" == "$root" || "$resolved" == "$root/"* ]] ||
+      die "Bundle link escapes its release directory: $path"
+  done
+  path="$(run_privileged find "$root" ! -type d ! -type f ! -type l -print -quit)"
+  if [[ -n "$path" ]]; then
+    die "Unsupported special file in release: $path"
+  fi
+}
+
+secure_system_stage() {
+  local stage="$1" unsafe
+  # Do not inherit downloader ownership, ACLs or privileged executable bits.
+  run_privileged chown -hR -P root:root -- "$stage"
+  run_privileged setfacl -R -P -b -k -- "$stage"
+  run_privileged find "$stage" ! -type l -exec chmod u+rwX,go+rX,go-w,a-s -- '{}' +
+  unsafe="$(run_privileged find "$stage" \( ! -uid 0 -o ! -gid 0 -o \( ! -type l -a -perm /6022 \) \) -print -quit)"
+  if [[ -n "$unsafe" ]]; then
+    die "Unsafe ownership or permissions in staged system release: $unsafe"
+  fi
 }
 
 find_packaged_command() {
@@ -286,21 +347,36 @@ install_release() {
   local extracted="$TEMP_DIR/$TOP_LEVEL_DIRECTORY"
   local releases_dir="$INSTALL_ROOT/releases"
   local release_dir="$releases_dir/$RELEASE_VERSION"
-  local stage_dir="$releases_dir/.${RELEASE_VERSION}.staging.$$.$RANDOM"
+  local stage_dir
   local current_link="$INSTALL_ROOT/current"
   local pending_link="$INSTALL_ROOT/.current.$$.$RANDOM"
   local cli
 
+  [[ ! -L "$extracted" ]] || die "Bundle root must not be a symbolic link."
+  if is_system_install; then
+    verify_system_ancestors "$releases_dir"
+    verify_system_ancestors "$BIN_DIR"
+  fi
   run_privileged install -d -m 0755 "$releases_dir" "$BIN_DIR"
 
-  if [[ -d "$release_dir" ]]; then
-    log "Release ${RELEASE_VERSION} is already present; validating it before activation."
-  else
-    log "Installing the verified bundle into $release_dir."
-    run_privileged install -d -m 0755 "$stage_dir"
-    run_privileged cp -a "$extracted/." "$stage_dir/"
-    run_privileged mv "$stage_dir" "$release_dir"
+  [[ ! -L "$release_dir" ]] || die "Refusing a symbolic-link release directory: $release_dir"
+  if [[ -e "$release_dir" ]]; then
+    # Never execute or legitimize bytes an older installation left user-writable.
+    release_dir="$releases_dir/${RELEASE_VERSION}.reinstall.$$.$RANDOM"
   fi
+  log "Installing the verified bundle into $release_dir."
+  # The outer directory keeps copied permissions from exposing incomplete files.
+  STAGING_DIR="$(run_privileged mktemp -d "$releases_dir/.${RELEASE_VERSION}.staging.XXXXXXXX")"
+  stage_dir="$STAGING_DIR/$TOP_LEVEL_DIRECTORY"
+  run_privileged install -d -m 0755 "$stage_dir"
+  run_privileged cp -a --no-preserve=ownership,xattr "$extracted/." "$stage_dir/"
+  if is_system_install; then
+    secure_system_stage "$stage_dir"
+  fi
+  verify_bundle_paths "$stage_dir"
+  run_privileged mv -T "$stage_dir" "$release_dir"
+  run_privileged rmdir -- "$STAGING_DIR"
+  STAGING_DIR=""
 
   cli="$(find_packaged_command "$release_dir" fedleave)"
   [[ -n "$cli" ]] || die "The installed release does not contain the required fedleave CLI."
