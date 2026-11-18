@@ -175,6 +175,8 @@ def test_linux_archive_has_stable_root_and_matching_checksum(tmp_path: Path) -> 
 
     with tarfile.open(archive, "r:gz") as handle:
         names = handle.getnames()
+        assert all(member.uid == member.gid == 0 for member in handle)
+        assert all(not member.mode & 0o6022 for member in handle if not member.issym())
         version_file = handle.extractfile("FedLeave/VERSION")
         version = version_file.read() if version_file is not None else None
     assert names[0] == "FedLeave"

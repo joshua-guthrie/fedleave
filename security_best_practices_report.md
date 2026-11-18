@@ -24,7 +24,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | ID | Severity and prerequisite | Baseline defect | Remediation | Source status |
 | --- | --- | --- | --- | --- |
 | SEC-002 | High; restricted MCP peer with network-init permission | Holiday URLs bypassed local-file read roots | Validate the actual download URL and suppress parser-content errors | Fixed |
-| SEC-005 | High, conditional; shared privileged Linux deployment | Extracted unprivileged ownership survived installation | Normalize staged ownership/modes/ACLs and activate fresh verified bytes | Pending |
+| SEC-005 | High, conditional; shared privileged Linux deployment | Extracted unprivileged ownership survived installation | Normalize staged ownership/modes/ACLs and activate fresh verified bytes | Fixed |
 | SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Pending |
 | SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Pending |
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Pending |
@@ -50,7 +50,15 @@ The fix validates HTTP(S), host, length and NUL constraints at [the actual downl
 
 ### SEC-005 — System installation preserved ordinary-user ownership
 
-Source remediation pending.
+**Impact:** Shared installed programs could remain writable by the downloading user; another identity, including root, could later execute modified bytes.
+
+The bootstrap extracted as the caller and used privileged `cp -a`, preserving caller ownership under the system installation root. The baseline isolated guest confirmed owner write access and later guest-root execution of an inert modified CLI. This is a conditional local privilege boundary, not remote compromise. Classification: CWE-732 / CWE-276.
+
+[Staging and activation](installer/linux/install.sh#L346) now require trusted root-owned system destination ancestors, reject escaping bundle links/special files, copy verified bytes into a private staging directory without preserving ownership or extended attributes, set root ownership without following links, clear ACLs and strip group/world write and setuid/setgid bits before invoking the CLI. Existing versions receive fresh uniquely named verified releases; an older writable CLI is never run or legitimized. Atomic activation and user-local ownership remain supported. [Archive creation](installer/package.py) also emits root metadata and safe modes.
+
+Tests cover user-local installation, external links, old tampered releases and archive metadata. A [privileged CI test](tests/test_linux_system_install_security.py) uses a disposable `/var/lib` tree with real root/nonroot identities, never the application's install or datastore. Distribution invokes it explicitly with sudo. The earlier fixed isolated guest showed root ownership in both caller modes, denied ordinary-user modification and did not execute the old modified release. That fixture uses GNU tools and a small privilege helper; supported Debian/Ubuntu sudo/PAM and Distribution acceptance remain CI work.
+
+**Commit verification:** 24 passed, 1 skipped in 2.30s.
 
 ## Medium severity
 

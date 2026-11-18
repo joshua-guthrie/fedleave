@@ -203,7 +203,14 @@ def create_linux_archive(bundle_dir: Path, output_dir: Path, version: str) -> tu
     # supplies the versioned /opt destination after checksum verification.
     try:
         with tarfile.open(pending_archive, "w:gz", format=tarfile.PAX_FORMAT, dereference=False) as tar:
-            tar.add(bundle_dir, arcname="FedLeave", recursive=True)
+
+            def release_metadata(member):
+                member.uid = member.gid = 0
+                member.uname = member.gname = "root"
+                member.mode &= ~0o6022
+                return member
+
+            tar.add(bundle_dir, arcname="FedLeave", recursive=True, filter=release_metadata)
             version_bytes = f"{version}\n".encode()
             version_info = tarfile.TarInfo("FedLeave/VERSION")
             version_info.size = len(version_bytes)

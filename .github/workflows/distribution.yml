@@ -154,8 +154,14 @@ jobs:
       - name: Install Linux packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y libegl1 shellcheck binutils
+          sudo apt-get install -y libegl1 shellcheck binutils acl
           chmod +x scripts/LinuxInstall.sh installer/linux/install.sh installer/package.py
+
+      - name: Verify system installation permissions in an isolated directory
+        run: |
+          python -m pip install pytest
+          sudo env FEDLEAVE_TEST_UID="$(id -u)" FEDLEAVE_TEST_GID="$(id -g)" \
+            "$(command -v python)" -m pytest -q tests/test_linux_system_install_security.py
 
       - name: Build PyInstaller applications
         run: ./scripts/LinuxInstall.sh --unattended --build-only --verbose
