@@ -22,6 +22,6 @@ def sanitize_url(value: str, *, field_name: str = "url") -> str:
     parsed = urlparse(s)
     if parsed.scheme not in ("http", "https"):
         raise ValueError(f"{field_name} must be an http(s) URL")
-    if not parsed.netloc:
+    if not parsed.hostname:
         raise ValueError(f"{field_name} missing host")
     return s

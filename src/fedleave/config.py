@@ -248,7 +248,9 @@ def init_config(
     # prevent initialization when the known OPM default remains available.
     try:
         config.holidays.ics_url = sanitize_url(holiday_ics_url)
-    except Exception:
+    except ValueError:
+        if holiday_source == "opm_ics":
+            raise
         config.holidays.ics_url = DEFAULT_OPM_ICS_URL
 
     config_path = data_dir / "config.json"
@@ -268,7 +270,7 @@ def init_config(
     holiday_cache = (
         None
         if holiday_cache_path.exists()
-        else generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=holiday_ics_url)
+        else generate_federal_holidays(year, data_dir, source=holiday_source, ics_url=config.holidays.ics_url)
     )
     ensure_data_dir(data_dir)
 

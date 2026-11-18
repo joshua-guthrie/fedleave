@@ -9,6 +9,8 @@ from pathlib import Path
 
 import holidays
 
+from .validation import sanitize_url
+
 try:
     from icalendar import Calendar
 except Exception:
@@ -20,7 +22,14 @@ DEFAULT_OPM_ICS_URL = "https://www.opm.gov/policy-data-oversight/pay-leave/feder
 def _parse_ics(ics_bytes: bytes) -> dict[str, object]:
     if Calendar is None:
         raise RuntimeError("icalendar not available; install with `pip install icalendar`")
+    try:
+        return _parse_ics_payload(ics_bytes)
+    except (ValueError, TypeError, AttributeError, KeyError, OverflowError):
+        # Calendar exceptions can include private source lines in CLI/MCP errors.
+        raise ValueError("Invalid holiday calendar data") from None
 
+
+def _parse_ics_payload(ics_bytes: bytes) -> dict[str, object]:
     cal = Calendar.from_ical(ics_bytes)
     entries: list[dict[str, object]] = []
     years: set[int] = set()
@@ -62,6 +71,8 @@ def _parse_ics(ics_bytes: bytes) -> dict[str, object]:
 
 def download_ics(url: str) -> bytes:
     """Download an iCalendar document, translating URL errors for the CLI."""
+    # Network permission must never authorize urllib's local-file handlers.
+    url = sanitize_url(url)
     try:
         with urllib.request.urlopen(url, timeout=30) as response:
             return response.read()
