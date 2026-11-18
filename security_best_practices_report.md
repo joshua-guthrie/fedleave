@@ -31,7 +31,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Fixed |
 | SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Fixed |
 | SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Fixed |
-| SEC-006 | Low established application exposure; affected Pillow resolution | No fixed minimum for advisory matches | Pillow 13.0.0 minimum and rendering validation | Pending |
+| SEC-006 | Low established application exposure; affected Pillow resolution | No fixed minimum for advisory matches | Pillow 13.0.0 minimum and rendering validation | Fixed |
 | SEC-007 | Low established application exposure; affected icalendar resolution | No fixed minimum for complexity advisory | icalendar 7.1.3 minimum and import validation | Pending |
 
 ## High severity
@@ -124,7 +124,11 @@ The [bounded reader](src/fedleave/network.py) enforces **5 MiB for holiday ICS**
 
 ### SEC-006 — Pillow resolution matched published advisories
 
-Source remediation pending.
+Local Pillow 12.2.0 matched 56 distinct GHSA identifiers in the refreshed query; recorded fixes extended through 13.0.0. FedLeave mainly generates charts. No attacker-to-affected decoder/filter feature route was established, so upstream High/Critical labels were not assigned automatically to the project. Earlier exact Windows/Linux packages already contained 13.0.0.
+
+The minimum is now `Pillow>=13.0.0`; local resolution is 13.0.0. Existing rendering/layout tests remain compatibility controls, with resolved inventories and advisory checks extending beyond declaration-string assertions. Native-library coverage remains partial. [Primary example advisory](https://github.com/python-pillow/Pillow/security/advisories/GHSA-22hg-r758-rrw9).
+
+**Commit verification:** 29 passed in 0.96s.
 
 ### SEC-007 — icalendar resolution matched a complexity advisory
 
