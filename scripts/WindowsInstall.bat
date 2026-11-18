@@ -24,7 +24,7 @@ if not defined PYTHON_CMD (
   where winget >nul 2>nul
   if %ERRORLEVEL%==0 (
     echo Python 3.11+ not found. Attempting bootstrap via winget...
-    winget install -e --id Python.Python.3.11 --silent --accept-package-agreements --accept-source-agreements
+    winget install -e --id Python.Python.3.13 --silent --accept-package-agreements --accept-source-agreements
     where py >nul 2>nul
     if %ERRORLEVEL%==0 (
       set "PYTHON_CMD=py -3"

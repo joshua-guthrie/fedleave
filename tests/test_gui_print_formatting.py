@@ -12,7 +12,7 @@ from PySide6.QtGui import QFont, QFontDatabase, QFontMetricsF, QPageLayout, QPag
 from PySide6.QtPdf import QPdfDocument
 from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtSvg import QSvgRenderer
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from fedleave.ledger import TRANSACTION_CATEGORIES
 from fedleave_gui.main_window import MainWindow
@@ -99,6 +99,7 @@ def test_save_pdf_delegates_to_print_document(monkeypatch, tmp_path):
     monkeypatch.setattr(
         QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(tmp_path / "month.pdf"), "PDF files (*.pdf)")
     )
+    monkeypatch.setattr(QMessageBox, "warning", lambda _parent, _title, message: pytest.fail(message))
 
     window.save_pdf()
 

@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontMetrics
-from PySide6.QtWidgets import QApplication, QFileDialog
+from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
 
 from fedleave_analytics.analytics import analyze_leave_year
 from fedleave_analytics.app import AnalyticsWindow
@@ -233,6 +233,11 @@ def test_current_analytics_table_can_be_exported_as_csv(monkeypatch, tmp_path):
     window.set_data(_data())
     output = tmp_path / "summary.csv"
     monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(output), "CSV files (*.csv)"))
+
+    def unexpected_warning(_parent, _title, message):
+        raise AssertionError(message)
+
+    monkeypatch.setattr(QMessageBox, "warning", unexpected_warning)
 
     window.save_csv()
 

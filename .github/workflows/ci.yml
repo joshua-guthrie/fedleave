@@ -22,7 +22,8 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          # Match the Windows installer runtime that supports private export directories.
+          python-version: ${{ runner.os == 'Windows' && '3.13' || '3.11' }}
 
       - name: Install Python deps
         shell: bash

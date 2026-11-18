@@ -54,7 +54,8 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # The Windows 3.11 binary selected by setup-python lacks private mkdir ACLs.
+          python-version: "3.13"
           cache: pip
           cache-dependency-path: pyproject.toml
 

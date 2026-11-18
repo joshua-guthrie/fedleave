@@ -12,6 +12,7 @@ import sys
 import time
 from datetime import date, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal, Slot
@@ -1285,6 +1286,12 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
     # Installed-bundle QA: use the real sibling CLI and render the existing
     # Seasonality page without writing any ledger or creating another app.
     window.set_data(load_analytics_data(backend, data_dir, year))
+    # Exercise the export boundary with the built application's own runtime.
+    with TemporaryDirectory() as directory:
+        report = Path(directory) / "report.csv"
+        sample = "Metric,Value\nLeave Year,2026\n"
+        write_export_text(report, sample, data_dir)
+        assert report.read_text(encoding="utf-8") == sample
     help_dialog = AnalyticsHelpDialog("what-if", window)
     assert help_dialog.available
     assert "Scenario rows" in help_dialog.browser.toPlainText()

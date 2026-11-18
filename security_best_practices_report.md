@@ -92,6 +92,10 @@ All affected writers use [one GUI-independent boundary](src/fedleave/exporting.p
 
 **Commit verification:** 61 passed in 8.91s in the initial export and rendering checks. The final compatibility changes passed 30 focused export and print tests.
 
+**Windows release follow-up:** GitHub's first Windows build selected Python 3.11.9, which lacks private temporary directory ACLs. The protection refused CSV export and the source test's warning dialog blocked unattended CI. Windows CI, Distribution, and the source install bootstrap now select Python 3.13 when provisioning a runtime. The frozen Analytics smoke test writes and reads a disposable CSV to verify the export boundary with the packaged interpreter. GUI tests report unexpected export warnings as failures.
+
+Local follow-up verification passed 69 Analytics, export, print, packaging, and MCP smoke tests. The updated Windows package is verified by Distribution.
+
 ### SEC-009 — MCP metadata reached a vulnerable OpenTelemetry parser
 
 MCP 2.3.0 installs tracing middleware without needing an exporter. Source OpenTelemetry API 1.45.1 parsed `_meta.traceparent` before CLI execution. A bounded 8-KiB malformed whitespace input delayed a real read-only MCP ping to about 598 ms versus about 3 ms normally. CLI deadlines/read-only policy did not bound the in-process parse. No indefinite hang or external service attack was attempted. Classification: CWE-1333; [GHSA-mf5v-w3w3-f6cg](https://github.com/open-telemetry/opentelemetry-python/security/advisories/GHSA-mf5v-w3w3-f6cg).
