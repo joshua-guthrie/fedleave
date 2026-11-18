@@ -25,7 +25,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | --- | --- | --- | --- | --- |
 | SEC-002 | High; restricted MCP peer with network-init permission | Holiday URLs bypassed local-file read roots | Validate the actual download URL and suppress parser-content errors | Fixed |
 | SEC-005 | High, conditional; shared privileged Linux deployment | Extracted unprivileged ownership survived installation | Normalize staged ownership/modes/ACLs and activate fresh verified bytes | Fixed |
-| SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Pending |
+| SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Fixed |
 | SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Pending |
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Pending |
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Pending |
@@ -64,7 +64,13 @@ Tests cover user-local installation, external links, old tampered releases and a
 
 ### SEC-003 — CSV exports retained spreadsheet formulas
 
-Source remediation pending.
+Descriptions, scenario names and metadata reached CSV writers unchanged. CSV delimiter quoting did not neutralize formula characters or control/whitespace prefixes. LibreOffice actually evaluated harmless arithmetic from a production comparison CSV. Spreadsheet-dependent network/command effects were neither attempted nor demonstrated. Classification: CWE-1236.
+
+The shared [cell encoder](src/fedleave_analytics/csv_export.py#L7) now prefixes dangerous text with an apostrophe across comparison, planning and ordinary Analytics exports, including headers and metadata. It recognizes ASCII/fullwidth formula characters and leading control/format characters. Numbers, including negative values, stay numeric; JSON/source records retain their original text. Help documents the marker and consumer/resaving limitations.
+
+[Tests](tests/test_csv_export_security.py) cover quoting, multiline text, Unicode, control prefixes, real planner exports, GUI saves and JSON fidelity. The focused suite passed 46 tests. Fixed production exports contained **zero formula cells** in LibreOffice with default and explicitly enabled formula-import settings. Excel and later transformations remain untested; there is no universal CSV-safety claim.
+
+**Commit verification:** 124 passed in 1.68s.
 
 ### SEC-001 — Windows desktop backends accepted batch launchers
 

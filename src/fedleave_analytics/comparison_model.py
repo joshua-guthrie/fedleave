@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import csv
 import io
 import json
 from dataclasses import asdict
 
+from .csv_export import SpreadsheetWriter
 from .planning_model import write_export
 
 POINT_COLUMNS = [
@@ -35,7 +35,7 @@ def csv_document(result, table_name, rows=None, columns=None):
     if rows is None:
         rows, columns = cumulative_tables(result)[table_name]
     output = io.StringIO(newline="")
-    writer = csv.writer(output)
+    writer = SpreadsheetWriter(output)
     for key, value in (
         ("Schema version", result.schema_version),
         ("Method", result.method_version),

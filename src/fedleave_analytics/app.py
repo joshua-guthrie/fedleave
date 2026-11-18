@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
 import os
 import re
@@ -48,6 +47,7 @@ from .charts import (
     table_widget,
 )
 from .comparison_view import ComparisonWidget
+from .csv_export import SpreadsheetWriter
 from .help_view import AnalyticsHelpDialog
 from .planning_window import PlanningWindow
 from .seasonality import seasonality_options, seasonality_series
@@ -1025,7 +1025,7 @@ class AnalyticsWindow(QMainWindow):
             return
         try:
             with Path(path).open("w", newline="", encoding="utf-8") as handle:
-                writer = csv.writer(handle)
+                writer = SpreadsheetWriter(handle)
                 if seasonality:
                     writer.writerows(seasonality["metadata"])
                 else:

@@ -47,7 +47,7 @@
 
 <a name="exports"></a><h2 id="exports">Files, charts and troubleshooting</h2>
 <ul><li><strong>Refresh</strong> reads the selected backend again. <strong>Calculate/Recalculate</strong> uses its cached snapshot. <strong>Cancel</strong> stops waiting and discards late results; it does not undo draft operations. Use Undo/Reset for that.</li>
-<li><strong>Save Table as CSV</strong> exports the currently selected result table, its filters and assumptions. It is not an editable scenario definition. Use Export scenario JSON for a What-if definition.</li>
+<li><strong>Save Table as CSV</strong> exports the currently selected result table, its filters and assumptions. Formula-like text is marked with a leading apostrophe for spreadsheet use; numeric values remain numbers. Other CSV readers may show that marker. Use JSON when you need the original text or an editable What-if definition. Spreadsheet save/reopen behavior can vary.</li>
 <li><strong>Open Chart</strong> opens exact supporting data with CSV, PNG, PDF and Print. Choose the intended category/table first. Exports must be outside the canonical datastore; the application guards against overwriting ledger files.</li>
 <li>If no result appears, inspect the status message and confirm the year is initialized in the selected datastore. Missing holiday/schedule/lot context is N/A. Check configured time increments and cutoff &lt; date &lt;= horizon.</li>
 <li>If a scheduled booking is missing from Scenario rows, it may be before/on cutoff, after horizon, ineffective/void, synthetic, an accrual or a non-absence event.</li>

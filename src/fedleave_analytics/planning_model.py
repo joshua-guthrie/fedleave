@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import io
 import json
 import tempfile
@@ -29,6 +28,7 @@ from fedleave.planning import (
     validate_scenario,
 )
 
+from .csv_export import SpreadsheetWriter
 from .snapshots import ReadOnlySnapshotSource
 
 LABELS = {
@@ -326,7 +326,7 @@ class PlanningSession:
             )
         rows, columns = self.rows(category)[table]
         handle = io.StringIO(newline="")
-        writer = csv.writer(handle)
+        writer = SpreadsheetWriter(handle)
         writer.writerows(self.csv_metadata(category, table))
         writer.writerow([label for _, label in columns])
         writer.writerows([[row.get(key) for key, _ in columns] for row in rows])
