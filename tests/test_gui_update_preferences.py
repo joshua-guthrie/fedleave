@@ -108,7 +108,9 @@ def test_manual_help_action_still_checks_when_automatic_checks_are_disabled(upda
     window.settings.automatic_update_checks = False
     messages = []
     monkeypatch.setattr(QMessageBox, "information", lambda *args: messages.append(args[2]))
-    help_menu = next(action.menu() for action in window.menuBar().actions() if action.text() == "Help")
+    # Keep Qt action wrappers alive while accessing their associated menu.
+    menu_actions = window.menuBar().actions()
+    help_menu = next(action.menu() for action in menu_actions if action.text() == "Help")
     action = next(action for action in help_menu.actions() if action.text() == "Check for Updates...")
 
     action.trigger()

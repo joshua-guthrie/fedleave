@@ -9,6 +9,7 @@ from pathlib import Path
 
 import holidays
 
+from .network import read_bounded
 from .validation import sanitize_url
 
 try:
@@ -17,6 +18,7 @@ except Exception:
     Calendar = None
 
 DEFAULT_OPM_ICS_URL = "https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/holidays.ics"
+HOLIDAY_ICS_MAX_BYTES = 5 * 1024 * 1024
 
 
 def _parse_ics(ics_bytes: bytes) -> dict[str, object]:
@@ -75,7 +77,7 @@ def download_ics(url: str) -> bytes:
     url = sanitize_url(url)
     try:
         with urllib.request.urlopen(url, timeout=30) as response:
-            return response.read()
+            return read_bounded(response, HOLIDAY_ICS_MAX_BYTES)
     except urllib.error.URLError as exc:
         raise RuntimeError(f"Failed to download ICS from {url}: {exc}") from exc
 

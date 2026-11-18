@@ -8,9 +8,11 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from . import __build_commit__, __version__
+from .network import read_bounded
 from .project_info import OFFICIAL_PROJECT_URL
 
 PUBLISHED_BUILD_URL = "https://raw.githubusercontent.com/joshua-guthrie/fedleave/master/installers/BUILD.txt"
+UPDATE_METADATA_MAX_BYTES = 64 * 1024
 
 
 def _parse_build_metadata(content: str) -> tuple[str, str]:
@@ -49,7 +51,7 @@ def check_for_updates(
     )
     try:
         with opener(request, timeout=timeout) as response:
-            build_file = response.read().decode("utf-8")
+            build_file = read_bounded(response, UPDATE_METADATA_MAX_BYTES).decode("utf-8")
         latest_version, latest_build = _parse_build_metadata(build_file)
         normalized_current_build = current_build.strip().lower()
         # Releases without an embedded build identity predate rolling-build

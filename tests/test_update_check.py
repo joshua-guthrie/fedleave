@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+
 from fedleave.project_info import OFFICIAL_PROJECT_URL
 from fedleave.update_check import check_for_updates
 
@@ -10,6 +12,7 @@ LATEST_BUILD = "b" * 40
 class _Response:
     def __init__(self, content: str) -> None:
         self.content = content
+        self._stream = io.BytesIO(content.encode("utf-8"))
 
     def __enter__(self):
         return self
@@ -17,8 +20,8 @@ class _Response:
     def __exit__(self, *args):
         return None
 
-    def read(self) -> bytes:
-        return self.content.encode("utf-8")
+    def read(self, size=-1) -> bytes:
+        return self._stream.read(size)
 
 
 def _build_file(version: str = "0.2.1.dev0+gbbbbbbbb", source_commit: str = LATEST_BUILD) -> str:

@@ -30,7 +30,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Fixed |
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Pending |
 | SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Fixed |
-| SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Pending |
+| SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Fixed |
 | SEC-006 | Low established application exposure; affected Pillow resolution | No fixed minimum for advisory matches | Pillow 13.0.0 minimum and rendering validation | Pending |
 | SEC-007 | Low established application exposure; affected icalendar resolution | No fixed minimum for complexity advisory | icalendar 7.1.3 minimum and import validation | Pending |
 
@@ -42,7 +42,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 
 Initialization sanitized a stored URL but handed the original argument to the holiday generator. The downloader accepted urllib-supported `file:` URLs, so `file_read_roots=[]` did not block this alternate read path. A plaintext marker appeared through parser errors; a valid local ICS outside the store could be imported. Real Executor/CLI-child reproductions established the bypass. Classification: CWE-918 / permission-boundary bypass.
 
-The fix validates HTTP(S), host, length and NUL constraints at [the actual downloader](src/fedleave/holidays.py#L72), passes the validated configuration value from [initialization](src/fedleave/config.py#L250), and translates malformed-calendar exceptions into a content-free error at [the parser boundary](src/fedleave/holidays.py#L22). Actual `opm_ics` initialization rejects invalid URLs; offline mode retains the existing fallback for an unused optional URL. Authorized local ICS file import remains available separately.
+The fix validates HTTP(S), host, length and NUL constraints at [the actual downloader](src/fedleave/holidays.py#L74), passes the validated configuration value from [initialization](src/fedleave/config.py#L250), and translates malformed-calendar exceptions into a content-free error at [the parser boundary](src/fedleave/holidays.py#L24). Actual `opm_ics` initialization rejects invalid URLs; offline mode retains the existing fallback for an unused optional URL. Authorized local ICS file import remains available separately.
 
 [Permanent tests](tests/test_holiday_download_security.py) cover zero opener calls on rejected URLs, normalized valid HTTP(S), text/JSON error redaction and restricted Executor children importing neither plaintext nor ICS fixtures. The initial focused suite passed 27 tests. No arbitrary-host allowlist was added: this addresses local-file permission bypass rather than claiming general SSRF isolation.
 
@@ -110,7 +110,11 @@ Archive validation rejected separators but allowed colons. A key such as `C:outs
 
 ### SEC-004 — Network documents lacked byte budgets
 
-Source remediation pending.
+Holiday/update readers used unbounded `read()`. Timeouts did not prevent a selected/compromised endpoint from supplying a large body. Moderate synthetic fixtures established the missing budget; no OOM was induced. Classification: CWE-400/CWE-770.
+
+The [bounded reader](src/fedleave/network.py) enforces **5 MiB for holiday ICS** and **64 KiB for update metadata**, independently of Content-Length and with at most one overflow byte. Oversized initialization fails before committed configuration/calendar data; update checks return unavailable. Responses close and diagnostics omit body content. [Tests](tests/test_network_response_limits.py) cover below/exact/over boundaries and high-level behavior; the focused suite passed 29 tests. These are not total elapsed-time or arbitrary parser-complexity limits.
+
+**Commit verification:** 35 passed in 2.48s.
 
 ### SEC-006 — Pillow resolution matched published advisories
 
