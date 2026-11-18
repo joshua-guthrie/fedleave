@@ -82,6 +82,8 @@ The shared [validator](src/fedleave/executable_search.py#L27), companion finders
 
 **Commit verification:** 70 passed, 1 skipped in 35.55s.
 
+Windows CI follow-up updated the mocked planning and report backend paths to match the executable requirement. The tests still verify the exact selected path and the absence of fallback on backend errors.
+
 ### SEC-008 — Exports could overwrite linked canonical data
 
 CSV, Calendar/Analytics PNG/PDF and month PDF writers opened destinations directly. Final writer review also reproduced the same overwrite through the print dialogs' file output in six actual Qt cases. Hard/symbolic links could turn a report save into ledger truncation. CLI month PNG also used a predictable temporary name; a planted link redirected staging writes. Actual Qt/Pillow/CSV paths reproduced these effects on synthetic ledgers. An unsafe selected destination or shared writable export directory was required; no remote write was established. Classification: CWE-59.
@@ -95,6 +97,8 @@ All affected writers use [one GUI-independent boundary](src/fedleave/exporting.p
 **Windows release follow-up:** GitHub's first Windows build selected Python 3.11.9, which lacks private temporary directory ACLs. The protection refused CSV export and the source test's warning dialog blocked unattended CI. Windows CI, Distribution, and the source install bootstrap now select Python 3.13 when provisioning a runtime. The frozen Analytics smoke test writes and reads a disposable CSV to verify the export boundary with the packaged interpreter. GUI tests report unexpected export warnings as failures.
 
 Local follow-up verification passed 69 Analytics, export, print, packaging, and MCP smoke tests. The updated Windows package is verified by Distribution.
+
+The Windows ACL regression test reads the directory's security descriptor directly through .NET. This avoids the hosted runner's PowerShell module loading error while preserving the checks for protected inheritance and allowed security principals. Local verification of the Windows test fixture changes passed 71 tests with one native Windows test skipped.
 
 ### SEC-009 — MCP metadata reached a vulnerable OpenTelemetry parser
 

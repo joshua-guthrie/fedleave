@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from datetime import date, datetime
 
 import pytest
@@ -128,7 +129,7 @@ def test_parse_args_rejects_existing_output_without_overwrite(tmp_path):
 
 
 def test_find_fedleave_accepts_explicit_path(tmp_path):
-    fedleave = tmp_path / "fedleave"
+    fedleave = tmp_path / ("fedleave.exe" if sys.platform.startswith("win") else "fedleave")
     fedleave.write_text("#!/bin/sh\n", encoding="utf-8")
     fedleave.chmod(0o755)
 

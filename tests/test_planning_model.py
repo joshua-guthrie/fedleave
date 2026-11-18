@@ -3,7 +3,6 @@ import json
 import os
 from copy import deepcopy
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
@@ -101,7 +100,14 @@ def test_export_rejects_datastore_targets_and_does_not_follow_hard_links(tmp_pat
     assert ledger.read_text() == "canonical bytes"
 
 
-def test_loader_uses_exact_backend_years_discovery_and_single_snapshot(monkeypatch):
+@pytest.fixture
+def selected_backend(tmp_path):
+    backend = tmp_path / "backend.exe"
+    backend.touch()
+    return backend.resolve()
+
+
+def test_loader_uses_exact_backend_years_discovery_and_single_snapshot(monkeypatch, selected_backend):
     source = snapshot()
     calls = []
 
@@ -111,7 +117,7 @@ def test_loader_uses_exact_backend_years_discovery_and_single_snapshot(monkeypat
         return type("Result", (), {"returncode": 0, "stdout": json.dumps(payload), "stderr": ""})()
 
     monkeypatch.setattr("fedleave_analytics.snapshots.subprocess.run", run)
-    backend = Path("/selected/backend")
+    backend = selected_backend
     result = load_planning_snapshot(backend, "/selected data with spaces", 2026)
     assert calls == [
         [str(backend), "years", "--json", "--data-dir", "/selected data with spaces"],
@@ -120,11 +126,11 @@ def test_loader_uses_exact_backend_years_discovery_and_single_snapshot(monkeypat
     assert result["calculation_context"]["backend"] == str(backend)
     calls.clear()
     with pytest.raises(RuntimeError, match="not initialized"):
-        load_planning_snapshot(Path("/selected/backend"), "/selected data with spaces", 2027)
+        load_planning_snapshot(backend, "/selected data with spaces", 2027)
     assert len(calls) == 1
 
 
-def test_loader_failure_never_falls_back_or_changes_active_scenario(monkeypatch):
+def test_loader_failure_never_falls_back_or_changes_active_scenario(monkeypatch, selected_backend):
     calls = []
 
     def run(command, **kwargs):
@@ -133,7 +139,7 @@ def test_loader_failure_never_falls_back_or_changes_active_scenario(monkeypatch)
 
     monkeypatch.setattr("fedleave_analytics.snapshots.subprocess.run", run)
     with pytest.raises(RuntimeError, match="selected store unavailable"):
-        load_planning_snapshot(Path("/selected/backend"), "/selected store", 2026)
+        load_planning_snapshot(selected_backend, "/selected store", 2026)
     assert len(calls) == 1
 
 

@@ -197,11 +197,13 @@ def test_export_workspace_is_private_on_the_running_platform(tmp_path):
             # Inspect real native ACLs. Python's maintained Windows releases
             # implement mkdtemp's 0700 directory using a restricted DACL.
             command = (
-                "$acl = Get-Acl -LiteralPath $env:FEDLEAVE_TEST_WORKSPACE; "
+                "$ErrorActionPreference = 'Stop'; "
+                "$directory = [System.IO.DirectoryInfo]::new($env:FEDLEAVE_TEST_WORKSPACE); "
+                "$acl = $directory.GetAccessControl(); "
                 "$allowed = @([Security.Principal.WindowsIdentity]::GetCurrent().User.Value, "
                 "'S-1-5-18', 'S-1-5-32-544', 'S-1-3-4'); "
-                "$unexpected = @($acl.Access | Where-Object { "
-                "$_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -notin $allowed }); "
+                "$rules = $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]); "
+                "$unexpected = @($rules | Where-Object { $_.IdentityReference.Value -notin $allowed }); "
                 "@{protected=$acl.AreAccessRulesProtected; unexpected=$unexpected.Count} | ConvertTo-Json -Compress"
             )
             result = subprocess.check_output(
