@@ -32,7 +32,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | SEC-010 | Medium, conditional; Windows drive layout and imported archive | Cache keys changed the destination drive | Reject nonportable names and preflight all targets | Fixed |
 | SEC-004 | Low; selected or compromised response endpoint | Network reads had no byte budget | Enforce actual response-byte budgets | Fixed |
 | SEC-006 | Low established application exposure; affected Pillow resolution | No fixed minimum for advisory matches | Pillow 13.0.0 minimum and rendering validation | Fixed |
-| SEC-007 | Low established application exposure; affected icalendar resolution | No fixed minimum for complexity advisory | icalendar 7.1.3 minimum and import validation | Pending |
+| SEC-007 | Low established application exposure; affected icalendar resolution | No fixed minimum for complexity advisory | icalendar 7.1.3 minimum and import validation | Fixed |
 
 ## High severity
 
@@ -132,4 +132,8 @@ The minimum is now `Pillow>=13.0.0`; local resolution is 13.0.0. Existing render
 
 ### SEC-007 — icalendar resolution matched a complexity advisory
 
-Source remediation pending.
+Local icalendar 7.1.2 matched [GHSA-cv84-9p8j-fj68 / CVE-2026-55099](https://github.com/collective/icalendar/security/advisories/GHSA-cv84-9p8j-fj68), affecting versions 7.1.0 through before 7.1.3. The vulnerable operation compares nested components; no application equality/deduplication route was identified. Parsing alone did not establish exploitation. Earlier exact packages contained unaffected 7.3.0.
+
+The minimum is now `icalendar>=7.1.3`; local resolution is 7.3.0. Holiday parsing, file import, configuration and MCP tests remain. URL validation and size limits are separate defenses; they do not follow merely from a library upgrade.
+
+**Commit verification:** 24 passed in 2.69s.
