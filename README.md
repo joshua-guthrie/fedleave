@@ -669,7 +669,7 @@ development version containing the abbreviated commit hash and appear as
 downloadable artifacts on that workflow run.
 
 After both platform jobs pass for `master`, the workflow also replaces five
-stable public assets on the existing `beta` prerelease: the Windows
+stable public assets on the rolling `beta` release: the Windows
 installer/checksum, Linux archive/checksum, and `install.sh`. The `beta` tag is
 advanced to that commit. It is a rolling download bucket, not a versioned
 release; no version tags or manual release process are used. Feature branches

@@ -15,3 +15,9 @@ source or packaging workflow and let CI regenerate them.
 The public download URLs documented in `README.md` are compatibility surfaces.
 If a URL must change, call it out explicitly in the push or issue closeout so
 the project website can be updated.
+
+## Local security reviews
+
+Store security audit findings, working notes, and evidence under
+`untracked/security/`. Git ignores this directory. Land remediation and
+regression tests with the affected source.
