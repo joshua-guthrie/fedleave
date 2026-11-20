@@ -14,13 +14,11 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDateEdit,
     QDialog,
-    QFileDialog,
     QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
     QLineEdit,
-    QMessageBox,
     QProgressBar,
     QPushButton,
     QScrollArea,
@@ -38,20 +36,17 @@ from fedleave.planning import (
     scheduled_transactions,
     source_identity,
     transaction_fingerprint,
-    validate_scenario,
 )
 
 from .action_help import ACTION_HELP
-from .charts import AnalyticsChartWindow, ResponsivePixmapLabel, render_planning_chart, table_widget
+from .charts import ChartPreviewWindow, ResponsivePixmapLabel, render_planning_chart, table_widget
 from .planning_controls import ScenarioDateDialog
 from .planning_model import (
     DAILY_COLUMNS,
     PlanningSession,
     category_label,
     category_options,
-    export_destination,
     load_planning_snapshot,
-    write_export,
 )
 
 
@@ -89,24 +84,20 @@ class PlannerWidget(QWidget):
         backend: Path,
         data_dir: str | None,
         year: int,
-        pdf_folder: str = "",
         *,
         today: date | None = None,
         parent=None,
     ):
         super().__init__(parent)
         self.backend, self.data_dir, self.year = backend, data_dir, year
-        self.pdf_folder = pdf_folder
         self.today = today or date.today()
         self.session: PlanningSession | None = None
         self._definition_source = None
-        self._saved_fingerprint = None
         self._revision = 0
         self._closed = False
         self._loading = False
         self._updating = False
         self._tasks = {}
-        self._fingerprints = {}
         self._draft_reserves = {}
         self._preserved_operations = []
         self._legacy_operations = []
@@ -137,7 +128,7 @@ class PlannerWidget(QWidget):
         self.reserve_edit = QLineEdit()
         self.reserve_edit.setPlaceholderText("Optional hours")
         self.reserve_edit.setMaximumWidth(130)
-        self.name_edit.setToolTip("Name this in-memory plan. Export scenario JSON to save a copy.")
+        self.name_edit.setToolTip("Name the draft shown in this window.")
         self.cutoff_edit.setToolTip(
             "Starting date for the scenario balance. Tentative use must be strictly after this date."
         )
@@ -181,10 +172,6 @@ class PlannerWidget(QWidget):
         self.calculate_button = self._button(actions, "Recalculate", self.recalculate)
         self.cancel_button = self._button(actions, "Cancel", self.cancel)
         self.resolve_button = self._button(actions, "Resolve selected references", self.resolve_selected)
-        self.export_button = self._button(actions, "Export scenario JSON...", self.export_json)
-        self.import_button = self._button(actions, "Import scenario JSON...", self.import_json)
-        self.modified_label = QLabel("Session only")
-        actions.addWidget(self.modified_label)
         actions.addStretch(1)
         layout.addLayout(actions)
         self.status_label = QLabel(
@@ -320,12 +307,9 @@ class PlannerWidget(QWidget):
                     snapshot,
                     today=self.today,
                     definition=preserved,
-                    saved_fingerprint=self._saved_fingerprint,
                 )
             except PlanningValidationError:
-                self.session = PlanningSession(snapshot, today=self.today, saved_fingerprint=self._saved_fingerprint)
-            if self._saved_fingerprint is None:
-                self._saved_fingerprint = self.session.saved_fingerprint
+                self.session = PlanningSession(snapshot, today=self.today)
             initial = self._definition_source is None
             self._definition_source = identity
             start = QDate.fromString(snapshot["leave_year_start"], "yyyy-MM-dd")
@@ -359,7 +343,6 @@ class PlannerWidget(QWidget):
             return
         self._revision += 1  # Invalidate old workers before the debounce fires.
         self._clear_results()
-        self.modified_label.setText("Modified since last export/import")
         self.status_label.setText("Draft changed; recalculating daily closing balances...")
         self._timer.start()
 
@@ -587,33 +570,18 @@ class PlannerWidget(QWidget):
             self._set_loading(False)
             self.set_snapshot(value)
             return
-        if kind == "import":
-            self._set_loading(False)
-            self._install_import(value)
-            return
         definition, result = value
         self.session.set_definition(definition)
         self.session.result = result
         self._clear_row_errors()
-        self.modified_label.setText(
-            "Modified since last export/import"
-            if self.session.modified
-            else "Session only; unchanged since export/import"
-        )
         self._render_result()
 
     @Slot(int, str, object)
-    def _failed(self, revision, kind, errors):
+    def _failed(self, revision, _kind, errors):
         self._tasks.pop(revision, None)
         if revision == self._revision and not self._closed:
             self._set_loading(False)
             self.progress.hide()
-            if kind == "import":
-                self.status_label.setText(
-                    "Import rejected; the active scenario is unchanged. "
-                    + "; ".join(item["message"] for item in errors)
-                )
-                return
             self._clear_results()
             self._show_errors(errors)
 
@@ -671,8 +639,6 @@ class PlannerWidget(QWidget):
             self.reset_button,
             self.resolve_button,
             self.calculate_button,
-            self.export_button,
-            self.import_button,
         ):
             widget.setEnabled(not loading)
 
@@ -847,9 +813,7 @@ class PlannerWidget(QWidget):
         operation_combo.setCurrentIndex(max(0, operation_combo.findData(row["operation"])))
         if row.get("legacy"):
             operation_combo.setEnabled(False)
-            operation_combo.setToolTip(
-                "Legacy combined operation. Use Reset all changes or edit/import the scenario JSON to change it."
-            )
+            operation_combo.setToolTip("Combined operation. Use Reset all changes to clear it.")
         operation_combo.currentIndexChanged.connect(lambda _index, key=row["key"]: self._operation_changed(key))
         self.scenario_table.setCellWidget(index, 4, operation_combo)
         replacement_combo = QComboBox()
@@ -989,7 +953,6 @@ class PlannerWidget(QWidget):
 
     def reset_scenario(self):
         self._updating = True
-        self._fingerprints.clear()
         self._preserved_operations = []
         self._legacy_operations = []
         self._daily_work_hours = None
@@ -1082,154 +1045,15 @@ class PlannerWidget(QWidget):
         self.status_label.setText(text)
         self.result_changed.emit()
 
-    def _default_path(self, suffix):
-        name = f"fedleave-what-if-{self.year}.{suffix}"
-        return str(Path(self.pdf_folder).expanduser() / name) if self.pdf_folder else name
-
-    def export_json(self):
-        if self.session is None:
-            return
-        try:
-            definition = validate_scenario(self.session.snapshot, self._collect_definition())
-            path, _ = QFileDialog.getSaveFileName(
-                self, "Export scenario definition", self._default_path("json"), "Scenario JSON (*.json)"
-            )
-            if not path:
-                return
-            candidate = PlanningSession(self.session.snapshot, today=self.today, definition=definition)
-            write_export(Path(path), candidate.export_json(), self.session.snapshot)
-            if definition != self.session.definition:
-                self.session.set_definition(definition)
-            self.session.mark_saved()
-            self._saved_fingerprint = self.session.saved_fingerprint
-            self.modified_label.setText("Unchanged since export")
-        except PlanningValidationError as exc:
-            self._show_errors(exc.errors)
-        except (OSError, ValueError) as exc:
-            QMessageBox.warning(self, "Export scenario", str(exc))
-
-    def import_document(self, text: str, *, mode: str):
-        """Atomically import against a supplied snapshot; file imports refresh it."""
-        if self.session is None:
-            raise PlanningValidationError(
-                [{"field": "snapshot", "message": "Load a leave year before importing a scenario."}]
-            )
-        active = (
-            validate_scenario(self.session.snapshot, self._collect_definition())
-            if mode == "merge"
-            else self.session.definition
-        )
-        candidate = PlanningSession(self.session.snapshot, today=self.today, definition=active)
-        candidate.import_json(text, mode=mode)
-        self._install_import(candidate)
-
-    def _install_import(self, candidate):
-        self._timer.stop()
-        self._revision += 1
-        self.session = candidate
-        self._saved_fingerprint = candidate.saved_fingerprint
-        definition = candidate.definition
-        self._updating = True
-        self.name_edit.setText(definition.name)
-        start = QDate.fromString(candidate.snapshot["leave_year_start"], "yyyy-MM-dd")
-        end = QDate.fromString(candidate.snapshot["leave_year_end"], "yyyy-MM-dd")
-        self.cutoff_edit.setDateRange(start, end)
-        self.horizon_edit.setDateRange(start, end)
-        self.cutoff_edit.setDate(QDate.fromString(definition.cutoff, "yyyy-MM-dd"))
-        self.horizon_edit.setDate(QDate.fromString(definition.horizon, "yyyy-MM-dd"))
-        self._definition_source = deepcopy(definition.source)
-        self._draft_reserves = deepcopy(definition.reserves)
-        self.scenario_table.setRowCount(0)
-        self._fingerprints.clear()
-        self._updating = False
-        self._rebuild_rows(definition.operations)
-        self.modified_label.setText("Unchanged since import")
-        self.source_loaded.emit(candidate.snapshot)
-        self._category_changed()
-        if candidate.result is None:
-            self.recalculate()
-
-    def start_import(self, path: Path, *, mode: str):
-        """Read the file and recheck identities against a fresh CLI snapshot."""
-        if self.session is None:
-            return
-        active = deepcopy(self._collect_definition()) if mode == "merge" else None
-        backend, data_dir, year, today = self.backend, self.data_dir, self.year, self.today
-        self._timer.stop()
-        self._set_loading(True)
-        self.status_label.setText("Validating the import against the current read-only source snapshot...")
-
-        def load_import():
-            text = path.read_text(encoding="utf-8")
-            fresh = load_planning_snapshot(backend, data_dir, year)
-            candidate = PlanningSession(fresh, today=today, definition=active)
-            candidate.import_json(text, mode=mode)
-            candidate.calculate()
-            return candidate
-
-        self._launch("import", load_import)
-
-    def import_json(self):
-        if self.session is None:
-            return
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Import scenario definition", self.pdf_folder, "Scenario JSON (*.json)"
-        )
-        if not path:
-            return
-        question = QMessageBox(self)
-        question.setWindowTitle("Import scenario")
-        question.setText(
-            "Replace the current scenario or merge its operations? This changes only the in-memory scenario."
-        )
-        replace_button = question.addButton("Replace scenario", QMessageBox.AcceptRole)
-        merge_button = question.addButton("Merge operations", QMessageBox.ActionRole)
-        question.addButton(QMessageBox.Cancel)
-        question.exec()
-        choice = question.clickedButton()
-        if choice not in {replace_button, merge_button}:
-            return
-        try:
-            self.start_import(Path(path), mode="replace" if choice == replace_button else "merge")
-        except PlanningValidationError as exc:
-            self._show_errors(exc.errors)
-        except (OSError, ValueError) as exc:
-            QMessageBox.warning(self, "Import scenario", str(exc))
-
-    def _save_csv_for(self, session, category, table):
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Save planning results as CSV", self._default_path("csv"), "CSV files (*.csv)"
-        )
-        if path:
-            try:
-                session.export_csv(Path(path), category, table)
-            except (OSError, ValueError) as exc:
-                QMessageBox.warning(self, "Save planning results", str(exc))
-
-    def save_csv(self):
-        if self.session and self.session.result:
-            self._save_csv_for(
-                self.session,
-                self.category_combo.currentData(),
-                self.detail_tabs.tabText(self.detail_tabs.currentIndex()),
-            )
-
     def open_chart(self):
         if self.session is None or self.session.result is None:
             return
-        category = self.category_combo.currentData()
         rows = self._views["Daily closing balances"][0]
-        frozen = PlanningSession(self.session.snapshot, today=self.today, definition=self.session.definition)
-        frozen.result = self.session.result
-        window = AnalyticsChartWindow(
+        window = ChartPreviewWindow(
             f"What-if Planner — {self.category_combo.currentText()}",
             self.chart_image.source_pixmap(),
             rows,
             DAILY_COLUMNS,
-            self.pdf_folder,
-            f"fedleave-what-if-{self.year}-{category}",
-            csv_export=lambda: self._save_csv_for(frozen, category, "Daily closing balances"),
-            export_target=lambda path: export_destination(Path(path), frozen.snapshot),
         )
         self._charts.append(window)
         window.destroyed.connect(lambda: self._charts.remove(window) if window in self._charts else None)

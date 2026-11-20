@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove CSV export throughout Analytics. What-if Planner drafts now stay in the session, and the planner chart opens with its supporting table for on-screen review.
+
 - Fix the Linux bootstrap when piped to bash: authenticate sudo through /dev/tty before downloading and run privileged steps with terminal stdin, so sudo and sudo-rs can read the password instead of timing out on the script pipe.
 
 - Remove the Usage Forecast, Leave Budget, and Holiday and Weekend Planner tools entirely; the What-if Planner remains the only Planning tool and menu entry.

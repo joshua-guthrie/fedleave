@@ -44,11 +44,6 @@ def export_file(path: Path | str, data_dir: Path | str | None = None, *, overwri
             os.link(temporary, destination)
 
 
-def write_export_text(path: Path | str, text: str, data_dir: Path | str | None = None) -> None:
-    with export_file(path, data_dir) as temporary:
-        temporary.write_text(text, encoding="utf-8", newline="")
-
-
 def render_print_job(printer, render, data_dir=None, *, export_target=None) -> None:
     """Apply export protections when a print dialog selects a file destination."""
     output = printer.outputFileName()

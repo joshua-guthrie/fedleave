@@ -139,9 +139,7 @@ def table_widget(rows: list[dict[str, Any]], columns: list[tuple[str, str]]) -> 
                 else _display(value)
             )
             if key == "average_hours_per_period" and value is not None:
-                item.setToolTip(
-                    f"Unrounded required hours / usable pay periods: {value!r}. CSV retains the full value."
-                )
+                item.setToolTip(f"Unrounded required hours / usable pay periods: {value!r}.")
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 item.setData(Qt.UserRole, float(value))
@@ -739,7 +737,7 @@ def render_cumulative_usage(result) -> QPixmap:
     return pixmap
 
 
-class AnalyticsChartWindow(QMainWindow):
+class ChartPreviewWindow(QMainWindow):
     """Show one analytic as both a graphic and its supporting data table."""
 
     def __init__(
@@ -748,20 +746,11 @@ class AnalyticsChartWindow(QMainWindow):
         pixmap: QPixmap,
         rows: list[dict[str, Any]],
         columns: list[tuple[str, str]],
-        default_folder: str = "",
-        base_name: str = "fedleave-analytics",
-        csv_export=None,
-        export_target=None,
     ) -> None:
         super().__init__()
         self.setAttribute(Qt.WA_DeleteOnClose, True)
         self.setWindowTitle(title)
         self.resize(1200, 860)
-        self._pixmap = pixmap
-        self._default_folder = Path(default_folder).expanduser() if default_folder else Path()
-        self._base_name = base_name
-        self._export_target = export_target
-
         tabs = QTabWidget()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -773,11 +762,27 @@ class AnalyticsChartWindow(QMainWindow):
         tabs.addTab(table_widget(rows, columns), "Data Table")
         self.setCentralWidget(tabs)
 
+
+class AnalyticsChartWindow(ChartPreviewWindow):
+    """Show supporting data and provide graphic export and printing."""
+
+    def __init__(
+        self,
+        title: str,
+        pixmap: QPixmap,
+        rows: list[dict[str, Any]],
+        columns: list[tuple[str, str]],
+        default_folder: str = "",
+        base_name: str = "fedleave-analytics",
+        export_target=None,
+    ) -> None:
+        super().__init__(title, pixmap, rows, columns)
+        self._pixmap = pixmap
+        self._default_folder = Path(default_folder).expanduser() if default_folder else Path()
+        self._base_name = base_name
+        self._export_target = export_target
+
         file_menu = self.menuBar().addMenu("File")
-        if csv_export is not None:
-            action = QAction("Save Table as CSV...", self)
-            action.triggered.connect(csv_export)
-            file_menu.addAction(action)
         for label, callback in (
             ("Save Graphic as PNG...", self.save_png),
             ("Save Graphic as PDF...", self.save_pdf),

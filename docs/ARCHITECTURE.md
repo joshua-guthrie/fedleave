@@ -137,7 +137,7 @@ is separate from physical absence.
 `analyze_leave_year` adds an operation-local `seasonality_context` containing a
 private snapshot and injected cutoff. Existing analytics fields are preserved.
 Changing Seasonality controls makes no subprocess call: one result supplies
-the chart, table, sorted-row transaction drilldowns, popup and CSV metadata.
+the chart, table, sorted-row transaction drilldowns and chart window.
 The overtime/net analyses retain their existing data and disable Leave Type.
 Heatmap, Summary and lifecycle calculations do not use this new selection path.
 The installed Analytics smoke mode exercises both controls through the real
@@ -177,20 +177,19 @@ outcomes; invalid inputs are structured row-level validation errors. No dates
 are optimized or moved. Historical cutoffs do not reconstruct historical
 knowledge; current past planned/requested rows remain unresolved.
 
-`fedleave_analytics.planning_model` owns the session and table/CSV view model;
-presentation and exports consume the result without recomputing accounting.
+`fedleave_analytics.planning_model` owns the session and table view model.
+Tables and charts consume the same projection result.
 `planning_view` hosts the What-if Planner and `planning_window` wraps it in a
 standalone window separate from Analytics. Calendar's Analysis > Planning entry
 launches the companion with `--view planning`, preserving backend, datastore,
-year, font and PDF folder.
+year and font.
 Snapshot acquisition uses `years --json` followed by `snapshot --json` on the
-selected backend. Edits reuse the snapshot; file imports refresh before identity
-validation. Thread-pool jobs carry revisions; edits, source changes, cancellation,
+selected backend. Edits reuse the snapshot and Refresh revalidates references.
+Thread-pool jobs carry revisions. Edits, source changes, cancellation,
 and close invalidate old results before queued callbacks can install them.
 
-JSON, CSV, and chart-file exports use atomic replacement outside the selected
-datastore; they cannot overwrite a canonical file through an existing hard link.
-There is no planner persistence or apply-to-ledger interface.
+The planner holds drafts in memory for the lifetime of the window. Its chart
+uses the shared preview window for the graphic and daily balances.
 
 ## Planning interaction and help
 
@@ -224,9 +223,8 @@ or out-of-year rows are skipped with warnings rather than fabricating zero
 usage. There is no cutoff, alignment, reference-year comparison or coverage
 confirmation.
 
-`comparison_model` maps one immutable result to exact tables/CSV, including
-metadata and original IDs. `comparison_view` uses revision-bound workers,
-read-only backend discovery/snapshots, cached recalculation, guarded exports
-and existing chart save/print windows. Analytics routes the existing backend,
+`comparison_model` maps one immutable result to presentation tables.
+`comparison_view` uses revision-bound workers, read-only backend discovery,
+cached recalculation and guarded chart save and print actions. Analytics routes the existing backend,
 datastore, year, font, PDF folder, Refresh and Help actions. Installed
 Analytics smoke renders the view in both platform bundles.

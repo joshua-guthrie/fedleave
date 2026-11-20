@@ -1,6 +1,5 @@
 """Arithmetic, identity, provenance and nonmutation contracts for issue #120."""
 
-import json
 from copy import deepcopy
 from dataclasses import replace
 from datetime import date
@@ -12,8 +11,6 @@ from fedleave.cross_year import seed_accruals
 from fedleave.ledger import calculate_balances
 from fedleave.planning import (
     PlanningValidationError,
-    export_scenario,
-    import_scenario,
     make_operation,
     new_scenario,
     project,
@@ -395,39 +392,26 @@ def test_unknown_opening_lots_and_unsupported_policy_have_null_metrics():
     assert category(result).scenario.horizon_balance == 92
 
 
-def test_json_roundtrip_stale_reference_unrelated_changes_and_atomic_import():
+def test_scenario_validation_preserves_references_through_unrelated_changes():
     source = snapshot()
     active = replace(
         scenario(source),
         operations=(operation(source, operation="replace", original_ids=("scheduled",)),),
         reserves={"annual": 80},
     )
-    text = export_scenario(active)
-    imported = import_scenario(source, scenario(source), text, mode="replace")
-    assert project(source, imported, today=TODAY) == project(source, active, today=TODAY)
+    document = active.to_dict()
+    assert project(source, document, today=TODAY) == project(source, active, today=TODAY)
     changed = deepcopy(source)
     changed["transactions"].append(tx("unrelated", "2026-07-30", "sick", hours=1))
-    imported = import_scenario(changed, scenario(changed), text, mode="replace")
-    result = project(changed, imported, today=TODAY)
+    result = project(changed, document, today=TODAY)
     assert category(result).scenario.horizon_balance == 84
     assert any(warning.code == "SNAPSHOT_CHANGED" for warning in result.warnings)
     changed["transactions"][0]["hours"] = 8
-    before = active.to_dict()
     with pytest.raises(PlanningValidationError, match="changed materially"):
-        import_scenario(changed, active, text, mode="replace")
-    assert active.to_dict() == before
-    for invalid in (
-        "not JSON",
-        text.replace('"schema_version": 1', '"schema_version": 99'),
-        text.replace('"operation": "replace"', '"operation": "unknown"'),
-        text.replace('"hours": 24', '"hours": NaN'),
-    ):
-        with pytest.raises(PlanningValidationError):
-            import_scenario(source, active, invalid, mode="replace")
-    with pytest.raises(PlanningValidationError):
-        import_scenario(source, active, text, mode="merge")
-    assert active.to_dict() == before
-    assert json.loads(export_scenario(active))["schema_version"] == 1
+        validate_scenario(changed, document)
+    assert document == active.to_dict()
+    with pytest.raises(PlanningValidationError, match="schema version"):
+        validate_scenario(source, {**document, "schema_version": 99})
 
 
 def test_operation_order_is_deterministic_and_categories_do_not_pool_balances():
@@ -479,7 +463,7 @@ def test_projection_has_no_file_or_repository_capability(monkeypatch):
     assert source == before
 
 
-def test_missing_source_fingerprint_is_rejected_before_import_changes_state():
+def test_missing_source_fingerprint_is_rejected():
     source = snapshot()
     document = scenario(source).to_dict()
     document["source"].pop("snapshot_fingerprint")

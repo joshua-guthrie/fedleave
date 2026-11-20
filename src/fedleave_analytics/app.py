@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import io
 import json
 import os
 import re
@@ -21,7 +20,6 @@ from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
     QDialog,
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -38,7 +36,7 @@ from PySide6.QtWidgets import (
 
 from fedleave.config import get_default_data_dir
 from fedleave.executable_search import validate_backend
-from fedleave.exporting import export_file, write_export_text
+from fedleave.exporting import export_file
 from fedleave.project_info import HELP_EPILOG
 
 from .analytics import analyze_leave_year
@@ -51,7 +49,6 @@ from .charts import (
     table_widget,
 )
 from .comparison_view import ComparisonWidget
-from .csv_export import SpreadsheetWriter
 from .help_view import AnalyticsHelpDialog
 from .planning_window import PlanningWindow
 from .seasonality import seasonality_options, seasonality_series
@@ -307,7 +304,7 @@ def _format_number(value: Any) -> str:
 
 
 class AnalyticsWindow(QMainWindow):
-    """Coordinate analytics loading, navigation, chart popups, and CSV export."""
+    """Coordinate analytics loading, navigation and chart windows."""
 
     def __init__(
         self,
@@ -328,9 +325,6 @@ class AnalyticsWindow(QMainWindow):
         self._load_thread: QThread | None = None
         self._loader: AnalyticsLoader | None = None
         self._chart_windows: list[AnalyticsChartWindow] = []
-        self._current_table: QTableWidget | None = None
-        self._current_rows: list[dict[str, Any]] = []
-        self._current_columns: list[tuple[str, str]] = []
         self._defaulted_splitters: set[int] = set()
         self._monthly_splitters: list[QSplitter] = []
         self._seasonality_result: dict | None = None
@@ -362,28 +356,17 @@ class AnalyticsWindow(QMainWindow):
         self.year_combo.currentIndexChanged.connect(self._year_changed)
         controls.addWidget(self.year_combo)
         self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.setToolTip(
-            "Read current records again from the selected backend and datastore; scenario references are rechecked."
-        )
+        self.refresh_button.setToolTip("Read current records again from the selected backend and datastore.")
         self.refresh_button.clicked.connect(self.refresh_data)
         controls.addWidget(self.refresh_button)
         self.open_chart_button = QPushButton("Open Chart")
         self.open_chart_button.setToolTip(
-            "Open the active view's chart with exact supporting data and PNG, PDF, Print and CSV exports."
+            "Open the active chart and its supporting data, with options to save or print the graphic."
         )
         self.open_chart_button.clicked.connect(self.open_chart)
         controls.addWidget(self.open_chart_button)
-        self.csv_button = QPushButton("Save Table as CSV...")
-        self.csv_button.setToolTip(
-            "Export the currently selected result table and its scope/assumptions outside the leave datastore."
-        )
-        self.csv_button.clicked.connect(self.save_csv)
-        controls.addWidget(self.csv_button)
         controls.addStretch(1)
         self.close_button = QPushButton("Close")
-        self.close_button.setToolTip(
-            "Close Analytics. Export any scenario you want to keep; drafts are not saved automatically."
-        )
         self.close_button.clicked.connect(self.close)
         controls.addWidget(self.close_button)
         layout.addLayout(controls)
@@ -422,7 +405,6 @@ class AnalyticsWindow(QMainWindow):
         for label, callback in (
             ("Refresh", self.refresh_data),
             ("Open Chart", self.open_chart),
-            ("Save Table as CSV...", self.save_csv),
         ):
             action = QAction(label, self)
             action.triggered.connect(callback)
@@ -907,44 +889,17 @@ class AnalyticsWindow(QMainWindow):
             return
         page = self.pages.currentIndex()
         self.open_chart_button.setEnabled(page != 0)
-        if page == 0:
-            self._set_current_table(
-                self.summary_table, self.data.get("summary", []) if self.data else [], SUMMARY_COLUMNS
-            )
-        elif page == 1:
-            self._set_current_table(self.seasonality_table, self._seasonality_rows, self._seasonality_columns)
-        elif page == 2:
+        if page == 2:
             self._schedule_default_chart_ratio(self.heatmap_splitter)
-            selected_key = str(self.heatmap_selector.currentData() or "all-used")
-            rows = self.data.get("heatmap_series", {}).get(selected_key, []) if self.data else []
-            self._set_current_table(self.heatmap_table, self._nonzero_heatmap_rows(rows), HEATMAP_COLUMNS)
-        elif self.data:
-            lifecycle = self.data["lifecycle"]
-            mappings = [
-                (self.lifecycle_table, lifecycle["summary"], LIFECYCLE_COLUMNS),
-                (self.lot_table, lifecycle["lots"], LOT_COLUMNS),
-                (self.allocation_table, lifecycle["allocations"], ALLOCATION_COLUMNS),
-                (self.matured_table, lifecycle["matured_lots"], MATURED_COLUMNS),
-                (self.overtime_comp_table, lifecycle["monthly_overtime_vs_comp"], OVERTIME_COMP_COLUMNS),
-                (self.comp_month_table, lifecycle["monthly_comp"], COMP_MONTH_COLUMNS),
-                (self.credit_month_table, lifecycle["monthly_credit"], CREDIT_MONTH_COLUMNS),
-            ]
+        elif page == 3 and self.data:
             index = self.lifecycle_tabs.currentIndex()
             if index >= 4:
                 self._schedule_default_chart_ratio(self._monthly_splitters[index - 4])
-            self._set_current_table(*mappings[index])
         self.notice_label.setText(
             "Seasonality shows recorded hours through the cutoff and future dated entries; unresolved statuses do not confirm attendance."
             if page == 1 and self._seasonality_result
             else self._default_notice_text
         )
-
-    def _set_current_table(
-        self, table: QTableWidget, rows: list[dict[str, Any]], columns: list[tuple[str, str]]
-    ) -> None:
-        self._current_table = table
-        self._current_rows = rows
-        self._current_columns = columns
 
     def open_chart(self) -> None:
         if self.pages.currentWidget() is self.comparer:
@@ -1023,38 +978,6 @@ class AnalyticsWindow(QMainWindow):
         self._chart_windows.append(window)
         window.destroyed.connect(lambda: self._chart_windows.remove(window) if window in self._chart_windows else None)
         window.show()
-
-    def save_csv(self) -> None:
-        if self.pages.currentWidget() is self.comparer:
-            self.comparer.save_csv()
-            return
-        if not self.data or not self._current_rows:
-            QMessageBox.information(self, "Save Table", "The selected table has no rows to export.")
-            return
-        default_name = f"fedleave-analytics-{self.data['year']}.csv"
-        seasonality = self._seasonality_result if self.pages.currentIndex() == 1 else None
-        if seasonality:
-            selection = seasonality["selection"]
-            default_name = f"fedleave-seasonality-{selection['key'].replace(':', '-')}-{selection['grouping']}-{self.data['year']}.csv"
-        default_path = str(Path(self.pdf_folder).expanduser() / default_name) if self.pdf_folder else default_name
-        path, _filter = QFileDialog.getSaveFileName(self, "Save Table as CSV", default_path, "CSV files (*.csv)")
-        if not path:
-            return
-        try:
-            with io.StringIO(newline="") as handle:
-                writer = SpreadsheetWriter(handle)
-                if seasonality:
-                    writer.writerows(seasonality["metadata"])
-                else:
-                    writer.writerow(["Leave Year", self.data["year"]])
-                writer.writerow([label for _key, label in self._current_columns])
-                for row in self._current_rows:
-                    writer.writerow([row.get(key) for key, _label in self._current_columns])
-                selected = getattr(self, "data_dir", None)
-                data_dir = get_default_data_dir(Path(selected).expanduser() if selected else None)
-                write_export_text(path, handle.getvalue(), data_dir)
-        except (OSError, ValueError) as exc:
-            QMessageBox.warning(self, "Save Table", f"Could not save CSV to {path}.\n\n{exc}")
 
     def _seasonality_drilldown(self, row_index: int, _column: int) -> None:
         if not self.data:
@@ -1253,9 +1176,9 @@ def main(argv: list[str] | None = None) -> int:
             )
     data_dir = args.data_dir or str(get_default_data_dir())
     if args.view == "planning":
-        window = PlanningWindow("what-if", backend, data_dir, year, args.font_size, args.pdf_folder)
         if args.smoke_test:
-            return _smoke_planning(app, backend, data_dir, year, args.font_size, args.pdf_folder)
+            return _smoke_planning(app, backend, data_dir, year, args.font_size)
+        window = PlanningWindow("what-if", backend, data_dir, year, args.font_size)
         window.show()
         return app.exec()
     window = AnalyticsWindow(
@@ -1268,7 +1191,7 @@ def main(argv: list[str] | None = None) -> int:
         initial_view=args.view if not args.smoke_test else "analytics",
     )
     if args.smoke_test:
-        return _smoke_analytics(app, window, backend, data_dir, year, args.font_size, args.pdf_folder)
+        return _smoke_analytics(app, window, backend, data_dir, year, args.font_size)
     window.show()
     return app.exec()
 
@@ -1282,16 +1205,10 @@ def _await(app, predicate, message):
         QThread.msleep(5)
 
 
-def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder):
+def _smoke_analytics(app, window, backend, data_dir, year, font_size):
     # Installed-bundle QA: use the real sibling CLI and render the existing
     # Seasonality page without writing any ledger or creating another app.
     window.set_data(load_analytics_data(backend, data_dir, year))
-    # Exercise the export boundary with the built application's own runtime.
-    with TemporaryDirectory() as directory:
-        report = Path(directory) / "report.csv"
-        sample = "Metric,Value\nLeave Year,2026\n"
-        write_export_text(report, sample, data_dir)
-        assert report.read_text(encoding="utf-8") == sample
     help_dialog = AnalyticsHelpDialog("what-if", window)
     assert help_dialog.available
     assert "Scenario rows" in help_dialog.browser.toPlainText()
@@ -1315,6 +1232,12 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
     assert not window.heatmap_image.source_pixmap().isNull()
     assert window.heatmap_image.source_pixmap().height() > year_height
     window.heatmap_view_selector.setCurrentIndex(window.heatmap_view_selector.findData("year"))
+    # Check that the packaged runtime can stage and publish a real graphic.
+    with TemporaryDirectory() as directory:
+        report = Path(directory) / "heatmap.png"
+        with export_file(report, data_dir) as staged:
+            assert window.heatmap_image.source_pixmap().save(str(staged), "PNG")
+        assert not QPixmap(str(report)).isNull()
     assert window.heatmap_image.source_pixmap().height() == year_height
     window.pages.setCurrentWidget(window.comparer)
     _await(app, lambda: window.comparer.result is not None, window.comparer.status_label.text())
@@ -1325,12 +1248,12 @@ def _smoke_analytics(app, window, backend, data_dir, year, font_size, pdf_folder
     window.show()
     app.processEvents()
     window.close()
-    _smoke_planning(app, backend, data_dir, year, font_size, pdf_folder)
+    _smoke_planning(app, backend, data_dir, year, font_size)
     return 0
 
 
-def _smoke_planning(app, backend, data_dir, year, font_size, pdf_folder):
-    window = PlanningWindow("what-if", backend, data_dir, year, font_size, pdf_folder)
+def _smoke_planning(app, backend, data_dir, year, font_size):
+    window = PlanningWindow("what-if", backend, data_dir, year, font_size)
     _await(
         app,
         lambda: window.widget.session is not None and window.widget.session.result is not None,

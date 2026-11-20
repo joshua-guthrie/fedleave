@@ -132,32 +132,6 @@ def test_create_only_export_does_not_replace_a_concurrent_creator(tmp_path):
     assert report.read_text() == "concurrent creator"
 
 
-@pytest.mark.parametrize("link", ["symlink", "hardlink"])
-def test_ordinary_analytics_csv_preserves_linked_ledger(tmp_path, monkeypatch, link):
-    from fedleave_analytics.app import AnalyticsWindow
-
-    ledger = tmp_path / "2026.json"
-    ledger.write_text("canonical")
-    destination = tmp_path / "report.csv"
-    link_to_ledger(destination, ledger, link)
-    page = object()
-    window = SimpleNamespace(
-        pages=SimpleNamespace(currentWidget=lambda: page, currentIndex=lambda: 0),
-        comparer=object(),
-        data={"year": 2026},
-        data_dir=None,
-        _current_rows=[{"hours": 4}],
-        _current_columns=[("hours", "Hours")],
-        pdf_folder="",
-    )
-    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **k: (str(destination), ""))
-    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
-    AnalyticsWindow.save_csv(window)
-    assert ledger.read_text() == "canonical"
-    if link == "hardlink":
-        assert "Hours" in destination.read_text()
-
-
 @pytest.mark.parametrize("window_type", ["calendar", "analytics", "month"])
 def test_pdf_renderer_failure_preserves_report_and_releases_staging(application, tmp_path, monkeypatch, window_type):
     destination = tmp_path / "report.pdf"

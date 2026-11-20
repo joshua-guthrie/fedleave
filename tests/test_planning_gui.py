@@ -14,9 +14,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QDate, QThreadPool, QTimer
-from PySide6.QtWidgets import QApplication, QFileDialog, QLabel
+from PySide6.QtWidgets import QApplication, QLabel
 
-from fedleave.planning import PlanningValidationError, export_scenario
 from fedleave_analytics.planning_view import PlannerWidget
 from leave_year_support import store, tree, tx
 from test_planning import TODAY, category, lot_source, operation, scenario, snapshot
@@ -176,7 +175,6 @@ def test_edit_add_reserve_invalid_row_and_no_backend_call_on_recalculation(qtbot
     assert (annual.horizon_balance, annual.first_reserve_breach) == (68, "2026-07-23")
     assert "Reserve breached 2026-07-23" in planner.status_label.text()
     assert not planner.chart_image.source_pixmap().isNull()
-    assert planner.session.modified
     planner.scenario_table.item(row, 3).setText("NaN")
     qtbot.waitUntil(lambda: "positive hours" in planner.status_label.text(), timeout=10000)
     assert planner.session.result is None
@@ -224,25 +222,6 @@ def test_scheduled_replace_remove_undo_and_reset_keep_rows_visible(qtbot, planne
     assert row_with_source(planner, "Scheduled") >= 0
 
 
-def test_import_is_atomic_roundtrips_and_keeps_explicit_lot_links(qtbot, planner):
-    source = planner.session.snapshot
-    definition = replace(scenario(source), operations=(operation(source),), reserves={"annual": 80})
-    encoded = export_scenario(definition)
-    planner.import_document(encoded, mode="replace")
-    wait_result(qtbot, planner)
-    assert category(planner.session.result).scenario.horizon_balance == 68
-    before = planner.session.definition.to_dict()
-    with pytest.raises(PlanningValidationError):
-        planner.import_document(encoded, mode="merge")
-    assert planner.session.definition.to_dict() == before
-    with pytest.raises(PlanningValidationError):
-        planner.import_document(encoded.replace('"schema_version": 1', '"schema_version": 99'), mode="replace")
-    assert planner.session.definition.to_dict() == before
-    assert not planner.session.modified
-    assert proposed_rows(planner)
-    assert planner.scenario_table.cellWidget(proposed_rows(planner)[0], 4).currentData() == "add"
-
-
 def test_unified_rows_keep_duplicate_originals_and_stable_ids(qtbot):
     source = snapshot()
     first = deepcopy(source["transactions"][0])
@@ -272,43 +251,13 @@ def test_unified_rows_keep_duplicate_originals_and_stable_ids(qtbot):
         qtbot.waitUntil(lambda: not view._tasks, timeout=15000)
 
 
-def test_file_import_refreshes_source_and_rejects_stale_refs_atomically(qtbot, planner, monkeypatch, tmp_path):
-    source = deepcopy(planner.session.snapshot)
-    encoded = export_scenario(
-        replace(scenario(source), operations=(operation(source, operation="replace", original_ids=("scheduled",)),))
-    )
-    path = tmp_path / "import.json"
-    path.write_text(encoded)
-    changed = deepcopy(source)
-    changed["transactions"][0]["hours"] = 8
-    calls = []
-
-    def load(*args):
-        calls.append(args)
-        return changed
-
-    monkeypatch.setattr("fedleave_analytics.planning_view.load_planning_snapshot", load)
-    before = planner.session.definition.to_dict(), planner.session.result
-    planner.start_import(path, mode="replace")
-    qtbot.waitUntil(lambda: "Import rejected" in planner.status_label.text(), timeout=10000)
-    assert (planner.session.definition.to_dict(), planner.session.result) == before
-    assert len(calls) == 1
-    assert "changed materially" in planner.status_label.text()
-    changed["transactions"][0]["hours"] = 16
-    changed["transactions"].append(tx("unrelated", "2026-07-30", "sick", "used", 1))
-    planner.start_import(path, mode="replace")
-    qtbot.waitUntil(lambda: planner.session.definition.operations != (), timeout=10000)
-    wait_result(qtbot, planner)
-    assert category(planner.session.result).scenario.horizon_balance == 84
-    assert category(planner.session.result, "sick").scenario.horizon_balance == 39
-
-
-def test_imported_explicit_lot_link_survives_gui_roundtrip(qtbot, planner):
+def test_explicit_lot_link_survives_gui_recalculation(qtbot, planner):
     source = lot_source()
     planner.set_snapshot(source)
     wait_result(qtbot, planner)
     op = operation(source, category="comp", date="2026-07-14", hours=2, earned_transaction_id="lot")
-    planner.import_document(export_scenario(replace(scenario(source), operations=(op,))), mode="replace")
+    planner._rebuild_rows((op,))
+    planner.recalculate()
     wait_result(qtbot, planner)
     proposed = proposed_rows(planner)[0]
     assert planner._row_meta(proposed)["earned_transaction_id"] == "lot"
@@ -350,20 +299,17 @@ def test_canceled_load_and_window_close_never_install_late_snapshot(qtbot, monke
     assert view._closed
 
 
-def test_chart_popup_has_exact_supporting_rows_and_all_export_actions(planner):
+def test_chart_popup_has_exact_supporting_rows_without_file_actions(planner):
     planner.open_chart()
     chart = planner._charts[0]
-    file_action = chart.menuBar().actions()[0]
-    file_menu = file_action.menu()
-    labels = [action.text() for action in file_menu.actions()]
-    assert {"Save Table as CSV...", "Save Graphic as PNG...", "Save Graphic as PDF...", "Print..."} <= set(labels)
+    assert chart.menuWidget() is None
     table = chart.centralWidget().widget(1)
     assert table.rowCount() == len(planner._views["Daily closing balances"][0])
-    assert not chart._pixmap.isNull()
+    assert not chart.image_label.source_pixmap().isNull()
     chart.close()
 
 
-def test_real_backend_legacy_read_only_store_survives_full_planner_lifecycle(qtbot, tmp_path, monkeypatch):
+def test_real_backend_legacy_read_only_store_survives_full_planner_lifecycle(qtbot, tmp_path):
     data = tmp_path / "selected datastore with spaces"
     ledger, _ = store(
         data,
@@ -397,17 +343,8 @@ def test_real_backend_legacy_read_only_store_survives_full_planner_lifecycle(qtb
         replacement = view.scenario_table.cellWidget(scheduled, 5)
         replacement.setCurrentIndex(replacement.findData("comp"))
         wait_result(qtbot, view)
-        definition_path = tmp_path / "scenario.json"
-        monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(definition_path), "JSON"))
-        view.export_json()
-        assert json.loads(definition_path.read_text())["operations"]
-        view.import_document(definition_path.read_text(), mode="replace")
-        wait_result(qtbot, view)
-        view.session.export_csv(tmp_path / "results.csv", "annual", "Daily closing balances")
-        before_import = view.session.definition.to_dict()
-        with pytest.raises(PlanningValidationError):
-            view.import_document("{}", mode="replace")
-        assert view.session.definition.to_dict() == before_import
+        assert {row.operation for row in view.session.definition.operations} == {"add", "replace"}
+        view.open_chart()
         view.reset_scenario()
         wait_result(qtbot, view)
         view.cancel()
@@ -507,7 +444,8 @@ def test_legacy_combined_replace_is_read_only_and_preserved(qtbot):
         view.set_snapshot(source)
         view.horizon_edit.setDate(QDate(2026, 7, 31))
         wait_result(qtbot, view)
-        view.import_document(export_scenario(definition), mode="replace")
+        view._rebuild_rows(definition.operations)
+        view.recalculate()
         wait_result(qtbot, view)
         scheduled = [row for row in range(view.scenario_table.rowCount()) if view._row_meta(row)["kind"] == "scheduled"]
         assert len(scheduled) == 2

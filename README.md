@@ -1115,11 +1115,9 @@ Future dated entries are included, and planned/requested dates do not establish
 attendance.
 
 There is no cutoff, alignment, reference-year comparison or coverage
-confirmation. The same curve backs the chart, the Cumulative usage table and
-the CSV export, which preserves the original transaction IDs.
+confirmation. The chart and its **Data Table** show the same cumulative totals.
 
-Save Table as CSV exports the exact curve with its categories and assumptions.
-Open Chart provides its exact daily table, CSV, PNG, PDF and Print. Loading and
+**Open Chart** shows the daily table and offers PNG, PDF and Print for the graphic. Loading and
 calculation run in workers; controls reuse the cached snapshot, Refresh reloads
 the selected backend, and stale results are discarded after edits/cancellation.
 No usage action changes leave data. File > Help/F1 opens the offline
@@ -1163,7 +1161,7 @@ explanations. Help is included in source/wheel packages and installed bundles.
   Starting Date, horizon and reserves. Scheduled originals never disappear;
   neither action changes or cancels real bookings. Legacy scenarios that
   combine several originals in one operation are shown read-only with an
-  explanation; use Reset all changes or edit/import the scenario JSON.
+  explanation. Use **Reset all changes** to clear them.
 
 For example, 100 hours at cutoff, an 8-hour accrual, and a scheduled 16-hour use
 give a 92-hour baseline. Adding a later 24-hour use gives 68 hours and breaches
@@ -1194,30 +1192,19 @@ unsupported policy produces warnings and unknown affected metrics.
 
 **Recorded Through Cutoff** describes effective dated rows in the current
 snapshot. Past planned/requested rows are unresolved, not proof of attendance.
-A historical cutoff uses presently available records; it does not reconstruct
-what was known or booked at that earlier time. This limitation is also included
-in scenario exports.
+A historical cutoff uses presently available records. The displayed history
+reflects the current snapshot.
 
-**Export scenario JSON...** saves a versioned definition, source identity,
-original reference fingerprints, assumptions, and operations. **Import scenario
-JSON...** requires an explicit Replace or Merge choice and validates against a
-fresh read-only backend snapshot. Unknown schemas, conflicting operations,
-invalid increments/dates, and materially changed or missing originals are
-rejected atomically. Unrelated source changes do not invalidate unchanged
-references. On refresh, stale rows remain visible; inspect the current originals
-and explicitly resolve their references or delete the operation. A modified
-indicator tracks changes since the last import/export. Session scenarios are
-not stored automatically.
+**Open Chart** displays the projection and its supporting daily table.
+Drafts stay in the planning window and are discarded when it closes.
+The planner reads existing leave data to calculate projections. Enter real
+bookings separately through Calendar or the CLI.
 
-**Save Table as CSV...** includes the selected table/category, cutoff, horizon,
-hours, reserves, assumptions, provenance, and warnings. **Open Chart** retains
-the exact supporting daily table and offers CSV, PNG, PDF, and Print. Exports
-must be outside the selected canonical datastore. Opening, editing, computing,
-importing, canceling, and closing the planner never initialize, migrate, back
-up, synchronize, or write leave data. There is no Apply to Ledger action.
-Edits reuse the cached snapshot; **Refresh** reads current backend data and
-revalidates references. Old worker results are discarded after edits, source
-changes, cancellation, or close.
+Edits reuse the cached snapshot. **Refresh** reads current backend data and
+revalidates references. Stale rows remain visible so you can review the updated
+originals, resolve their references, or undo the affected draft operation.
+Old worker results are discarded after edits, source changes, cancellation, or
+close.
 
 #### Seasonality
 
@@ -1234,7 +1221,7 @@ enabled for the first three date groupings, and disabled for **Overtime Worked
 by Month** and **Net Leave Accumulation by Month**; those calculations retain
 their existing behavior. Returning to a leave grouping restores the type choice.
 The selected type/activity appears in the chart title, supporting table,
-drilldown, popup chart, and CSV metadata. Export names distinguish selections.
+drilldown and popup chart. Saved chart filenames distinguish selections.
 
 Earned views include genuine new comp, travel-comp, credit-hour, award, restored
 annual and PPL credits. Annual and sick earned/accrual choices are excluded.

@@ -1,4 +1,3 @@
-import csv
 import os
 import sysconfig
 from datetime import date
@@ -11,10 +10,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QThread, QThreadPool
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import QFileDialog, QPushButton
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QPushButton
 
 from fedleave_analytics.app import AnalyticsWindow
-from fedleave_analytics.comparison_model import csv_document, cumulative_tables
+from fedleave_analytics.comparison_model import cumulative_tables
 from fedleave_analytics.comparison_view import ComparisonWidget
 from leave_year_support import source, store, tree, tx
 
@@ -44,7 +43,7 @@ def comparison(qtbot, monkeypatch):
     qtbot.waitUntil(lambda: not view._tasks, timeout=30000)
 
 
-def test_existing_analytics_routes_comparison_year_context_help_refresh_and_exports(qtbot, monkeypatch):
+def test_existing_analytics_routes_comparison_year_context_help_refresh_and_chart(qtbot, monkeypatch):
     calls = []
     monkeypatch.setattr(ComparisonWidget, "activate", lambda self: calls.append("activate"))
     window = AnalyticsWindow(
@@ -67,12 +66,11 @@ def test_existing_analytics_routes_comparison_year_context_help_refresh_and_expo
     )
     assert window.comparer.font().pointSize() == 12
     assert window.comparer.category_actions["annual"].isChecked()
-    for method, name in (("load_source", "refresh"), ("open_chart", "chart"), ("save_csv", "csv")):
+    for method, name in (("load_source", "refresh"), ("open_chart", "chart")):
         monkeypatch.setattr(window.comparer, method, lambda name=name: calls.append(name))
     window.refresh_data()
     window.open_chart()
-    window.save_csv()
-    assert calls[-3:] == ["refresh", "chart", "csv"]
+    assert calls[-2:] == ["refresh", "chart"]
     window.year_combo.addItem("2025", 2025)
     window.year_combo.setCurrentIndex(window.year_combo.findData(2025))
     assert window.comparer.year == 2025
@@ -127,12 +125,19 @@ def test_real_backend_legacy_readonly_store_survives_exports(qtbot, tmp_path, mo
         assert view.result.summary["total_hours"] == 8
         assert view.result.summary["source_year"] == 2026
         assert view.result.source["backend"] == str(backend)
-        path = tmp_path / "usage.csv"
-        monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(path), "CSV"))
-        view.save_csv()
-        assert path.exists()
         view.open_chart()
-        assert not view._charts[-1].image_label.source_pixmap().isNull()
+        chart = view._charts[-1]
+        assert not chart.image_label.source_pixmap().isNull()
+        path = tmp_path / "usage.png"
+        monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(path), "PNG"))
+        chart.save_png()
+        assert not QPixmap(str(path)).isNull()
+        warnings = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda _parent, _title, message: warnings.append(message))
+        path = data / "usage.png"
+        chart.save_png()
+        assert warnings and "outside the selected leave datastore" in warnings[-1]
+        assert not path.exists()
         view.cancel()
         view.shutdown()
         qtbot.waitUntil(lambda: not view._tasks, timeout=30000)
@@ -156,20 +161,14 @@ def test_missing_store_is_not_initialized(qtbot, tmp_path):
     view.shutdown()
 
 
-def test_csv_chart_png_pdf_exports_share_exact_data_and_metadata(comparison, tmp_path, monkeypatch):
+def test_chart_contains_daily_data_and_retains_graphic_export_actions(comparison, tmp_path, monkeypatch):
     view = comparison
-    path = tmp_path / "cumulative.csv"
-    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(path), "CSV"))
-    view.save_csv()
-    exported = list(csv.reader(path.read_text().splitlines()))
-    assert ["Units", "hours; cumulative effective used hours from the leave-year start"] in exported
-    assert float(exported[-1][1]) == 104
-    assert "Source transactions" in csv_document(view.result, "Source transactions")
-    assert "target" in csv_document(view.result, "Source transactions")
     view.open_chart()
     chart = view._charts[-1]
     assert chart.centralWidget().widget(1).rowCount() == len(view.result.points)
+    assert view.result.points[-1]["hours"] == 104
     path = tmp_path / "chart.png"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(path), ""))
     chart.save_png()
     assert QPixmap(str(path)).width() == 1610
     path = tmp_path / "chart.pdf"
@@ -177,7 +176,12 @@ def test_csv_chart_png_pdf_exports_share_exact_data_and_metadata(comparison, tmp
     assert path.read_bytes().startswith(b"%PDF-")
     file_action = chart.menuBar().actions()[0]
     file_menu = file_action.menu()
-    assert "Print..." in [action.text() for action in file_menu.actions()]
+    assert [action.text() for action in file_menu.actions() if not action.isSeparator()] == [
+        "Save Graphic as PNG...",
+        "Save Graphic as PDF...",
+        "Print...",
+        "Close",
+    ]
     chart.close()
 
 

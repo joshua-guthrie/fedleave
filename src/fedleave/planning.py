@@ -411,29 +411,6 @@ def validate_scenario(snapshot: dict, document: dict | Scenario) -> Scenario:
     )
 
 
-def export_scenario(scenario: Scenario) -> str:
-    return json.dumps(scenario.to_dict(), indent=2, sort_keys=True, allow_nan=False) + "\n"
-
-
-def import_scenario(snapshot: dict, current: Scenario, text: str, *, mode: Literal["replace", "merge"]) -> Scenario:
-    """Return a new validated definition; failures never alter active state."""
-    if mode not in {"replace", "merge"}:
-        _invalid("mode", "Choose explicitly whether to replace or merge the scenario.")
-    try:
-        document = json.loads(text, parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
-    except (ValueError, TypeError) as exc:
-        _invalid("json", f"Invalid scenario JSON: {exc}")
-    imported = validate_scenario(snapshot, document)
-    if mode == "replace":
-        return imported
-    if imported.cutoff != current.cutoff or imported.horizon != current.horizon:
-        _invalid("horizon", "Merge requires the same cutoff and horizon as the active scenario.")
-    merged = current.to_dict()
-    merged["operations"] = [asdict(op) for op in (*current.operations, *imported.operations)]
-    merged["reserves"] = {**current.reserves, **imported.reserves}
-    return validate_scenario(snapshot, merged)
-
-
 @dataclass(frozen=True)
 class CategoryProjection:
     cutoff_balance: float | None

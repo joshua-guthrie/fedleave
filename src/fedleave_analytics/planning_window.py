@@ -23,12 +23,12 @@ TOOL = "what-if"
 TITLE = "What-if Planner"
 NOTICE = (
     "What-if Planner: compare a session-only scenario with the unchanged scheduled baseline. "
-    "Leave records are never modified."
+    "Closing this window discards the draft."
 )
 
 
 class PlanningWindow(QMainWindow):
-    """Host the read-only What-if Planner with year/refresh/export controls."""
+    """Host the read-only What-if Planner."""
 
     def __init__(
         self,
@@ -37,14 +37,12 @@ class PlanningWindow(QMainWindow):
         data_dir: str | None,
         year: int,
         font_size: int = 10,
-        pdf_folder: str = "",
     ) -> None:
         super().__init__()
         if tool != TOOL:
             raise ValueError(f"Unsupported planning tool: {tool!r}.")
         self.tool = tool
         self.backend, self.data_dir, self.year = backend, data_dir, year
-        self.pdf_folder = pdf_folder
         self.font_size = font_size
         self._closing = False
 
@@ -72,16 +70,12 @@ class PlanningWindow(QMainWindow):
         self.refresh_button.clicked.connect(self.refresh_data)
         controls.addWidget(self.refresh_button)
         self.open_chart_button = QPushButton("Open Chart")
-        self.open_chart_button.setToolTip("Open the chart with exact data and PNG, PDF, Print and CSV exports.")
+        self.open_chart_button.setToolTip("Open the chart and its daily closing balances.")
         self.open_chart_button.clicked.connect(self.open_chart)
         controls.addWidget(self.open_chart_button)
-        self.csv_button = QPushButton("Save Table as CSV...")
-        self.csv_button.setToolTip("Export the current result table outside the leave datastore.")
-        self.csv_button.clicked.connect(self.save_csv)
-        controls.addWidget(self.csv_button)
         controls.addStretch(1)
         self.close_button = QPushButton("Close")
-        self.close_button.setToolTip("Close this planning window. Export any scenario you want to keep.")
+        self.close_button.setToolTip("Close this window and discard the draft.")
         self.close_button.clicked.connect(self.close)
         controls.addWidget(self.close_button)
         layout.addLayout(controls)
@@ -90,7 +84,7 @@ class PlanningWindow(QMainWindow):
         self.notice_label.setWordWrap(True)
         layout.addWidget(self.notice_label)
 
-        self.widget = PlannerWidget(self.backend, self.data_dir, self.year, self.pdf_folder, parent=self)
+        self.widget = PlannerWidget(self.backend, self.data_dir, self.year, parent=self)
         self.widget.source_loaded.connect(self._source_loaded)
         layout.addWidget(self.widget, 1)
         self.setCentralWidget(root)
@@ -99,7 +93,6 @@ class PlanningWindow(QMainWindow):
         for label, callback in (
             ("Refresh", self.refresh_data),
             ("Open Chart", self.open_chart),
-            ("Save Table as CSV...", self.save_csv),
         ):
             action = QAction(label, self)
             action.triggered.connect(callback)
@@ -142,9 +135,6 @@ class PlanningWindow(QMainWindow):
 
     def open_chart(self) -> None:
         self.widget.open_chart()
-
-    def save_csv(self) -> None:
-        self.widget.save_csv()
 
     def closeEvent(self, event) -> None:
         self._closing = True

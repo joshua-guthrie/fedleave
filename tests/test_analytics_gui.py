@@ -6,7 +6,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontMetrics
-from PySide6.QtWidgets import QApplication, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QPushButton
 
 from fedleave_analytics.analytics import analyze_leave_year
 from fedleave_analytics.app import AnalyticsWindow
@@ -81,7 +81,15 @@ def test_main_window_has_required_pages_controls_without_backend_diagnostics():
     assert window.summary_table.rowCount() == 15
     assert window.refresh_button.text() == "Refresh"
     assert window.open_chart_button.text() == "Open Chart"
-    assert window.csv_button.text() == "Save Table as CSV..."
+    assert all("CSV" not in button.text() for button in window.findChildren(QPushButton))
+    file_action = window.menuBar().actions()[0]
+    file_menu = file_action.menu()
+    assert [action.text() for action in file_menu.actions() if not action.isSeparator()] == [
+        "Refresh",
+        "Open Chart",
+        "Help...",
+        "Close",
+    ]
     assert not hasattr(window, "source_label")
     assert "/data/fedleave" not in window.notice_label.text()
     assert "/opt/fedleave" not in window.notice_label.text()
@@ -227,26 +235,6 @@ def test_dynamic_heatmaps_and_monthly_lifecycle_charts_are_populated():
     assert "Credit Worked" not in credit_headers
 
 
-def test_current_analytics_table_can_be_exported_as_csv(monkeypatch, tmp_path):
-    _application()
-    window = AnalyticsWindow(Path("fedleave"), "/data", 2026, auto_load=False)
-    window.set_data(_data())
-    output = tmp_path / "summary.csv"
-    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args, **kwargs: (str(output), "CSV files (*.csv)"))
-
-    def unexpected_warning(_parent, _title, message):
-        raise AssertionError(message)
-
-    monkeypatch.setattr(QMessageBox, "warning", unexpected_warning)
-
-    window.save_csv()
-
-    content = output.read_text(encoding="utf-8")
-    assert "Leave Year,2026" in content
-    assert "Metric,Value,Units,Period or Date,Basis" in content
-    assert "Total Leave Used or Scheduled" in content
-
-
 def test_open_chart_creates_popup_with_graphic_and_data_table():
     _application()
     window = AnalyticsWindow(Path("fedleave"), "/data", 2026, auto_load=False)
@@ -342,7 +330,7 @@ def test_seasonality_exactly_two_selectors_preserve_analysis_and_option_state(qt
     for name, key in ((names[3], "overtime_months"), (names[4], "net_accumulation")):
         window.seasonality_selector.setCurrentText(name)
         assert not window.leave_type_selector.isEnabled()
-        assert window._current_rows == window.data[key]
+        assert window._seasonality_rows == window.data[key]
         assert window._seasonality_result is None
     window.seasonality_selector.setCurrentText(names[0])
     assert window.leave_type_selector.currentData() == "comp:earned"
@@ -418,32 +406,13 @@ def test_seasonality_sorted_drilldown_uses_only_contributing_credits(qtbot, monk
         assert sum(row["hours"] for row in captured) == 10
 
 
-def test_seasonality_csv_popup_and_image_use_exact_selection(qtbot, monkeypatch, tmp_path):
-    import csv
-
+def test_seasonality_popup_and_image_use_exact_selection(qtbot, tmp_path):
     window = _seasonality_window(qtbot)
     window.leave_type_selector.setCurrentIndex(window.leave_type_selector.findData("comp:earned"))
-    target = tmp_path / "selected.csv"
-    suggested = []
-
-    def choose(*args, **kwargs):
-        suggested.append(args[2])
-        return str(target), "CSV"
-
-    monkeypatch.setattr(QFileDialog, "getSaveFileName", choose)
-    window.save_csv()
-    with target.open(newline="", encoding="utf-8") as handle:
-        rows = list(csv.reader(handle))
-    assert ["Category", "comp"] in rows
-    assert ["Activity", "earned"] in rows and ["Time Grouping", "month"] in rows
-    assert ["Cutoff", "2026-06-01"] in rows and ["Units", "hours"] in rows
-    header = next(index for index, row in enumerate(rows) if row[0] == "Month")
-    assert len(rows[header + 1 :]) == len(window._current_rows)
-    assert sum(float(row[-1]) for row in rows[header + 1 :]) == 12
-    assert "comp-earned-month" in suggested[-1]
     window.open_chart()
     chart = window._chart_windows[-1]
     assert chart.windowTitle() == "Comp Time Earned by Month — 2026"
+    assert chart.centralWidget().widget(1).rowCount() == len(window._seasonality_rows)
     assert "comp-time-earned-by-month" in chart._base_name
     assert chart._pixmap.toImage() == window.seasonality_chart_image.source_pixmap().toImage()
     png = tmp_path / "selected.png"

@@ -25,7 +25,7 @@ Findings distinguish demonstrated behavior from inferred impact. A version/advis
 | --- | --- | --- | --- | --- |
 | SEC-002 | High; restricted MCP peer with network-init permission | Holiday URLs bypassed local-file read roots | Validate the actual download URL and suppress parser-content errors | Fixed |
 | SEC-005 | High, conditional; shared privileged Linux deployment | Extracted unprivileged ownership survived installation | Normalize staged ownership/modes/ACLs and activate fresh verified bytes | Fixed |
-| SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Encode dangerous text cells at every CSV writer | Fixed |
+| SEC-003 | Medium; untrusted text opened in a formula-evaluating spreadsheet | CSV delimiter quoting preserved formulas | Neutralize formula text in the audited beta, then remove CSV export from Analytics | Fixed in beta, removed in current source |
 | SEC-001 | Medium, conditional; Windows batch backend selected | Batch launchers introduced shell parsing | Require existing native `.exe` backends on Windows | Fixed |
 | SEC-008 | Medium; unsafe destination or writable export directory | Writers followed links into canonical files | Datastore guard, private staging and atomic publication | Fixed |
 | SEC-009 | Medium; affected source dependency and controlled metadata | OpenTelemetry trace parsing delayed MCP | Fixed dependency minimum and resolved advisory gate | Fixed |
@@ -68,7 +68,9 @@ Descriptions, scenario names and metadata reached CSV writers unchanged. CSV del
 
 The shared [cell encoder](src/fedleave_analytics/csv_export.py#L7) now prefixes dangerous text with an apostrophe across comparison, planning and ordinary Analytics exports, including headers and metadata. It recognizes ASCII/fullwidth formula characters and leading control/format characters. Numbers, including negative values, stay numeric; JSON/source records retain their original text. Help documents the marker and consumer/resaving limitations.
 
-[Tests](tests/test_csv_export_security.py) cover quoting, multiline text, Unicode, control prefixes, real planner exports, GUI saves and JSON fidelity. The focused suite passed 46 tests. Fixed production exports contained **zero formula cells** in LibreOffice with default and explicitly enabled formula-import settings. Excel and later transformations remain untested; there is no universal CSV-safety claim.
+[Tests at the audited beta source](https://github.com/joshua-guthrie/fedleave/blob/d724b61d835cc0e8d2182186fdc1d6f71e42f27f/tests/test_csv_export_security.py) covered quoting, multiline text, Unicode, control prefixes, planner exports, GUI saves and JSON fidelity. The focused suite passed 46 tests. Fixed production exports contained **zero formula cells** in LibreOffice with default and explicitly enabled formula-import settings.
+
+The subsequent source change removes CSV export from Analytics and all planner file actions. The beta built from `d724b61` contained the hardened CSV writer. Excel testing applies to that earlier build.
 
 **Commit verification:** 124 passed in 1.68s.
 
@@ -90,11 +92,11 @@ CSV, Calendar/Analytics PNG/PDF and month PDF writers opened destinations direct
 
 All affected writers use [one GUI-independent boundary](src/fedleave/exporting.py#L12), including print-to-file and month print-preview output. Ordinary native printer jobs retain their existing rendering path. It rejects selected-datastore destinations and final symlinks, renders inside a private randomly named staging directory on the destination filesystem, closes handles and atomically replaces the external directory entry. Replacing an external hard link preserves the ledger inode. Failed rendering closes printer handles before cleaning staging and preserves the previous report. Atomic create-only publication preserves concurrent creators. Windows source exports require a Python patch release that creates private temporary directories (3.11.10 or 3.12.4 and later in each series).
 
-[Regressions](tests/test_export_security.py) exercise real chart PNG/PDF combinations, month PDF, CSV aliases, legacy staging links, direct datastore targets, failure cleanup, print-to-file and create-only races. The native Windows test also inspects actual staging ACLs; POSIX tests check private directory permissions. Related exporter suites passed; printer tests retain layout assertions while checking staging. This protects the identified link attacks; it is not an OS sandbox against arbitrary concurrent ancestor-directory replacement. Native Windows link semantics remain CI acceptance work.
+[Regressions](tests/test_export_security.py) exercise real chart PNG/PDF combinations, month PDF, legacy staging links, direct datastore targets, failure cleanup, print-to-file and create-only races. The native Windows test also inspects actual staging ACLs; POSIX tests check private directory permissions. Related exporter suites passed; printer tests retain layout assertions while checking staging. This protects the identified link attacks; it is not an OS sandbox against arbitrary concurrent ancestor-directory replacement. Native Windows link semantics remain CI acceptance work.
 
 **Commit verification:** 61 passed in 8.91s in the initial export and rendering checks. The final compatibility changes passed 30 focused export and print tests.
 
-**Windows release follow-up:** GitHub's first Windows build selected Python 3.11.9, which lacks private temporary directory ACLs. The protection refused CSV export and the source test's warning dialog blocked unattended CI. Windows CI, Distribution, and the source install bootstrap now select Python 3.13 when provisioning a runtime. The frozen Analytics smoke test writes and reads a disposable CSV to verify the export boundary with the packaged interpreter. GUI tests report unexpected export warnings as failures.
+**Windows release follow-up:** GitHub's first Windows build selected Python 3.11.9, which lacks private temporary directory ACLs. The protection refused CSV export and the source test's warning dialog blocked unattended CI. Windows CI, Distribution, and the source install bootstrap now select Python 3.13 when provisioning a runtime. The frozen Analytics smoke test checked that export boundary with a disposable CSV in the audited beta. The test now stages and reloads a PNG through the same export boundary. GUI tests report unexpected export warnings as failures.
 
 Local follow-up verification passed 69 Analytics, export, print, packaging, and MCP smoke tests. The updated Windows package is verified by Distribution.
 
@@ -156,7 +158,15 @@ The earlier Linux package contained vendored wheel 0.45.1 matching GHSA-8rrh-rw8
 
 ## Validation and release acceptance
 
-- Current source verification: 1032 passed, 3 skipped in 172.33s (0:02:52); formatting, lint, typing, ShellCheck, and source and wheel builds passed.
+- November 18 remediation verification: 1032 passed, 3 skipped in 172.33s (0:02:52). Formatting, lint, typing, ShellCheck, and source and wheel builds passed.
 - The earlier remediated Linux bundle passed MCP and Analytics smoke tests. This host exceeds the release GLIBC 2.35 gate. Distribution builds the supported Linux package on Ubuntu 22.04.
 - The refreshed OSV scan covered all 46 resolved source runtime packages and returned no known matches. The earlier build scan covered 55 packages with no known matches at the time. Distribution scans the dependency versions resolved for each release build.
 - Native Windows source tests run in [CI](https://github.com/joshua-guthrie/fedleave/actions/workflows/ci.yml). Both platform packages must pass [Distribution](https://github.com/joshua-guthrie/fedleave/actions/workflows/distribution.yml), which publishes the [stable beta assets](https://github.com/joshua-guthrie/fedleave/releases/tag/beta) and records the source commit in [installers/BUILD.txt](installers/BUILD.txt). Public download URLs are unchanged.
+
+### November 19 release retest
+
+- The tested beta was built from `d724b61` and published in installer commit `5a921a8`. The downloaded Linux archive passed SHA-256 verification. Its bundled CLI, Calendar, and Analytics ran against a disposable datastore whose hashes stayed unchanged. [Distribution run](https://github.com/joshua-guthrie/fedleave/actions/runs/44422447753) · [Beta release](https://github.com/joshua-guthrie/fedleave/releases/tag/beta)
+- **SEC-002.** An independent stdio check used the frozen MCP server with two unattended policies. The first denied network operations. The second granted network permission and rejected the file scheme during holiday URL validation. Both rejected requests created zero ledger JSON files. Standard offline initialization and balance reads succeeded under both policies.
+- **SEC-005.** The exact published bootstrap installed the verified beta into `/opt/fedleave` as root inside an offline Linux guest. It used a local mirror of the downloaded assets. All 864 installed entries had root ownership and passed the mode and extended ACL checks. A standard guest user could launch the CLI and had no write access to the release tree or activation paths. Distribution separately passed its privileged installation fixture. [Linux Distribution job](https://github.com/joshua-guthrie/fedleave/actions/runs/44422447753/job/135218927647)
+- Native Windows CI and the Windows installer job passed for the tested beta. An independent Windows desktop test of PNG and PDF remains open because a native Windows environment was unavailable for the retest. [Native Windows CI](https://github.com/joshua-guthrie/fedleave/actions/runs/44422449307/job/135218617225) · [Windows Distribution job](https://github.com/joshua-guthrie/fedleave/actions/runs/44422447753/job/135218927691)
+- After removing CSV export and planner file actions, the local source suite passed 1013 tests with 3 skips. Formatting, lint, typing, and both Analytics entry-point smoke tests passed. The source distribution and wheel built successfully, and the wheel includes the updated offline Help.

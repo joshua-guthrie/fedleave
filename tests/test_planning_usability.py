@@ -100,6 +100,22 @@ def test_help_is_offline_contextual_and_all_planning_actions_have_tips(qtbot, mo
     window = PlanningWindow("what-if", Path("/backend"), "/store", 2026)
     qtbot.addWidget(window)
     assert all(button.toolTip() for button in window.widget.findChildren(QPushButton))
+    assert [button.text() for button in window.widget.findChildren(QPushButton)] == [
+        "Add tentative use",
+        "Undo selected changes",
+        "Reset all changes",
+        "Recalculate",
+        "Cancel",
+        "Resolve selected references",
+    ]
+    file_action = window.menuBar().actions()[0]
+    file_menu = file_action.menu()
+    assert [action.text() for action in file_menu.actions() if not action.isSeparator()] == [
+        "Refresh",
+        "Open Chart",
+        "Help...",
+        "Close",
+    ]
     window.help_action.trigger()
     assert seen == ["what-if"]
     assert window.help_action.shortcut().toString() == "F1"

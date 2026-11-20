@@ -175,8 +175,6 @@ def test_planning_menu_launches_existing_analytics_with_exact_context(monkeypatc
             "12",
             "--data-dir",
             str(tmp_path / "selected data"),
-            "--pdf-folder",
-            str(tmp_path / "pdf"),
             "--view",
             "planning",
         ]

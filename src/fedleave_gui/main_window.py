@@ -2188,7 +2188,7 @@ class MainWindow(QMainWindow):
             str(self.settings.font_size),
         ]
         command.extend(["--data-dir", str(self.backend.data_directory())])
-        if self.settings.pdf_export_folder:
+        if view != "planning" and self.settings.pdf_export_folder:
             command.extend(["--pdf-folder", self.settings.pdf_export_folder])
         if view is not None:
             command.extend(["--view", view])

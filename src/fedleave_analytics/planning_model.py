@@ -2,33 +2,24 @@
 
 from __future__ import annotations
 
-import io
 import json
-from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, replace
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fedleave.exporting import export_file
 from fedleave.planning import (
     GENERAL_CATEGORIES,
-    METHOD_VERSION,
     PLANNABLE_CATEGORIES,
-    PlanningValidationError,
     ProjectionResult,
     Scenario,
     ScenarioOperation,
-    export_scenario,
-    fingerprint,
-    import_scenario,
     new_scenario,
     project,
     validate_scenario,
 )
 
-from .csv_export import SpreadsheetWriter
 from .snapshots import ReadOnlySnapshotSource
 
 LABELS = {
@@ -106,23 +97,6 @@ def category_options() -> list[tuple[str, str]]:
     ]
 
 
-@contextmanager
-def export_destination(path: Path, snapshot: dict):
-    """Atomic user-requested output outside the canonical datastore.
-
-    Replacing the output inode also avoids modifying an existing hard link to
-    a ledger, even if that link was placed outside the datastore.
-    """
-    data_store = snapshot.get("calculation_context", {}).get("data_store")
-    with export_file(path, data_store) as temporary:
-        yield temporary
-
-
-def write_export(path: Path, text: str, snapshot: dict) -> None:
-    with export_destination(path, snapshot) as temporary:
-        temporary.write_text(text, encoding="utf-8", newline="")
-
-
 def load_planning_snapshot(backend: Path, data_dir: str | None, year: int) -> dict:
     """Use the shared cached read-only CLI boundary for one planner load."""
     return ReadOnlySnapshotSource(backend, data_dir).snapshot(year)
@@ -183,7 +157,6 @@ class PlanningSession:
         *,
         today: date,
         definition: Scenario | dict | None = None,
-        saved_fingerprint: str | None = None,
     ):
         self.snapshot = deepcopy(snapshot)
         self.today = today
@@ -193,15 +166,6 @@ class PlanningSession:
             else new_scenario(self.snapshot, today=today)
         )
         self.result: ProjectionResult | None = None
-        self._saved_fingerprint = saved_fingerprint or fingerprint(self.definition.to_dict())
-
-    @property
-    def saved_fingerprint(self) -> str:
-        return self._saved_fingerprint
-
-    @property
-    def modified(self) -> bool:
-        return fingerprint(self.definition.to_dict()) != self._saved_fingerprint
 
     def set_definition(self, document: Scenario | dict) -> None:
         validated = validate_scenario(self.snapshot, document)
@@ -219,17 +183,6 @@ class PlanningSession:
     def calculate(self) -> ProjectionResult:
         self.result = project(self.snapshot, self.definition, today=self.today)
         return self.result
-
-    def export_json(self) -> str:
-        return export_scenario(self.definition)
-
-    def mark_saved(self) -> None:
-        self._saved_fingerprint = fingerprint(self.definition.to_dict())
-
-    def import_json(self, text: str, *, mode: str) -> None:
-        candidate = import_scenario(self.snapshot, self.definition, text, mode=mode)
-        self.set_definition(candidate)
-        self.mark_saved()
 
     def rows(self, category: str) -> dict[str, tuple[list[dict], list[tuple[str, str]]]]:
         if self.result is None:
@@ -279,43 +232,3 @@ class PlanningSession:
             "Expiring lots": ([asdict(row) for row in result.lots if row.category == category], LOT_COLUMNS),
             "Warnings": ([asdict(row) for row in result.warnings], WARNING_COLUMNS),
         }
-
-    def csv_metadata(self, category: str, table: str) -> list[list[Any]]:
-        return [
-            ["Result schema version", self.result.schema_version if self.result else 1],
-            ["Calculation method", METHOD_VERSION],
-            ["Leave year", self.definition.source["leave_year"]],
-            ["Scenario", self.definition.name],
-            ["Cutoff", self.definition.cutoff],
-            ["Horizon", self.definition.horizon],
-            ["Units", "hours"],
-            ["Category filter", category],
-            ["Table", table],
-            ["Reserve thresholds", json.dumps(self.definition.reserves, sort_keys=True)],
-            [
-                "Source identity",
-                json.dumps(self.result.source if self.result else self.definition.source, sort_keys=True),
-            ],
-            [
-                "Assumptions",
-                json.dumps(self.result.assumptions if self.result else self.definition.assumptions, sort_keys=True),
-            ],
-            ["Scenario operations", json.dumps([asdict(row) for row in self.definition.operations], sort_keys=True)],
-            [
-                "Warnings",
-                json.dumps([asdict(row) for row in self.result.warnings], sort_keys=True) if self.result else "[]",
-            ],
-        ]
-
-    def export_csv(self, path: Path, category: str, table: str) -> None:
-        if self.result is None:
-            raise PlanningValidationError(
-                [{"field": "result", "message": "Calculate a valid scenario before exporting results."}]
-            )
-        rows, columns = self.rows(category)[table]
-        handle = io.StringIO(newline="")
-        writer = SpreadsheetWriter(handle)
-        writer.writerows(self.csv_metadata(category, table))
-        writer.writerow([label for _, label in columns])
-        writer.writerows([[row.get(key) for key, _ in columns] for row in rows])
-        write_export(path, handle.getvalue(), self.snapshot)

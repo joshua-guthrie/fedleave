@@ -2,20 +2,20 @@
 <html lang="en"><head><meta charset="utf-8"><title>FedLeave Analytics Help</title>
 <style>body{font-family:sans-serif;line-height:1.4}td,th{padding:8px;text-align:left}table{border-collapse:collapse}th,td{border:1px solid #bbb}h2{margin-top:30px}</style></head><body>
 <h1>FedLeave Analytics: instructions and examples</h1>
-<p><a href="#overview">Overview</a> | <a href="#comparison">Cumulative Usage</a> | <a href="#what-if">What-if Planner</a> | <a href="#exports">Files, charts and troubleshooting</a></p>
+<p><a href="#overview">Overview</a> | <a href="#comparison">Cumulative Usage</a> | <a href="#what-if">What-if Planner</a> | <a href="#exports">Charts and troubleshooting</a></p>
 <a name="overview"></a><h2 id="overview">Choose the right tool</h2>
 <table><tr><th>Tool</th><th>Question it answers</th><th>What you do</th></tr>
 <tr><td>What-if Planner</td><td>What happens if I add, remove or replace specific planned leave?</td><td>Review the unified Scenario rows table and compare against existing scheduled leave.</td></tr>
 <tr><td>Cumulative Usage</td><td>How much effective leave has been used across the year?</td><td>Choose leave categories and inspect the running total, chart and exact daily table.</td></tr></table>
-<p><strong>This is a read-only planning tool. No action books leave or changes canonical leave records.</strong> Your original scheduled leave remains in the ledger. Export a plan to keep it; enter any real booking separately in Calendar/CLI using your normal workflow. A projected balance does not establish legal eligibility for a leave purpose.</p>
+<p><strong>The planner compares drafts with your scheduled leave.</strong> Enter real bookings separately in Calendar or the CLI. A projected balance does not establish legal eligibility for a leave purpose.</p>
 <p>The selected backend, exact datastore and leave year are authoritative. The year selector changes the initialized year being examined. File &gt; Refresh reads the current backend again; editing controls normally reuses a cached snapshot. Missing stores are not initialized, and no alternate backend is silently substituted. File &gt; Help opens this offline guide at the active tool. Hover over an action for a short explanation.</p>
 <p>Summary reports totals and balances. Seasonality groups qualifying activity by month, weekday or actual pay period; choose its leave type and grouping. Calendar Heatmap shows activity by date; choose Year at a Glance for the continuous week-column view or Monthly Calendars for separate month-by-month calendar grids across the leave year. Overtime, Comp and Credit pages show earning/use/disposal activity and lot lifecycles. Their tables and charts explain the selected scope; these reports do not make a scenario.</p>
 
 <a name="comparison"></a><h2 id="comparison">Cumulative Usage: used hours across one leave year</h2>
 <ol><li>Open Calendar &gt; Analysis &gt; Analytics, then <strong>Cumulative Usage</strong>. The global Leave Year selects the year. Annual leave is selected initially; use Absence categories to choose one category or an explicit sum. Sick and purpose-restricted categories are never added silently. FMLA entitlement tracking and overtime are not physical absence.</li>
 <li>The chart is the running total of effective used hours from the year start through each date. It uses all effective used statuses; denied, cancelled and void rows are excluded. Accruals, openings, corrections, expirations and forfeitures are not used hours. Future dated entries are included, and a planned or requested date does not confirm leave was taken.</li>
-<li>The whole leave year is shown; there is no cutoff, alignment, reference years or coverage confirmation. The same curve backs the chart, the Cumulative usage table and the CSV export, which preserves the original transaction IDs.</li>
-<li>Save Table as CSV exports the exact curve and its assumptions. Open Chart provides its exact daily data plus CSV, PNG, PDF and Print. Controls recalculate from the cached snapshot; Refresh reloads the selected backend. Cancel/source changes discard stale work. Loading, calculating, exporting and closing never change canonical leave data.</li></ol>
+<li>The running total covers the whole leave year. The chart and its Data Table show the same daily totals.</li>
+<li>Open Chart shows the daily table and offers PNG, PDF and Print for the graphic. Controls recalculate from the cached snapshot. Refresh reloads the selected backend. Canceling or switching sources discards pending results.</li></ol>
 
 <a name="what-if"></a><h2 id="what-if">What-if Planner: start here</h2>
 <ol><li>Open Calendar &gt; Analysis &gt; Planning &gt; What-if Planner. Check the leave year.</li>
@@ -23,7 +23,7 @@
 <li>Choose a category. This selects the chart/results category and the default for new Proposed rows. Optional <strong>Reserve</strong> is a warning threshold for that category; it does not stop you entering a plan. Each category has its own balance and reserve.</li>
 <li><strong>Scenario rows</strong> is the single editor. Every eligible scheduled booking appears automatically as a <strong>Scheduled</strong> row with the operation <strong>Unchanged</strong>. Choose <strong>Remove</strong> or <strong>Replace</strong> in that row. For a Proposed row, choose <strong>Add</strong> or <strong>Remove</strong>; Replace never appears for Proposed rows.</li>
 <li>Edits recalculate automatically after a short pause. Recalculate runs immediately. Compare the unchanged Scheduled baseline and your scenario; inspect the Summary and Daily closing balances tabs before relying on the result.</li>
-<li>Export scenario JSON to save an editable plan. Save Table as CSV or Open Chart to share calculated results. There is no Apply to Ledger.</li></ol>
+<li>Use <strong>Open Chart</strong> to review the projection and daily closing balances. Closing the planner discards the draft.</li></ol>
 <h3>Unchanged, Remove, Replace, Add and Undo are different</h3>
 <table><tr><th>Action</th><th>Effect in your scenario</th><th>Effect on original bookings</th></tr>
 <tr><td><strong>Scheduled: Unchanged</strong></td><td>Keeps the original scheduled booking. No draft operation is saved for that row.</td><td>Original remains in the baseline and ledger.</td></tr>
@@ -41,16 +41,14 @@
 <li>Daily closing balances share a date's closing total; they do not establish intraday order. The chart footer shows the selected category's scenario ending balance.</li>
 <li>Invalid input, such as an out-of-range date, invalid increment, same-category replacement or stale original, is reported in the status area; keep the row and correct it, or Undo it. Negative balances and capacity excess are valid but problematic results; they are not a booking approval.</li>
 <li>Recorded Through Cutoff includes effective dated rows, including unresolved past planned/requested entries; it does not assert attendance. Historical cutoffs use present records, not reconstructed historical knowledge.</li></ul>
-<h3>Saved plans and refreshed originals</h3>
-<p>Export scenario JSON saves only actual draft add, replace and remove operations plus source identity, assumptions and original fingerprints. Unchanged rows are display-only and are not exported. Import asks Replace or Merge and checks a fresh read-only snapshot. Replace loads the saved definition; Merge combines operations and requires matching cutoff/horizon and no duplicate/overlapping targets. A rejected import leaves the active draft unchanged.</p>
-<p>If an original changes materially after Refresh, its scenario row remains visible and invalid. Review the current booking, then select the affected <em>scenario</em> row and choose Resolve selected references to explicitly accept its current identity, or Undo that change. Legacy scenarios that combine several originals into one Replace or Remove are shown read-only with an explanation; use Reset all changes or edit/import the scenario JSON to change them. Resolution is not permission to change the ledger. Modified indicators compare with the last import/export. Plans are session-only unless exported.</p>
+<h3>Refreshed originals</h3>
+<p>If an original changes materially after Refresh, its scenario row remains visible and invalid. Review the current booking, then select the affected row and choose Resolve selected references to accept its current identity, or undo that change. Use Reset all changes to clear any read-only operation that combines several originals.</p>
 
-<a name="exports"></a><h2 id="exports">Files, charts and troubleshooting</h2>
+<a name="exports"></a><h2 id="exports">Charts and troubleshooting</h2>
 <ul><li><strong>Refresh</strong> reads the selected backend again. <strong>Calculate/Recalculate</strong> uses its cached snapshot. <strong>Cancel</strong> stops waiting and discards late results; it does not undo draft operations. Use Undo/Reset for that.</li>
-<li><strong>Save Table as CSV</strong> exports the currently selected result table, its filters and assumptions. Formula-like text is marked with a leading apostrophe for spreadsheet use; numeric values remain numbers. Other CSV readers may show that marker. Use JSON when you need the original text or an editable What-if definition. Spreadsheet save/reopen behavior can vary.</li>
-<li><strong>Open Chart</strong> opens exact supporting data with CSV, PNG, PDF and Print. Choose the intended category/table first. Exports must be outside the canonical datastore; the application guards against overwriting ledger files.</li>
+<li><strong>Open Chart</strong> displays the active graphic and its supporting data. To save a graphic from the main Analytics window, choose a location outside the leave datastore.</li>
 <li>If no result appears, inspect the status message and confirm the year is initialized in the selected datastore. Missing holiday/schedule/lot context is N/A. Check configured time increments and cutoff &lt; date &lt;= horizon.</li>
 <li>If a scheduled booking is missing from Scenario rows, it may be before/on cutoff, after horizon, ineffective/void, synthetic, an accrual or a non-absence event.</li>
-<li>If you close the application without exporting a draft, it is not saved automatically. Closing help or a date chooser never changes a plan; canceling a date chooser preserves the original cell text.</li></ul>
+<li>Cancel the date chooser to keep the original cell text.</li></ul>
 <p><a href="#overview">Back to tool overview</a></p>
 </body></html>

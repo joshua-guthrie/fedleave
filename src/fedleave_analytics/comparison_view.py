@@ -10,7 +10,6 @@ from threading import Event
 from PySide6.QtCore import QThreadPool, QTimer, Signal, Slot
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
-    QFileDialog,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -22,11 +21,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from fedleave.exporting import export_file
 from fedleave.usage_comparison import ABSENCE_CATEGORIES, cumulative_usage
 
 from .charts import AnalyticsChartWindow, ResponsivePixmapLabel, render_cumulative_usage
-from .comparison_model import cumulative_tables, export_csv
-from .planning_model import export_destination
+from .comparison_model import cumulative_tables
 from .planning_view import _Task
 from .seasonality import LABELS
 from .snapshots import ReadOnlySnapshotSource
@@ -91,12 +90,6 @@ class ComparisonWidget(QWidget):
             "Cancel",
             self.cancel,
             "Discard the pending calculation; leave records are unchanged.",
-        )
-        self._button(
-            actions,
-            "Save Table as CSV...",
-            self.save_csv,
-            "Export the exact cumulative curve and its assumptions.",
         )
         actions.addStretch(1)
         layout.addLayout(actions)
@@ -245,31 +238,14 @@ class ComparisonWidget(QWidget):
             f"{categories} for {summary['source_year']}: {total:.6g} h cumulative from "
             f"{summary['start']} through {summary['end']}. {summary['transaction_count']} used record(s)"
             + (f"; {malformed} malformed record(s) excluded." if malformed else ".")
-            + f" Warnings: {len(self.result.warnings)}. Open Chart or Save CSV for the exact curve."
+            + f" Warnings: {len(self.result.warnings)}. Open Chart to view the daily totals."
         )
-
-    def _export(self, snapshot, result, title, rows=None, columns=None):
-        path, _ = QFileDialog.getSaveFileName(
-            self,
-            "Save Cumulative Usage Table",
-            str(Path(self.pdf_folder or ".") / f"fedleave-cumulative-usage-{result.source['leave_year']}.csv"),
-            "CSV files (*.csv)",
-        )
-        if path:
-            try:
-                export_csv(Path(path), snapshot, result, title, rows, columns)
-            except (OSError, ValueError) as exc:
-                self.status_label.setText(str(exc))
-
-    def save_csv(self):
-        if self.result is not None:
-            self._export(self.snapshot, self.result, "Cumulative usage")
 
     def open_chart(self):
         if self.result is None:
             return
-        snapshot, result = deepcopy((self.snapshot, self.result))
-        rows, columns = cumulative_tables(result)["Cumulative usage"]
+        data_store = self.snapshot.get("calculation_context", {}).get("data_store")
+        rows, columns = cumulative_tables(self.result)["Cumulative usage"]
         chart = AnalyticsChartWindow(
             "Cumulative Usage",
             self.chart_image.source_pixmap(),
@@ -277,8 +253,7 @@ class ComparisonWidget(QWidget):
             columns,
             self.pdf_folder,
             f"fedleave-cumulative-usage-{self.year}",
-            csv_export=lambda: self._export(snapshot, result, "Cumulative usage"),
-            export_target=lambda path: export_destination(Path(path), snapshot),
+            export_target=lambda path: export_file(path, data_store),
         )
         self._charts.append(chart)
         chart.destroyed.connect(lambda: self._charts.remove(chart) if chart in self._charts else None)

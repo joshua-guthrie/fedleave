@@ -1,35 +1,23 @@
-import csv
 import json
-import os
 from copy import deepcopy
 from dataclasses import replace
 
 import pytest
 
-from fedleave.planning import PlanningValidationError
-from fedleave_analytics.planning_model import PlanningSession, category_options, load_planning_snapshot, write_export
+from fedleave_analytics.planning_model import PlanningSession, category_options, load_planning_snapshot
 from test_planning import TODAY, category, operation, scenario, snapshot, tx
 
 
-def test_session_delete_reset_dirty_indicator_and_atomic_import():
+def test_session_delete_reset_and_recalculate():
     source = snapshot()
     before = deepcopy(source)
     session = PlanningSession(source, today=TODAY, definition=replace(scenario(source), reserves={"annual": 80}))
-    assert not session.modified
-    session.set_operations((operation(source, operation="replace", original_ids=("scheduled",)),))
-    assert session.modified
+    replacement = operation(source, operation="replace", original_ids=("scheduled",))
+    session.set_operations((replacement,))
     assert category(session.calculate()).scenario.horizon_balance == 84
-    encoded = session.export_json()
-    session.mark_saved()
-    assert not session.modified
     session.delete_operation("tentative")
     assert category(session.calculate()).scenario.horizon_balance == 92
-    session.import_json(encoded, mode="replace")
-    assert not session.modified
-    before_import = session.definition.to_dict()
-    with pytest.raises(PlanningValidationError):
-        session.import_json(encoded, mode="merge")
-    assert session.definition.to_dict() == before_import
+    session.set_operations((replacement,))
     session.reset()
     result = session.calculate()
     assert category(result).baseline == category(result).scenario
@@ -37,7 +25,7 @@ def test_session_delete_reset_dirty_indicator_and_atomic_import():
     assert source == before
 
 
-def test_models_tables_and_csv_use_the_same_result_with_filters_and_assumptions(tmp_path):
+def test_model_tables_use_the_same_result_with_filters():
     source = snapshot()
     session = PlanningSession(
         source,
@@ -55,23 +43,13 @@ def test_models_tables_and_csv_use_the_same_result_with_filters_and_assumptions(
         row["scenario_row_id"] == "tentative" and row["timing"] == "Tentative"
         for row in rows["Events and provenance"][0]
     )
-    path = tmp_path / "daily.csv"
-    session.export_csv(path, "annual", "Daily closing balances")
-    with path.open(newline="", encoding="utf-8") as handle:
-        exported = list(csv.reader(handle))
-    assert ["Cutoff", "2026-07-01"] in exported
-    assert ["Horizon", "2026-07-31"] in exported
-    assert ["Units", "hours"] in exported
-    assert ["Category filter", "annual"] in exported
-    assert any(row[0] == "Assumptions" and "closing balances" in row[1] for row in exported)
-    assert exported[-1] == ["2026-07-31", "annual", "92.0", "68.0", "-24.0"]
 
 
-def test_historical_cutoff_limitation_is_in_scenario_json():
+def test_historical_cutoff_limitation_is_in_scenario_assumptions():
     source = snapshot()
     session = PlanningSession(source, today=TODAY, definition=scenario(source))
-    assert "presently available leave records" in session.export_json()
-    assert json.loads(session.export_json())["source"]["snapshot_fingerprint"]
+    assert "presently available leave records" in str(session.definition.assumptions)
+    assert session.definition.source["snapshot_fingerprint"]
 
 
 def test_category_choices_distinguish_purpose_restrictions_and_exclude_work_tracking():
@@ -81,23 +59,6 @@ def test_category_choices_distinguish_purpose_restrictions_and_exclude_work_trac
     assert "purpose restricted" not in choices["annual"]
     for category_name in ("sick", "military", "court", "religious_comp", "ppl"):
         assert "purpose restricted" in choices[category_name]
-
-
-def test_export_rejects_datastore_targets_and_does_not_follow_hard_links(tmp_path):
-    data = tmp_path / "store"
-    data.mkdir()
-    ledger = data / "ledger.json"
-    ledger.write_text("canonical bytes")
-    source = snapshot()
-    source["calculation_context"]["data_store"] = str(data)
-    with pytest.raises(ValueError, match="outside"):
-        write_export(ledger, "scenario", source)
-    assert ledger.read_text() == "canonical bytes"
-    alias = tmp_path / "chosen-export.json"
-    os.link(ledger, alias)
-    write_export(alias, "scenario definition", source)
-    assert alias.read_text() == "scenario definition"
-    assert ledger.read_text() == "canonical bytes"
 
 
 @pytest.fixture
