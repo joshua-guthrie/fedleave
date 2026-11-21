@@ -1,12 +1,12 @@
 # Plan for writing the FedLeave Android specification
 
-Use this plan to turn the existing FedLeave desktop product into a detailed, reviewable specification for an Android phone app. The specification will define the behavior, annotate the screens, settle the technical decisions, and identify the tests that prove parity. Write it before committing to a full implementation.
+Use this plan to turn the existing FedLeave desktop product into a detailed, reviewable specification for an Android phone app. The specification will define the behavior, annotate the screens, settle the technical decisions, and identify the tests that prove parity. Review and approve this plan before drafting the specification.
 
 ## What we want to build
 
-- A phone-friendly FedLeave app with the same leave-accounting behavior and a mobile way to perform every supported user workflow.
-- Private on-device storage for leave records, comments, settings, and working files. Ordinary use should work offline. File transfer is an explicit user action.
-- An **Export** action for supported graphs, report images, and backup files. The user chooses where the export goes.
+- A phone-friendly FedLeave app with the same leave-accounting behavior and a mobile way to perform every workflow in scope for the first release.
+- Private on-device storage for leave records, comments, settings, and working files. Use the existing FedLeave JSON formats so the phone and the Linux and Windows desktop apps can exchange backups. Ordinary use should work offline.
+- **Share** for supported graphs, report images, and backups. Open the Android Sharesheet so the user can choose a compatible app, such as messaging or email.
 - A consistent, polished interface that is comfortable on a small screen. Each function in scope must have an annotated screen or an annotated flow that shows how the user performs it.
 
 ### Organize the eventual specification
@@ -19,13 +19,25 @@ Use a short `specification.md` as an index with requirements by topic under `sec
 | Feature parity | A row for each existing function, its proposed phone workflow or other disposition, and the evidence needed to verify it. |
 | Navigation and screens | A navigation map, annotated screen images, interaction rules, and accessibility and visual design standards. |
 | Rules and architecture | The calculation contract, how the Android app and desktop CLI use core logic, and the cases that must produce identical results. |
-| On-device data and export | What gets stored, how it survives upgrades, compatible backups and restore, explicit file sharing, privacy, and recovery. |
+| On-device data and sharing | Desktop-compatible JSON storage and backups, Android sharing, import and restore, upgrades, privacy, and recovery. |
 | Testing and Google Play | Beginner setup, automated and manual testing, release checks, publisher account steps, and the production submission plan. |
 | Implementation milestones | Small, testable increments with dependencies, acceptance checks, and a passdown at the end of each usage window. |
 
 ## Start with the desktop app as the reference
 
-Record the exact source revision and build used to establish parity. The published build at the start of planning is `0.2.2.dev0+gd9e1818e`. Inventory the README, desktop menus, CLI help and entry points, MCP surface, and behavior tests. Verify which features exist in the current build when the changelog covers retired features. Start with the [FedLeave README](../../README.md), [architecture](../../docs/ARCHITECTURE.md), [MCP guide](../../docs/MCP.md), and [entry points](../../pyproject.toml).
+Pin the source revision and published build used to establish parity. Use the revision recorded in `installers/BUILD.txt` when starting the inventory. Consult the README, desktop menus, CLI help and entry points, behavior tests, and relevant open and closed GitHub issues. Mark whether each issue describes shipped behavior, a new Android requirement, or a deferred item. Verify what exists in the reference build when the issue or changelog describes an older feature. [FedLeave README](../../README.md) · [Architecture](../../docs/ARCHITECTURE.md) · [Build identity](../../installers/BUILD.txt) · [GitHub issue history](https://github.com/joshua-guthrie/fedleave/issues?q=is%3Aissue)
+
+### GitHub issues reflected in this draft
+
+The five open issues reviewed on November 20, 2026 inform the first Android release and this plan's sample screen.
+
+| Issue | Direction for the plan |
+| --- | --- |
+| [#147](https://github.com/joshua-guthrie/fedleave/issues/147) | Defer the What-if Planner beyond the first Android release. Record it as a parity exception. |
+| [#148](https://github.com/joshua-guthrie/fedleave/issues/148) | Use **Share** and Android's Sharesheet for graphs, images, and backups. |
+| [#149](https://github.com/joshua-guthrie/fedleave/issues/149) | Have Android handle missing leave years for the current date and actions in a future year. Define when to confirm and how to initialize the year. |
+| [#150](https://github.com/joshua-guthrie/fedleave/issues/150) | Use the front-window sample below to review the layout and Material 3 style before writing the specification. |
+| [#151](https://github.com/joshua-guthrie/fedleave/issues/151) | Exclude MCP and AI interfaces from Android. Keep desktop CLI commands and references entirely out of Android's UI and user help. |
 
 Give each function a stable ID. Use these columns in the parity matrix.
 
@@ -33,20 +45,34 @@ Give each function a stable ID. Use these columns in the parity matrix.
 | --- | --- | --- | --- | --- | --- |
 | Example `CAL-01` | Calendar **Edit Day** changes the selected date using the daily ledger rules | Phone workflow | `DAY-EDIT` | `T-CAL-01` | Choose how to show an edit preview in the draft spec |
 
-Default every existing user capability to a **phone workflow** or **Android equivalent**. A CLI-only command or MCP capability still gets a matrix row. Decide how the underlying function translates to Android and whether the CLI or MCP interface itself belongs on the phone. Examine platform-specific settings such as choosing a desktop backend or checking desktop installer updates. Record each proposed **desktop-only exception** with its reason and get the owner's agreement before counting parity as complete.
+Default each existing user capability to a **phone workflow** or **Android equivalent** within the agreed scope. Inventory desktop commands to find underlying workflows and rules worth carrying forward. Keep developer-facing desktop interfaces separate from those capabilities. Examine platform-specific settings such as choosing a desktop backend or checking desktop installer updates. Record approved exceptions, including the deferred Planner and desktop integrations, in the parity matrix.
 
 Break the first inventory into groups that can be finished independently.
 
 - **Calendar and ledger.** Today, month and day navigation, pay days and pay periods, balances, daily entries and free-text comments, transaction history, planned leave, corrections and voids, and force balance.
 - **Leave-year rules.** Manual starting balances, carryover and reconciliation, accrual schedules and changes, caps, expirations and use-or-lose, lot allocation, all supported leave categories, and paid parental leave and FMLA.
-- **Reports and planning.** Analytics sections and their filters, source transaction drill-downs, yearly charts and comparisons, month report graphics, and the What-if Planner. Include the planner's scheduled and tentative rows, recalculation, warnings, and view-only chart with daily balances.
-- **Import, export, and settings.** Compatible FedLeave backup and restore, WMS HTML import, holiday cache and calendar sources, report export, presentation preferences, help, and about. Use the current release as the reference for CSV and planner file actions.
+- **Reports.** Analytics sections and their filters, source transaction drill-downs, yearly charts and comparisons, and month report graphics. Record the desktop What-if Planner as deferred for the first Android release.
+- **Import, sharing, and settings.** Compatible FedLeave backup and restore, WMS HTML import, holiday cache and calendar sources, report and backup sharing, presentation preferences, help, and about. Check which report formats the desktop actually makes available.
 
 ## Design the phone screens
 
-Start with a navigation sketch for the most frequent jobs. Compare candidates such as **Today**, **Calendar**, and **Reports**, with less frequent settings and maintenance actions grouped separately. Walk through a few realistic tasks before choosing a structure. Check how quickly a new user can see a balance, enter leave, correct an entry, export a chart, and make a backup.
+Start with a navigation sketch for the most frequent jobs. Compare candidates such as **Today**, **Calendar**, and **Reports**, with less frequent settings and maintenance actions grouped separately. Walk through a few realistic tasks before choosing a structure. Check how quickly a new user can see a balance, enter leave, correct an entry, share a chart, and share a backup.
 
 Mock up a single **Balances** panel for Android Calendar. A fresh open shows **As of today** with the date. **Change date** opens the calendar picker, where pay-period end dates are bold and labeled. Try nearby period ends as quick choices. Any selected date updates the same panel, and **Today** resets it. Label future balances as projections. Explore an expandable section for the selected pay period's earned and used hours. Annotate these states and write acceptance checks for the default, an ordinary day, a pay-period end, a projected date, and the return to Today.
+
+### Front-window sample for review
+
+![FedLeave Calendar concept with one dated balance panel, a month grid with marked pay-period ends, and bottom navigation](mockups/calendar-front-window.png)
+
+The sample uses fictional balances and a fixed blue Material 3 palette. The single **Balances** card gives today's numbers priority. **Change date** selects the balance date, and the calendar marks pay-period ends with bold text and a dot as well as a legend. Review whether Calendar, Reports, and Settings work as the first-level destinations.
+
+| Style option | What to compare |
+| --- | --- |
+| Fixed Material 3 palette | Consistent FedLeave colors in light and dark mode. The sample uses this direction so dates, balances, and primary actions are easy to compare. |
+| System dynamic color | Match the user's system palette where supported, with fixed light and dark colors as a fallback. Verify that pay-period and chart distinctions remain easy to read. |
+| Material 3 Expressive | Try stronger typography and more varied shapes for selected actions. Keep dense balance rows and the month grid easy to scan. |
+
+Choose the theme direction when reviewing the plan. Final navigation and annotated states for other screens belong in the specification. [Material 3 theming in Compose](https://developer.android.com/develop/ui/compose/designsystems/material3)
 
 Require an **annotated image for every function accessible on the phone**. One image can cover several functions when a labeled callout identifies each one. Include dialogs, sheets, menus, confirmation steps, and screens handed off to Android, such as the system file picker and share sheet. For functions that stay on desktop, link the parity row to the approved disposition. For significant background behavior, annotate the user-visible result on the screen where it appears.
 
@@ -58,7 +84,7 @@ Define what **looks good and is easy to use** in observable terms. Specify a con
 
 Start with **Kotlin** for the language and **Jetpack Compose with Material 3** for the phone interface. Kotlin is Google's recommended starting point for native Android, and Compose can preview screens in Android Studio. Use **Android Studio** as the IDE, which is the application you use to edit, build, run, and debug the app. [Android's Kotlin-first guidance](https://developer.android.com/kotlin/first) · [Jetpack Compose](https://developer.android.com/compose)
 
-**Keep the existing desktop command lines.** Put more of the leave behavior behind callable library functions where it currently lives in command handlers. Keep the desktop CLI as an adapter that calls those functions and preserves its existing command names, options, and JSON output. FedLeave already has independently callable Python calculation and persistence code. The Android UI should call library functions through a typed app interface, following a design that can pass comments as data. [Existing architecture and compatibility policy](../../docs/ARCHITECTURE.md)
+**Keep the existing desktop command lines.** Put more of the leave behavior behind callable library functions where it currently lives in command handlers. Keep the desktop CLI as an adapter that calls those functions and preserves its existing command names, options, and JSON output. FedLeave already has independently callable Python calculation and persistence code. Android calls the core through a typed app interface. Use ordinary app language in every Android screen, message, and help topic. [Existing architecture and compatibility policy](../../docs/ARCHITECTURE.md)
 
 Have the specification compare these two paths for Android and record the decision.
 
@@ -67,11 +93,12 @@ Have the specification compare these two paths for Android and record the decisi
 
 Record tradeoffs in duplication, portability, packaging size, and maintenance. Leave a future single shared engine as a separate decision based on evidence. Define the rules once in the spec, especially decimal hours, date handling, accrual cutoffs, audit history, and behavior across leave years.
 
-## Plan local storage, backup, and explicit export
+## Plan local JSON storage, backup, and sharing
 
-- **Working data.** Define the app-private store for ledger records, history, comments, settings, and caches. Evaluate Room, Android's library for SQLite, against storing desktop-compatible JSON internally. Prefer Room if transactions, migrations, and query tests justify it. Specify the canonical source of truth and how an Android upgrade preserves existing records. [Android Room guide](https://developer.android.com/training/data-storage/room)
-- **Backup and restore.** Review the desktop backup format and define compatibility in both directions. Document which records, settings, holiday data, IDs, and history transfer. Specify how the user previews an import, handles collisions, and confirms changes. Require complete validation before the active ledger changes and a recovery test for interrupted and invalid restores. Explain what happens to the private store when someone uninstalls the app or replaces a phone. [Desktop backup and restore code](../../src/fedleave/commands/data.py)
-- **Export experience.** Sketch **Export** from each eligible report or graph and **Export backup** from the data screen. Define PNG for graphs and report images, PDF where the desktop supports it, and a compatible JSON backup. Show the preview, filename, Android share or file picker, success, cancellation, and failure. Generate working copies in app-private temporary storage and retain an external copy when the user explicitly chooses it. Decide whether user-selected external providers are allowed as destinations and explain what a share hands to another app. [Android file picker](https://developer.android.com/training/data-storage/shared/documents-files) · [Android share sheet](https://developer.android.com/develop/ui/compose/sharing/send)
+- **Working data.** Use the existing FedLeave JSON datastore format as the canonical phone store inside app-private storage. Use the desktop schemas and layout for `config.json`, `leave_years/<year>.json`, and `holiday_cache/<key>.json`. Define safe writes, recovery, and preservation of these files on app updates. [Desktop JSON storage](../../src/fedleave/storage.py)
+- **Leave-year setup.** Define how the app creates a missing year when the user opens Calendar for the current date or performs an action in a future year. Decide when to confirm creation, how to determine the year and starting balances, and what cancellation does to the original action. Keep explicit creation as the desktop CLI behavior. Test creation of each missing year and preservation of any existing year. [Leave-year setup issue](https://github.com/joshua-guthrie/fedleave/issues/149)
+- **Backup and restore.** Write and read the desktop CLI's existing portable JSON archive with `schema_version: 1`, including the existing `config`, `leave_years`, and `holiday_cache` fields. Accept the existing single-leave-year JSON backup supported by the desktop importer. Require round trips in both directions using the existing Linux and Windows GUI backup and import flows. Compare records, transaction IDs, supported history, settings, and holiday data. Define import preview, merge or replace choices, and complete validation before changing the active ledger. Use the Android file picker to select a backup to restore. Test interrupted and invalid restores, and explain recovery after uninstall or a phone change. [Desktop archive contract](../../src/fedleave/commands/data.py) · [Desktop Calendar backup controls](../../src/fedleave_gui/main_window.py#L1920) · [Android file picker](https://developer.android.com/training/data-storage/shared/documents-files)
+- **Sharing experience.** Sketch **Share** for eligible reports and graphs and **Share backup** from the data screen. Prepare a PNG for a chart or report image, a PDF where supported, or the standard JSON backup, then open the Android Sharesheet. The user chooses the receiving app. Give that app temporary read access to the prepared copy and define when FedLeave can safely clean up its app-private working file. Show cancellation and preparation errors in the flow. Keep the canonical data store private and treat the receiving app's delivery or storage as its responsibility. [Android Sharesheet](https://developer.android.com/develop/ui/compose/sharing/send) · [Android secure file sharing](https://developer.android.com/training/secure-file-sharing)
 - **Privacy and offline behavior.** Define which data stays on the device. Configure and verify exclusions for automatic cloud backup and OS-managed device-to-device transfer where supported. Record any optional network feature, such as requesting a holiday calendar, and the data it sends. Use synthetic data in screenshots, logs, bug reports, and testing. [Android Auto Backup and device transfer](https://developer.android.com/identity/data/autobackup)
 
 ## Plan beginner setup and testing
@@ -83,9 +110,9 @@ Record tradeoffs in duplication, portability, packaging size, and maintenance. L
 | Test level | What the specification should require |
 | --- | --- |
 | Fast unit and parity tests on the computer | Shared synthetic ledgers for accrual, carryover, expiry, fractions, year boundaries, and conflicting transactions. Fix the clock and relevant settings and compare Android results with the desktop reference. |
-| Android integration tests | App-private persistence, upgrades and migrations, backup round trips in both directions, duplicate and invalid imports, failed or interrupted writes, and private data retention. |
-| Screen and accessibility tests | Compose tests for entry and validation, navigation and Back, canceled edit and export, and recovery after app restart. Review small-screen layouts, large text, dark mode, and TalkBack with the annotated mockups beside the app. |
-| Manual release rehearsals | On a real phone, install, create or restore a fictional leave year, enter and correct leave, reopen the app in airplane mode, export a graph and backup, restore the backup, and update from the previous build without losing data. Keep test results and store feedback tied to the build ID. |
+| Android integration tests | App-private JSON persistence, upgrades, app-driven creation of missing leave years, backup round trips with the Linux and Windows GUIs, duplicate and invalid imports, and interrupted writes. |
+| Screen and accessibility tests | Compose tests for entry and validation, navigation and Back, canceled edits, and recovery after app restart. Check that Share opens the system Sharesheet with the intended file and that dismissing it leaves the ledger intact. Review small-screen layouts, large text, dark mode, and TalkBack. |
+| Manual release rehearsals | On a real phone, install, set up or restore a fictional leave year, enter and correct leave, and reopen the app in airplane mode. Use Share for a graph and a backup in compatible receiving apps. Test restoring a received backup and updating from the previous build without losing data. Keep results tied to the build ID. |
 
 Write instructions for running tests from Android Studio and from a terminal. Typical Gradle tasks are `./gradlew test` for local tests and `./gradlew connectedAndroidTest` for tests that need a running emulator or a connected phone. Record the exact commands once the app's project structure is chosen. [Run Android tests from the command line](https://developer.android.com/studio/test/command-line)
 
@@ -98,25 +125,25 @@ Write instructions for running tests from Android Studio and from a terminal. Ty
 
 ## Write the specification in five-hour usage windows
 
-Each row below is a **specification-writing milestone** with a concrete stopping point. Target one bounded row or part of a row per window. Split any large row by screen group or rules family before starting it. Use the same sizing approach when the specification later lays out implementation milestones. Treat a five-hour window as a usage limit and use the measured balance to decide when to stop.
+Each row below is a **specification-writing milestone** sized to fit in one five-hour usage window, with a concrete stopping point. Split any large row by screen group or rules family. Use the same sizing approach when the specification lays out implementation milestones. More than one milestone can fit in a window. Check measured usage between milestones and commit each verified milestone before starting the next one.
 
 | Window | Write or decide | Done for this window when |
 | --- | --- | --- |
 | 1. Baseline and scope | Create the spec index, record the desktop reference build, and inventory the core Calendar workflows. | The parity table has its columns, first rows, and a list of remaining sources. |
 | 2. Ledger and year parity | Enumerate transaction editing, leave-year creation, carryover, accrual, and expiration rules. Split PPL/FMLA and lot rules into their own part if needed. | Each reviewed workflow has a source and a testable expected outcome. |
-| 3. Remaining features | Inventory reports, Planner, imports, preferences, and the CLI-only and MCP functions. | Each desktop function has a disposition or a named question to resolve. |
+| 3. Remaining features | Inventory reports, imports, preferences, and the underlying behaviors exposed by desktop tools. Record the Planner and desktop integrations as scope exceptions. | Each desktop capability has a disposition or a named question to resolve. |
 | 4. Phone navigation and Calendar | Draft annotated first launch, navigation, balances, day edit, and history images. | Each reviewed Calendar function points to a labeled callout and screen ID. |
-| 5. Reports and Planner screens | Draft annotated reports, charts, filters, and Planner flows. | Each reviewed function has a labeled mockup and covers the relevant empty or error states. |
-| 6. Data and settings screens | Draft annotated import, restore, backup, export, preferences, and help flows. | Every remaining phone function points to a screen or an annotated flow. |
+| 5. Report screens | Draft annotated reports, charts, filters, and sharing flows. | Each reviewed function has a labeled mockup and covers the relevant empty or error states. |
+| 6. Data and settings screens | Draft annotated import, restore, backup sharing, preferences, and help flows. | Every remaining phone function points to a screen or an annotated flow. |
 | 7. Core and compatibility | Write the CLI/library boundary decision and define the parity fixtures that will compare the engines. | Expected results and any proof-of-concept questions are recorded. |
-| 8. Device storage and file exchange | Write the offline data contract, backup compatibility, export rules, and migration behavior. | Every store and export type has a defined lifecycle and a recovery test. |
+| 8. Device storage and file exchange | Write the on-device JSON contract, desktop backup compatibility, sharing rules, and migration behavior. | Every store and shared file type has a defined lifecycle and a verification test. |
 | 9. Tools and testing | Write the install walkthrough, test cases, handset and emulator coverage, and release rehearsal. | A beginner can identify the tools and run each planned check. |
 | 10. Google Play | Write the publisher account choices, signing and listing tasks, and release sequence. | The release checklist identifies the account owner, tester needs, and calendar dependencies. |
 | 11. Review and implementation breakdown | Walk the parity matrix against mockups and tests, resolve gaps, and write small implementation milestones. | Every in-scope function is traceable from desktop behavior to Android acceptance, and open decisions have owners. |
 
-### Passdown required after every window
+### Passdown and commit at each checkpoint
 
-Use a numbered Markdown note such as `passdowns/01-baseline.md`. Check five-hour usage at the start, before taking on another large section, and near the stopping point. Use the workspace's `codex-usage --json` check when available. Begin the passdown early enough to finish with **at least 20% remaining**. Stop new work at that threshold or at a completed milestone. Record unknown usage as unknown and size the work conservatively.
+Use a numbered Markdown note such as `passdowns/01-baseline.md` at each milestone and keep the root `passdown.md` pointing to the next task. Check five-hour usage at the start, between milestones, before taking on another large section, and near the stopping point. Use the workspace's `codex-usage --json` check when available. Continue through milestones while there is enough usage to verify and commit the next piece with **at least 30% remaining**. At the cutoff, finish a coherent subsection if time permits, record any unfinished work in the passdown, and commit the checkpoint. Record unknown usage as unknown and size the work conservatively.
 
 Every passdown should record:
 
