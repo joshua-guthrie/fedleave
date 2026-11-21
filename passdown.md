@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–5 of the Android specification are complete. Start milestone 6 with the annotated data, backup, restore, maintenance and settings flows. See the [milestone 5 passdown](android/specficaiton/passdowns/05-report-screens.md) for image coverage and the next boards to draft.
+Milestones 1–6 of the Android specification are complete. Start milestone 7 by choosing the CLI and accounting library boundary and defining parity fixtures. See the [milestone 6 passdown](android/specficaiton/passdowns/06-data-settings-screens.md) for complete screen coverage and the core decision to make next.
 
 ## Decisions to carry forward
 

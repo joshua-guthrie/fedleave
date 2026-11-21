@@ -42,7 +42,7 @@ Use three persistent destinations for familiar tasks. **Calendar** opens first a
 | --- | --- | --- |
 | 1–2 | Prefill the day, direction, valid increments and existing comments. Offer Add leave type. Display individual entries when a total represents multiple records. Use native numeric entry and keep form controls visible above the keyboard. | `CAL-DAY-01`, `PARENT-01` |
 | 3–4 | Review changed categories and comments and identify the records being replaced. Back keeps the draft. Show mismatched amount, conflict or save failure inline and keep the copy of the draft editable. | `CAL-DAY-01` |
-| 5–6 | For a new individual record, choose date, category, direction, hours and status. Label future dates and display status in history. After entering overlapping PPL and FMLA usage, add the dedicated confirmation shown in the later settings and maintenance visuals. | `CAL-DAY-02`, `PARENT-02` |
+| 5–6 | For a new individual record, choose date, category, direction, hours and status. Label future dates and display status in history. Overlapping PPL and FMLA usage has a [dedicated confirmation](data-settings-screens.md#ppl-windows-and-fmla-tracking). | `CAL-DAY-02`, `PARENT-02` |
 
 ## History and corrections
 

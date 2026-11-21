@@ -26,6 +26,7 @@ Use the pinned source to resolve differences between the older documentation and
 | [Acceptance plan](testPlan.md) | Synthetic fixtures and reference results for Calendar, ledger, and leave-year cases. |
 | [Reports, data, and preferences](sections/reports-data-and-preferences.md) | Report calculations and display, compatible sharing and restore, imports, preferences, help, and platform equivalents. |
 | [Report screens and sharing](sections/report-screens.md) | Annotated report navigation, all chart families, filters, source entries, empty states, Share and Print. |
+| [Data, maintenance, and settings screens](sections/data-settings-screens.md) | Annotated backup, restore, imports, ledger maintenance, accounting preferences, and help. |
 | Architecture, release, and implementation milestones | Later milestones record core decisions, testing setup, Google Play steps, and bounded implementation work. |
 
 ## Decisions carried into the first release

@@ -1,0 +1,279 @@
+[
+  {
+    "file": "settings-data.png",
+    "title": "Find backup and restore",
+    "subtitle": "Prepare a compatible JSON backup for Android Share or open a file to review.",
+    "screens": [
+      {"id": "SETTINGS-HOME", "title": "Settings", "nav": "Settings", "items": [
+        {"type": "row", "text": "Calendar preferences", "value": "›", "note": 1},
+        {"type": "row", "text": "Accounting and leave years", "value": "›"},
+        {"type": "row", "text": "Holidays and reminders", "value": "›"},
+        {"type": "row", "text": "Data and backups", "value": "›"},
+        {"type": "row", "text": "Help and about", "value": "›"}
+      ]},
+      {"id": "DATA-HOME", "title": "Data and backups", "items": [
+        {"type": "card", "text": "On this device", "body": "2 leave years · 2026–2027. FedLeave keeps working files private to this app.", "note": 2},
+        {"type": "action", "text": "Share backup", "note": 3},
+        {"type": "action", "text": "Restore backup", "emphasis": false},
+        {"type": "action", "text": "Import WMS leave report", "emphasis": false},
+        {"type": "action", "text": "Check data", "emphasis": false}
+      ]},
+      {"id": "SHARE-BACKUP", "title": "Share backup", "subtitle": "Android system sheet · illustrative", "items": [
+        {"type": "card", "text": "FedLeave backup", "body": "JSON · Includes your leave records, comments, accounting settings and holiday cache.", "note": 4},
+        {"type": "row", "text": "Nearby sharing", "value": "›"},
+        {"type": "row", "text": "Mail", "value": "›"},
+        {"type": "action", "text": "Back", "emphasis": false}
+      ]},
+      {"id": "RESTORE-PICKER", "title": "Open a backup", "subtitle": "Android file picker · illustrative", "items": [
+        {"type": "row", "text": "Location", "value": "Downloads"},
+        {"type": "card", "text": "fedleave_backup.json", "body": "JSON file · Nov 20", "note": 5},
+        {"type": "action", "text": "Open"},
+        {"type": "action", "text": "Cancel", "emphasis": false}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-restore.png",
+    "title": "Review a backup before changing data",
+    "subtitle": "Show the files affected, explain conflicts, and recover from interruptions.",
+    "screens": [
+      {"id": "RESTORE-REVIEW", "title": "Review restore", "subtitle": "fedleave_backup.json", "items": [
+        {"type": "card", "text": "Leave years 2026 and 2027", "body": "2026 matches an existing year. 2027 is new.", "note": 1},
+        {"type": "row", "text": "Matching record IDs", "value": "3"},
+        {"type": "row", "text": "Mode", "value": "Merge", "note": 2},
+        {"type": "text", "text": "Merge keeps your current records when IDs match. Replace takes the backup’s version of included files."},
+        {"type": "action", "text": "Confirm merge", "note": 3},
+        {"type": "action", "text": "Cancel", "emphasis": false}
+      ]},
+      {"id": "RESTORE-RESULT", "title": "Backup restored", "items": [
+        {"type": "card", "text": "2026 and 2027 available", "body": "Added 8 entries. Kept 3 current entries with matching IDs.", "note": 4},
+        {"type": "action", "text": "Back to Calendar"}
+      ]},
+      {"id": "RESTORE-INVALID", "title": "Cannot restore", "items": [
+        {"type": "card", "text": "Missing linked leave year", "body": "The backup refers to 2026, but the required ledger is missing. Your current data is unchanged.", "warning": true, "note": 5},
+        {"type": "action", "text": "Choose another backup"},
+        {"type": "action", "text": "Back", "emphasis": false}
+      ]},
+      {"id": "RESTORE-RECOVERY", "title": "Recover data", "items": [
+        {"type": "card", "text": "Restore was interrupted", "body": "Recover the last complete store before opening Calendar.", "warning": true, "note": 6},
+        {"type": "action", "text": "Recover previous data"},
+        {"type": "action", "text": "View details", "emphasis": false}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-import.png",
+    "title": "Review payroll records before importing",
+    "subtitle": "Choose the report, inspect matching records, and confirm the proposed changes.",
+    "screens": [
+      {"id": "WMS-PICKER", "title": "Open WMS report", "subtitle": "Android file picker · illustrative", "items": [
+        {"type": "card", "text": "clocking-report.html", "body": "FRC-E WMS clocking report", "note": 1},
+        {"type": "action", "text": "Open"},
+        {"type": "action", "text": "Cancel", "emphasis": false}
+      ]},
+      {"id": "WMS-REVIEW", "title": "Review WMS import", "subtitle": "clocking-report.html", "items": [
+        {"type": "row", "text": "Jan 13 · Annual", "value": "3 h used", "note": 2},
+        {"type": "row", "text": "Jan 13 · Sick", "value": "1.5 h used"},
+        {"type": "row", "text": "Matching entries to replace", "value": "1"},
+        {"type": "row", "text": "Regular-time rows skipped", "value": "2"},
+        {"type": "action", "text": "Review replacement", "emphasis": false},
+        {"type": "action", "text": "Apply import", "note": 3}
+      ]},
+      {"id": "WMS-RESULT", "title": "Review import result", "items": [
+        {"type": "card", "text": "2 leave entries recorded", "body": "Replaced 1 matching entry and skipped 2 regular-time rows.", "note": 4},
+        {"type": "action", "text": "View transactions"}
+      ]},
+      {"id": "PAYROLL-REVIEW", "title": "Reconcile entry", "subtitle": "Jan 13, 2026 · Annual use",
+        "items": [
+          {"type": "row", "text": "20260113-001", "value": "2 h"},
+          {"type": "row", "text": "20260113-002", "value": "1 h"},
+          {"type": "card", "text": "Choose the matching entry", "body": "More than one entry has this date, leave type and direction.", "note": 5},
+          {"type": "action", "text": "Select entry"}
+        ]
+      }
+    ]
+  },
+  {
+    "file": "settings-calendar.png",
+    "title": "Set Calendar display and reminders",
+    "subtitle": "Select review years, display choices, local holiday dates and expiration thresholds.",
+    "screens": [
+      {"id": "LEAVE-YEAR-CHOOSER", "title": "Choose a leave year", "items": [
+        {"type": "card", "text": "2026 · Current", "body": "Jan 11, 2026 – Jan 9, 2027", "note": 1},
+        {"type": "card", "text": "2027", "body": "Jan 10, 2027 – Jan 8, 2028"},
+        {"type": "action", "text": "Set up another year", "emphasis": false}
+      ]},
+      {"id": "PREF-CALENDAR", "title": "Calendar preferences", "items": [
+        {"type": "row", "text": "Start of week", "value": "Sunday", "note": 2},
+        {"type": "row", "text": "Days from period end to payday", "value": "6"},
+        {"type": "row", "text": "Automatic accruals", "value": "Hidden"},
+        {"type": "row", "text": "Holiday highlighting", "value": "On"},
+        {"type": "row", "text": "Payday highlighting", "value": "On"},
+        {"type": "row", "text": "Pay-period end marks", "value": "On"},
+        {"type": "action", "text": "Save display settings"}
+      ]},
+      {"id": "PREF-HOLIDAYS", "title": "Holidays", "subtitle": "2026 · Cached federal holidays", "items": [
+        {"type": "row", "text": "Jan 1", "value": "New Year’s Day", "note": 3},
+        {"type": "row", "text": "Jan 19", "value": "MLK Jr. Day"},
+        {"type": "action", "text": "Regenerate offline", "emphasis": false},
+        {"type": "action", "text": "Open holiday calendar"}
+      ]},
+      {"id": "HOLIDAY-PICKER", "title": "Open holiday calendar", "subtitle": "Android file picker · illustrative", "items": [
+        {"type": "card", "text": "agency-holidays.ics", "body": "Calendar file · Review the dates before applying.", "note": 4},
+        {"type": "action", "text": "Open"}
+      ]},
+      {"id": "PREF-REMINDERS", "title": "Expiration reminders", "items": [
+        {"type": "row", "text": "Pay periods before expiry", "value": "1, 3, 6, 12", "note": 5},
+        {"type": "text", "text": "FedLeave shows a reminder in the app when tracked leave is due soon."},
+        {"type": "action", "text": "Save thresholds"}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-rules-help.png",
+    "title": "Review accounting settings and find help",
+    "subtitle": "Show the data the app uses and explain which settings affect calculations.",
+    "screens": [
+      {"id": "PREF-ACCOUNTING", "title": "Accounting settings", "items": [
+        {"type": "row", "text": "Workdays", "value": "Mon–Fri", "note": 1},
+        {"type": "row", "text": "Scheduled work", "value": "40 h/week"},
+        {"type": "row", "text": "Time increment", "value": "0.25 h"},
+        {"type": "row", "text": "Annual carryover limit", "value": "240 h"},
+        {"type": "action", "text": "Review work tour", "emphasis": false},
+        {"type": "action", "text": "Review FMLA history", "emphasis": false}
+      ]},
+      {"id": "FMLA-HISTORY-REVIEW", "title": "Review FMLA history", "items": [
+        {"type": "row", "text": "History complete from", "value": "Jun 1, 2026", "note": 2},
+        {"type": "text", "text": "Choose the earliest date from which your relevant FMLA records and work schedules are complete."},
+        {"type": "action", "text": "Confirm verified date"}
+      ]},
+      {"id": "HELP-HOME", "title": "Help", "items": [
+        {"type": "row", "text": "Set up a leave year", "value": "›", "note": 3},
+        {"type": "row", "text": "Record or correct leave", "value": "›"},
+        {"type": "row", "text": "Share or restore a backup", "value": "›"},
+        {"type": "row", "text": "Leave abbreviations", "value": "›"},
+        {"type": "row", "text": "About FedLeave", "value": "›"}
+      ]},
+      {"id": "HELP-ABOUT", "title": "About FedLeave", "items": [
+        {"type": "row", "text": "App version", "value": "1.0 draft", "note": 4},
+        {"type": "text", "text": "Calendar and reporting for your leave records."},
+        {"type": "action", "text": "Open project website", "emphasis": false}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-health.png",
+    "title": "Review data health and carryover",
+    "subtitle": "See the affected years and approve only the reviewed correction.",
+    "screens": [
+      {"id": "DATA-CHECK", "title": "Check data", "items": [
+        {"type": "card", "text": "2027 carryover needs review", "body": "Changes to 2026 affect the 2027 opening.", "warning": true, "note": 1},
+        {"type": "action", "text": "Review carryover"},
+        {"type": "action", "text": "View other checks", "emphasis": false}
+      ]},
+      {"id": "CARRYOVER-REVIEW", "title": "Review carryover", "subtitle": "Source correction · 2026", "items": [
+        {"type": "row", "text": "2027 annual opening", "value": "100 h → 92 h", "note": 2},
+        {"type": "row", "text": "2028 linked year", "value": "Recalculate"},
+        {"type": "action", "text": "Review affected lots", "emphasis": false},
+        {"type": "action", "text": "Apply reviewed changes"},
+        {"type": "action", "text": "Cancel", "emphasis": false}
+      ]},
+      {"id": "CARRYOVER-REPAIR", "title": "Repair duplicate opening", "subtitle": "2026 leave year", "items": [
+        {"type": "card", "text": "Travel comp opening · 40 h", "body": "Repair removes the legacy duplicate. The opening balance stays at 40 h.", "note": 3},
+        {"type": "action", "text": "Apply repair"},
+        {"type": "action", "text": "Cancel", "emphasis": false}
+      ]},
+      {"id": "CARRYOVER-RECOVERY", "title": "Recover carryover", "items": [
+        {"type": "card", "text": "Update was interrupted", "body": "Recover the previous ledgers for 2027 and 2028 before reviewing carryover again.", "warning": true, "note": 4},
+        {"type": "action", "text": "Recover prior data"}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-adjustments.png",
+    "title": "Maintain balances, accruals, and caps",
+    "subtitle": "Make each dated change explicit and distinguish forecasts from corrections.",
+    "screens": [
+      {"id": "STARTING-BALANCE-EDIT", "title": "Correct opening balance", "subtitle": "Manual year · 2026", "items": [
+        {"type": "row", "text": "Annual opening", "value": "20 h → 25 h", "note": 1},
+        {"type": "row", "text": "Reason", "value": "Verified baseline"},
+        {"type": "action", "text": "Save revised opening"}
+      ]},
+      {"id": "BALANCE-ADJUST", "title": "Adjust balance", "subtitle": "Annual leave · Feb 1, 2026", "items": [
+        {"type": "row", "text": "Recorded balance", "value": "20 h"},
+        {"type": "row", "text": "Verified target", "value": "5 h", "note": 2},
+        {"type": "row", "text": "Change on Feb 1", "value": "15 h decrease"},
+        {"type": "row", "text": "Reason", "value": "Payroll correction"},
+        {"type": "action", "text": "Apply adjustment"}
+      ]},
+      {"id": "ACCRUAL-CHANGE", "title": "Change accrual", "subtitle": "Annual leave · 2026", "items": [
+        {"type": "row", "text": "Effective date", "value": "Jul 12, 2026", "note": 3},
+        {"type": "row", "text": "Hours per pay period", "value": "4 h → 6 h"},
+        {"type": "text", "text": "The first changed accrual is July 25. Thirteen annual accrual rows will change."},
+        {"type": "action", "text": "Save rate change"}
+      ]},
+      {"id": "YEAR-END-FORECAST", "title": "Annual use or lose", "subtitle": "Projected through Jan 9, 2027", "items": [
+        {"type": "row", "text": "Projected balance", "value": "272 h", "note": 4},
+        {"type": "row", "text": "Carryover limit", "value": "240 h"},
+        {"type": "row", "text": "Project to carry", "value": "240 h"},
+        {"type": "card", "text": "32 h may be lost", "body": "Includes effective scheduled leave through the closing date."}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-expiration.png",
+    "title": "Review and act on expiring leave",
+    "subtitle": "See the last eligible day, associated lots, and extension history.",
+    "screens": [
+      {"id": "EXPIRATION-LIST", "title": "Expiring leave", "subtitle": "As of April 15, 2027", "items": [
+        {"type": "card", "text": "8 h within 3 pay periods", "body": "Next last eligible day: May 1, 2027.", "note": 1},
+        {"type": "row", "text": "Travel comp", "value": "8 h · May 1"},
+        {"type": "action", "text": "Review travel comp lot", "emphasis": false}
+      ]},
+      {"id": "LOT-DETAIL", "title": "Travel comp lot", "subtitle": "Earned April 29, 2026", "items": [
+        {"type": "row", "text": "Original", "value": "12 h"},
+        {"type": "row", "text": "Remaining", "value": "8 h", "note": 2},
+        {"type": "row", "text": "Last eligible use", "value": "May 1, 2027"},
+        {"type": "row", "text": "Unavailable from", "value": "May 2, 2027"},
+        {"type": "action", "text": "Record approved extension"}
+      ]},
+      {"id": "LOT-EXTENSION", "title": "Record an extension", "subtitle": "Travel comp lot", "items": [
+        {"type": "row", "text": "Current last eligible date", "value": "May 1, 2027"},
+        {"type": "row", "text": "Approved date", "value": "Jun 1, 2027", "note": 3},
+        {"type": "row", "text": "Reason", "value": "Agency approval"},
+        {"type": "action", "text": "Save extension"}
+      ]},
+      {"id": "EXPIRATION-REMINDER", "title": "Leave expiring soon", "items": [
+        {"type": "card", "text": "8 h travel comp", "body": "Use by May 1, 2027.", "warning": true, "note": 4},
+        {"type": "action", "text": "Review expiring leave"},
+        {"type": "action", "text": "Dismiss", "emphasis": false}
+      ]}
+    ]
+  },
+  {
+    "file": "settings-parental.png",
+    "title": "Review paid parental leave and FMLA",
+    "subtitle": "Show event windows and track additional FMLA usage explicitly.",
+    "screens": [
+      {"id": "PPL-WINDOWS", "title": "Paid parental leave", "subtitle": "As of January 10, 2027", "items": [
+        {"type": "card", "text": "472 h in active windows", "body": "PPL use reduces each active window.", "note": 1},
+        {"type": "row", "text": "June 1 grant", "value": "472 h · Use by May 31"},
+        {"type": "row", "text": "Sept 1 grant", "value": "472 h · Use by Aug 31"},
+        {"type": "action", "text": "View grant and usage details", "emphasis": false}
+      ]},
+      {"id": "FMLA-OVERLAP-REVIEW", "title": "Confirm additional FMLA", "subtitle": "Jul 1, 2026", "items": [
+        {"type": "row", "text": "From paid parental leave", "value": "8 h"},
+        {"type": "row", "text": "Additional FMLA entered", "value": "4 h"},
+        {"type": "card", "text": "12 h total tracking", "body": "Confirm the 4 h represent additional leave outside the 8 h of paid parental leave.", "note": 2},
+        {"type": "action", "text": "Confirm additional hours"},
+        {"type": "action", "text": "Back to draft", "emphasis": false}
+      ]},
+      {"id": "FMLA-STATUS", "title": "FMLA tracking", "subtitle": "First use · Jul 1, 2026", "items": [
+        {"type": "row", "text": "From paid parental leave", "value": "8 h"},
+        {"type": "row", "text": "Additional FMLA", "value": "4 h"},
+        {"type": "card", "text": "Remaining hours unavailable", "body": "FedLeave needs verified prior dates and work schedules to calculate capacity.", "warning": true, "note": 3},
+        {"type": "action", "text": "Review FMLA history", "emphasis": false}
+      ]}
+    ]
+  }
+]
