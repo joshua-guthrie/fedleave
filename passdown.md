@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–4 of the Android specification are complete. Start milestone 5 with annotated report, chart, filter and share screens. The [milestone 4 passdown](android/specficaiton/passdowns/04-calendar-screens.md) records the image sources and exactly where to start.
+Milestones 1–5 of the Android specification are complete. Start milestone 6 with the annotated data, backup, restore, maintenance and settings flows. See the [milestone 5 passdown](android/specficaiton/passdowns/05-report-screens.md) for image coverage and the next boards to draft.
 
 ## Decisions to carry forward
 

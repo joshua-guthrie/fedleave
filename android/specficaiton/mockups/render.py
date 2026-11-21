@@ -182,10 +182,15 @@ class Screen:
         values = item["values"]
         scale = max(values) or 1
         if item.get("style") == "line":
+            positions = item.get("positions", [index / (len(values) - 1) for index in range(len(values))])
             points = [
-                (start + (end - start) * index / (len(values) - 1), base - value * 57 / scale)
-                for index, value in enumerate(values)
+                (start + (end - start) * position, base - value * 57 / scale)
+                for position, value in zip(positions, values, strict=True)
             ]
+            if item.get("step"):
+                points = [points[0], *[point for previous, current in zip(points, points[1:]) for point in (
+                    (current[0], previous[1]), current,
+                )]]
             self.draw.line(points, fill=PRIMARY, width=3, joint="curve")
         else:
             step = (end - start) / len(values)
@@ -196,6 +201,25 @@ class Screen:
         self.text(end, y + 96, item.get("end_label", ""), 11, MUTED, anchor="ra")
         self.mark(item.get("note"), y + 18)
         self.cursor += 129
+
+    def heatmap(self, item):
+        y = self.cursor
+        rows = item["rows"]
+        columns = len(rows[0])
+        step = min(24, (self.width - 26) // columns)
+        height = min(13, step)
+        legend_y = y + 43 + len(rows) * (height + 2)
+        self.box(self.left, y, self.inner_right, legend_y + 25, "#F0F4FC", 12)
+        self.text(self.left + 12, y + 10, item["text"], 13, bold=True)
+        colors = ("#E1E8F2", "#BDD1F6", "#789FDE", PRIMARY)
+        for row_index, row in enumerate(rows):
+            for column, value in enumerate(row):
+                x = self.left + 12 + column * step
+                cell_y = y + 37 + row_index * (height + 2)
+                self.box(x, cell_y, x + step - 2, cell_y + height, colors[value], 2)
+        self.text(self.left + 12, legend_y, "0 h    ·    up to 8 h", 11, MUTED)
+        self.mark(item.get("note"), y + 16)
+        self.cursor = legend_y + 37
 
 
 def render_board(board, font_dir, destination):
