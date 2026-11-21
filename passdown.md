@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–7 of the Android specification are complete. Start milestone 8 with the app-private JSON store, desktop backup compatibility, and ordered restore and share behavior. See the [milestone 7 passdown](android/specficaiton/passdowns/07-shared-core.md) for the architecture decision and exact handoff.
+Milestones 1–8 of the Android specification are complete. Start milestone 9 with the beginner Android Studio, emulator, physical-phone, and testing walkthrough. See the [milestone 8 passdown](android/specficaiton/passdowns/08-device-storage.md) for storage requirements and the platform gates to carry forward.
 
 ## Decisions to carry forward
 

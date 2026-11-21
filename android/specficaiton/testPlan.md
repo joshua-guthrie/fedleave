@@ -138,3 +138,16 @@ Use synthetic data for the system picker and Sharesheet. Test typical and corrup
 | `T-SCOPE-PLANNER-01` | Review initial release navigation and Ledger future dates. | The What-if Planner is absent. Real planned entries and dated lookups remain available. |
 | `T-SCOPE-TOOLS-01` | Review Settings, help and data actions. | App language covers all in-scope tasks. There are no desktop process paths, raw snapshot tools, CLI, MCP or AI actions in the phone UI and help. |
 | `T-SCOPE-OS-01` | Exercise Back, report sharing, compatible file picking and the release update process. | The platform actions handle navigation, content exchange and version updates. Normal app flows require no desktop installer, PDF export folder or Exit command. |
+
+## Storage and interchange acceptance
+
+The following release gates extend the Data and Reports cases. Use the [private store and archive contract](sections/device-storage.md), a disposable store, and synthetic records. Keep a manifest of platform, app and desktop builds, results, and hashes. Unknown or pending platform results remain open.
+
+| Gate | Procedure and pass condition |
+| --- | --- |
+| `STORE-ROUNDTRIP` | Complete Windows GUI → Android, Android → Windows GUI, Linux GUI → Android and Android → Linux GUI with the installed reference build. Compare canonical JSON, IDs, dated accounting, settings and holiday cache. Verify a manual year and linked successor with expiry history and PPL/FMLA. |
+| `STORE-RESTORE-MODES` | Use distinct matching IDs in the same year, repeated IDs across different years, new records and an unrelated year. Verify Merge, Replace, `null` config and supported legacy single-year restore. Include malformed UTF-8, invalid numeric values, a future schema version, and missing or conflicting lineage. Require the same active bytes after rejection and cancellation. |
+| `STORE-RECOVERY` | Interrupt a restore at candidate write, before pointer publish and after publish but before success. Reopen each case and use the recovery screen where needed. Accept exactly the last complete valid generation or the complete committed replacement. Simulate out-of-space, loss of picker access and a stale preview. Confirm the pending action cannot apply twice. |
+| `STORE-SHARE-URI` | Share PNG, PDF and JSON via Android to a test receiver. Open each copy after the chooser returns, confirm MIME and byte contents, and verify that temporary access applies to that artifact. Cancel one handoff and test bounded cleanup of expired copies. The active store remains unchanged. |
+| `STORE-OFFLINE` | Use airplane mode for setup, reads, edits, reports, holiday rules and opening a local backup. Verify no background network requests or transfers. Confirm any external website action is explicit. |
+| `STORE-REINSTALL` | Install a new build over a synthetic prior build and compare ledgers, then uninstall and reinstall. Confirm first launch requires setup or explicit restore. Restore the saved portable archive and compare the canonical data. Exercise available Android automatic backup and transfer paths with synthetic data. |

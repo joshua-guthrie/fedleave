@@ -28,6 +28,7 @@ Use the pinned source to resolve differences between the older documentation and
 | [Report screens and sharing](sections/report-screens.md) | Annotated report navigation, all chart families, filters, source entries, empty states, Share and Print. |
 | [Data, maintenance, and settings screens](sections/data-settings-screens.md) | Annotated backup, restore, imports, ledger maintenance, accounting preferences, and help. |
 | [Shared accounting core and compatibility](sections/core-and-compatibility.md) | Recommended library boundary, bridge proof of concept, and a shared parity fixture contract. |
+| [Device storage, backups, and sharing](sections/device-storage.md) | Private desktop JSON store, compatible archives, restore recovery, temporary sharing, and round-trip release checks. |
 | Release and implementation milestones | Later milestones record testing setup, Google Play steps, and bounded implementation work. |
 
 ## Decisions carried into the first release
