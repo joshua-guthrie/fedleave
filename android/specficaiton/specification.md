@@ -21,6 +21,7 @@ Use the pinned source to resolve differences between the older documentation and
 | --- | --- |
 | [Feature parity matrix](parity.md) | Calendar, ledger, reports, data maintenance, preferences, and scope exceptions. |
 | [Calendar balances](sections/calendar-balances.md) | One date-driven balance panel, its screen states, and the rules for today, historical dates, and pay-period ends. |
+| [Phone navigation and Calendar screens](sections/calendar-screens.md) | Annotated first use, balance states, Calendar navigation, day editing, history and corrections. |
 | [Ledger and leave years](sections/ledger-and-leave-years.md) | Missing-year setup, editing and history, accrual, carryover, expiration, and PPL/FMLA. |
 | [Acceptance plan](testPlan.md) | Synthetic fixtures and reference results for Calendar, ledger, and leave-year cases. |
 | [Reports, data, and preferences](sections/reports-data-and-preferences.md) | Report calculations and display, compatible sharing and restore, imports, preferences, help, and platform equivalents. |

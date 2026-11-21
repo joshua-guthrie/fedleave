@@ -1,0 +1,239 @@
+[
+  {
+    "file": "calendar-setup.png",
+    "title": "Set up a leave year",
+    "subtitle": "Calendar opens the right setup step and returns to the original task.",
+    "screens": [
+      {
+        "id": "LEAVE-YEAR-SETUP",
+        "title": "Welcome to FedLeave",
+        "subtitle": "Set up a leave year to start recording leave.",
+        "items": [
+          {"type": "card", "text": "Restore existing leave", "body": "Use a FedLeave backup from your computer or previous phone.", "note": 1},
+          {"type": "action", "text": "Restore backup"},
+          {"type": "action", "text": "Set up leave year", "emphasis": false, "note": 2}
+        ]
+      },
+      {
+        "id": "LEAVE-YEAR-MANUAL",
+        "title": "Manual starting balances",
+        "subtitle": "New leave year · 2026",
+        "items": [
+          {"type": "row", "text": "First pay period starts", "value": "Jan 11, 2026", "note": 3},
+          {"type": "row", "text": "Pay periods", "value": "26"},
+          {"type": "row", "text": "Annual accrual", "value": "6 h / period"},
+          {"type": "row", "text": "Annual opening", "value": "100 h"},
+          {"type": "row", "text": "Sick opening", "value": "20 h"},
+          {"type": "action", "text": "Other starting balances", "emphasis": false},
+          {"type": "card", "text": "Independent opening", "body": "Earlier balances, earned dates and expiration history stay in their original year.", "note": 4},
+          {"type": "action", "text": "Review leave year"}
+        ]
+      },
+      {
+        "id": "LEAVE-YEAR-CARRYOVER / LEAVE-YEAR-REVIEW",
+        "title": "Review 2027 leave year",
+        "subtitle": "For the balance on February 1, 2027",
+        "items": [
+          {"type": "card", "text": "Carry over from 2026", "body": "Jan 10, 2027 – Jan 8, 2028 · 26 periods. Source closes Jan 9, 2027.", "note": 5},
+          {"type": "row", "text": "Annual opening", "value": "240 h"},
+          {"type": "row", "text": "Sick opening", "value": "600 h"},
+          {"type": "row", "text": "Credit opening", "value": "24 h"},
+          {"type": "text", "text": "Annual 40 h and credit 6 h exceed the configured limits.", "note": 6},
+          {"type": "action", "text": "Review lots and warnings", "emphasis": false},
+          {"type": "action", "text": "Create leave year", "note": 7},
+          {"type": "action", "text": "Back to balance date", "emphasis": false}
+        ]
+      }
+    ]
+  },
+  {
+    "file": "calendar-balances.png",
+    "title": "One balances panel",
+    "subtitle": "The balance date and the day selected for editing have their own controls.",
+    "screens": [
+      {
+        "id": "CALENDAR-MONTH / BALANCES-TODAY",
+        "title": "Calendar",
+        "subtitle": "January 2026",
+        "nav": "Calendar",
+        "top_action": "Today",
+        "items": [
+          {"type": "heading", "text": "Balances"},
+          {"type": "card", "text": "As of today · Jan 16, 2026", "body": "Annual 90 h  ·  Sick 20 h", "note": 1},
+          {"type": "action", "text": "Change date", "emphasis": false, "note": 2},
+          {"type": "calendar", "text": "January 2026", "start": 4, "ends": [24], "paydays": [30], "selected": 16, "note": 3},
+          {"type": "row", "text": "Editing day", "value": "Fri, Jan 16"},
+          {"type": "action", "text": "Edit day"}
+        ]
+      },
+      {
+        "id": "BALANCE-DATE-PICKER",
+        "title": "Balance date",
+        "subtitle": "Currently showing January 16, 2026",
+        "items": [
+          {"type": "calendar", "text": "January 2026", "start": 4, "ends": [24], "paydays": [30], "selected": 24, "note": 4},
+          {"type": "row", "text": "Period 1 ends", "value": "Sat, Jan 24"},
+          {"type": "row", "text": "Period 2 ends", "value": "Sat, Feb 7"},
+          {"type": "action", "text": "Show January 24", "note": 5},
+          {"type": "action", "text": "Cancel", "emphasis": false}
+        ]
+      },
+      {
+        "id": "BALANCES-PERIOD",
+        "title": "Balances",
+        "subtitle": "Projected balance · Saturday, Jan 24, 2026",
+        "items": [
+          {"type": "row", "text": "Annual leave", "value": "92 h", "note": 6},
+          {"type": "row", "text": "Sick leave", "value": "24 h"},
+          {"type": "card", "text": "Pay period 1 · Details open", "body": "Jan 11–24 · Pay date Jan 30.", "note": 7},
+          {"type": "row", "text": "Annual leave", "value": "6 h earned · 14 h used"},
+          {"type": "row", "text": "Sick leave", "value": "4 h earned · 0 h used"},
+          {"type": "action", "text": "View transactions", "emphasis": false},
+          {"type": "action", "text": "Today", "note": 8}
+        ]
+      }
+    ]
+  },
+  {
+    "file": "calendar-date-states.png",
+    "title": "Dated balances and missing data",
+    "subtitle": "A result belongs to one date. Show the same panel as its state changes.",
+    "screens": [
+      {
+        "id": "BALANCES-DATED",
+        "title": "Balances",
+        "subtitle": "As of Tuesday, January 13, 2026",
+        "items": [
+          {"type": "row", "text": "Annual leave", "value": "92 h", "note": 1},
+          {"type": "row", "text": "Sick leave", "value": "20 h"},
+          {"type": "action", "text": "Change date", "emphasis": false},
+          {"type": "action", "text": "Today", "emphasis": false}
+        ]
+      },
+      {
+        "id": "BALANCES-PROJECTED",
+        "title": "Balances",
+        "subtitle": "Projected balance · Thursday, Jan 22, 2026",
+        "items": [
+          {"type": "row", "text": "Annual leave", "value": "86 h", "note": 2},
+          {"type": "row", "text": "Sick leave", "value": "20 h"},
+          {"type": "text", "text": "Includes effective scheduled leave and accruals through January 22."},
+          {"type": "action", "text": "Change date", "emphasis": false},
+          {"type": "action", "text": "Today", "emphasis": false}
+        ]
+      },
+      {
+        "id": "BALANCES-UNAVAILABLE",
+        "title": "Balances",
+        "subtitle": "Requested date · Thursday, Jan 22, 2026",
+        "items": [
+          {"type": "card", "text": "Balance unavailable", "body": "FedLeave could not read this date's leave year.", "warning": true, "note": 3},
+          {"type": "action", "text": "Retry"},
+          {"type": "action", "text": "Change date", "emphasis": false}
+        ]
+      }
+    ]
+  },
+  {
+    "file": "calendar-edit.png",
+    "title": "Edit a day or add one entry",
+    "subtitle": "The day total and an individual entry have separate review paths.",
+    "screens": [
+      {
+        "id": "DAY-EDIT",
+        "title": "Edit day",
+        "subtitle": "Friday, Jan 16, 2026",
+        "items": [
+          {"type": "heading", "text": "Annual leave"},
+          {"type": "row", "text": "Direction", "value": "Use", "note": 1},
+          {"type": "row", "text": "Hours · 0.25 h increments", "value": "3.5"},
+          {"type": "row", "text": "Comment", "value": "Appointment"},
+          {"type": "action", "text": "View the 2 current entries", "emphasis": false, "note": 2},
+          {"type": "row", "text": "Sick leave", "value": "1 h used"},
+          {"type": "action", "text": "Add leave type", "emphasis": false},
+          {"type": "action", "text": "Review changes"}
+        ]
+      },
+      {
+        "id": "DAY-SAVE-REVIEW",
+        "title": "Review day changes",
+        "subtitle": "Friday, Jan 16, 2026",
+        "items": [
+          {"type": "card", "text": "Annual leave", "body": "Replace 2 entries totaling 3 h used with 3.5 h used.", "note": 3},
+          {"type": "row", "text": "Comment", "value": "Appointment"},
+          {"type": "text", "text": "An unchanged sick leave entry stays at 1 h."},
+          {"type": "action", "text": "Save changes", "note": 4},
+          {"type": "action", "text": "Back to draft", "emphasis": false}
+        ]
+      },
+      {
+        "id": "ENTRY-ADD",
+        "title": "Add entry",
+        "subtitle": "Thursday, Jan 22, 2026",
+        "items": [
+          {"type": "row", "text": "Leave type", "value": "Annual"},
+          {"type": "row", "text": "Direction", "value": "Use"},
+          {"type": "row", "text": "Hours", "value": "1 h"},
+          {"type": "row", "text": "Status", "value": "Planned", "note": 5},
+          {"type": "row", "text": "Comment", "value": "Follow-up"},
+          {"type": "action", "text": "Add planned entry", "note": 6}
+        ]
+      }
+    ]
+  },
+  {
+    "file": "calendar-history.png",
+    "title": "Review and change one transaction",
+    "subtitle": "From a date range to an individual source record.",
+    "screens": [
+      {
+        "id": "TRANSACTIONS",
+        "title": "Transactions",
+        "subtitle": "January 13–24, 2026",
+        "items": [
+          {"type": "row", "text": "Date range", "value": "Jan 13 – Jan 24", "note": 1},
+          {"type": "row", "text": "Sort by", "value": "Date"},
+          {"type": "card", "text": "Jan 13 · Annual leave", "body": "8 h used · Approved", "note": 2},
+          {"type": "card", "text": "Jan 16 · Annual leave", "body": "2 h used · Approved"},
+          {"type": "card", "text": "Jan 24 · Annual leave", "body": "6 h earned · Automatic accrual"}
+        ]
+      },
+      {
+        "id": "TRANSACTION-DETAIL",
+        "title": "Transaction details",
+        "subtitle": "Jan 16, 2026 · Annual leave",
+        "items": [
+          {"type": "row", "text": "Activity", "value": "2 h used"},
+          {"type": "row", "text": "Status", "value": "Approved"},
+          {"type": "row", "text": "Source", "value": "Manual"},
+          {"type": "row", "text": "Record ID", "value": "20260116-001", "note": 3},
+          {"type": "text", "text": "Appointment"},
+          {"type": "action", "text": "Correct entry", "note": 4},
+          {"type": "action", "text": "Delete entry", "emphasis": false}
+        ]
+      },
+      {
+        "id": "TRANSACTION-CORRECT",
+        "title": "Correct entry",
+        "subtitle": "Jan 16, 2026 · Record 20260116-001",
+        "items": [
+          {"type": "row", "text": "Current annual usage", "value": "2 h"},
+          {"type": "row", "text": "Corrected usage", "value": "3 h", "note": 5},
+          {"type": "row", "text": "Reason", "value": "Payroll review"},
+          {"type": "action", "text": "Save correction"},
+          {"type": "action", "text": "Back to details", "emphasis": false}
+        ]
+      },
+      {
+        "id": "TRANSACTION-DELETE",
+        "title": "Delete entry?",
+        "subtitle": "Jan 16, 2026 · Record 20260116-001",
+        "items": [
+          {"type": "card", "text": "Annual leave · 2 h used", "body": "Remove this entry from January 16, 2026?", "warning": true, "note": 6},
+          {"type": "action", "text": "Delete entry"},
+          {"type": "action", "text": "Keep entry", "emphasis": false}
+        ]
+      }
+    ]
+  }
+]

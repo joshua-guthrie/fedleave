@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–3 of the Android specification are complete. Start milestone 4 with annotated first-launch, Calendar, day editor and history screens. The [milestone 3 passdown](android/specficaiton/passdowns/03-remaining-features.md) records the reviewed workflows and where to start.
+Milestones 1–4 of the Android specification are complete. Start milestone 5 with annotated report, chart, filter and share screens. The [milestone 4 passdown](android/specficaiton/passdowns/04-calendar-screens.md) records the image sources and exactly where to start.
 
 ## Decisions to carry forward
 

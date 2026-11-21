@@ -11,7 +11,7 @@ Calendar gives the user one **Balances** panel. They can see their position toda
 3. The month grid marks pay-period ends with bold numerals and a dot. The legend explains the mark. The date picker will use the same marker and an accessible label.
 4. The selected calendar day above **Edit day** is the date the user is preparing to edit. The date in the Balances heading is the cutoff used for the balance calculation.
 
-This front-window sample uses fictional November data. Date picker, historical selection, period detail, projection, and unavailable-state annotations are the next visual deliverables for this flow in the Calendar screen milestone.
+This front-window sample uses fictional November data. The detailed annotated phone screens use the fixed January acceptance fixture. [Calendar screen states](calendar-screens.md#calendar-date-picker-and-period-detail)
 
 ## Requirements
 
@@ -32,7 +32,7 @@ This front-window sample uses fictional November data. Date picker, historical s
 - Use the stored pay-period ending date as the balance cutoff for a closing balance. Pay date and accrual date are separate schedule fields. Closing balance equals the dated balance for that end date when calculated from the same data. Period earned and used totals cover the whole period and follow the desktop activity rules. [Month period calculations](../../../src/fedleave/commands/balances.py#L144) · [Schedule fields](../../../src/fedleave/payperiods.py#L43)
 - A future dated balance uses the same result as a desktop lookup for that date. Label year-end **Use or Lose** with its own forecast horizon. Link from relevant balances to the lot and parental details. [Forecast and expiration requirements](ledger-and-leave-years.md#accrual-caps-and-expiration) · [Parental requirements](ledger-and-leave-years.md#paid-parental-leave-and-fmla) · [Desktop dated and projected month fields](../../../src/fedleave/commands/balances.py#L655)
 
-## Screen states to annotate
+## Screen states
 
 | Screen or state ID | Key visual or interaction |
 | --- | --- |
