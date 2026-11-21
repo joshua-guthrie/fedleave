@@ -143,6 +143,7 @@
         "id": "DAY-EDIT",
         "title": "Edit day",
         "subtitle": "Friday, Jan 16, 2026",
+        "top_action": "Add entry",
         "items": [
           {"type": "heading", "text": "Annual leave"},
           {"type": "row", "text": "Direction", "value": "Use", "note": 1},

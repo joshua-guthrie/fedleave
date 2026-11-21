@@ -2,7 +2,9 @@
 
 ## Where to resume
 
-Milestones 1–10 of the Android specification are complete. Start the final review and implementation breakdown in milestone 11. The [milestone 10 passdown](android/specficaiton/passdowns/10-google-play.md) records the Play timing, ownership decisions and final review checklist.
+The Android specification draft is complete through milestone 11. Start with the [specification index](android/specficaiton/specification.md) and [draft decisions for owner review](android/specficaiton/sections/implementation-milestones.md#draft-decisions-for-owner-review). The first implementation checkpoint after review is **I01**, a minimal Compose project opened and run from Android Studio. See the [final specification passdown](android/specficaiton/passdowns/11-specification-review.md) for verification and the handoff.
+
+Specification work finished with 62% of the five-hour window remaining. Milestones 3–11 each have their own local commit.
 
 ## Decisions to carry forward
 

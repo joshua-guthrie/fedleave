@@ -29,7 +29,7 @@ Settings groups week and display preferences, leave-year maintenance, holiday an
 | Callout | Interaction and states | Requirements |
 | --- | --- | --- |
 | 1–3 | Select a report file through Android, parse in private storage, and review mapped hours, matched replacements and skipped rows. Ask for leave-year setup when needed. A rejected report identifies the row or mapping issue in app terms. | `DATA-WMS-01`, `CAL-YEAR-01` |
-| 4–5 | Return from the import result to the affected dates. The proposed manual payroll action opens a selector when multiple rows match, then shows the selected record, revised hours and reason before applying. | `DATA-WMS-01`, `DATA-PAYROLL-01` |
+| 4–5 | Return from the import result to the affected dates. The manual payroll action opens a selector when multiple rows match, then shows the selected record, revised hours and reason before applying. | `DATA-WMS-01`, `DATA-PAYROLL-01` |
 
 ## Calendar, holidays, and reminders
 
@@ -65,7 +65,7 @@ Settings groups week and display preferences, leave-year maintenance, holiday an
 | Callout | Interaction and states | Requirements |
 | --- | --- | --- |
 | 1 | Compare old and revised opening in an independent year. A linked year routes to source or carryover review. | `YEAR-OPEN-01` |
-| 2–3 | Select the date and input the intended adjustment or accrual rate. Review the effective date, applicable hours, and reason. Keep draft on failure and show the new calculation after save. | `CAL-FORCE-01`, `YEAR-ACC-01` |
+| 2–3 | Select the date and input the intended adjustment or accrual rate. The accrual editor accepts annual or sick. Review the effective date, applicable hours, and reason. Keep draft on failure and show the new calculation after save. | `CAL-FORCE-01`, `YEAR-ACC-01` |
 | 4 | Read the dedicated use-or-lose calculation with its forecast close, carryover cap and excess. It does not alter the data. | `YEAR-CAP-01` |
 
 ## Expiration and approved deadlines

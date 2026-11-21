@@ -23,7 +23,7 @@ Use the pinned source to resolve differences between the older documentation and
 | [Calendar balances](sections/calendar-balances.md) | One date-driven balance panel, its screen states, and the rules for today, historical dates, and pay-period ends. |
 | [Phone navigation and Calendar screens](sections/calendar-screens.md) | Annotated first use, balance states, Calendar navigation, day editing, history and corrections. |
 | [Ledger and leave years](sections/ledger-and-leave-years.md) | Missing-year setup, editing and history, accrual, carryover, expiration, and PPL/FMLA. |
-| [Acceptance plan](testPlan.md) | Synthetic fixtures and reference results for Calendar, ledger, and leave-year cases. |
+| [Acceptance plan](testPlan.md) | Synthetic fixtures, desktop reference results, phone workflow tests, and storage gates. |
 | [Reports, data, and preferences](sections/reports-data-and-preferences.md) | Report calculations and display, compatible sharing and restore, imports, preferences, help, and platform equivalents. |
 | [Report screens and sharing](sections/report-screens.md) | Annotated report navigation, all chart families, filters, source entries, empty states, Share and Print. |
 | [Data, maintenance, and settings screens](sections/data-settings-screens.md) | Annotated backup, restore, imports, ledger maintenance, accounting preferences, and help. |
@@ -31,7 +31,7 @@ Use the pinned source to resolve differences between the older documentation and
 | [Device storage, backups, and sharing](sections/device-storage.md) | Private desktop JSON store, compatible archives, restore recovery, temporary sharing, and round-trip release checks. |
 | [Developer setup and testing](sections/developer-setup-and-testing.md) | Android Studio and emulator setup, physical handset and API coverage, tests and release rehearsal. |
 | [Google Play publishing](sections/google-play.md) | Account and device verification, signed candidate, store listing, test tracks, and production submission. |
-| Implementation milestones | The final review divides implementation into bounded increments and records open decisions. |
+| [Implementation milestones and release decisions](sections/implementation-milestones.md) | Five-hour implementation checkpoints, owner review decisions, and a final specification checklist. |
 
 ## Decisions carried into the first release
 

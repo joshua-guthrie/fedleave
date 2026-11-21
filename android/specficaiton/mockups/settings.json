@@ -207,6 +207,7 @@
         {"type": "action", "text": "Apply adjustment"}
       ]},
       {"id": "ACCRUAL-CHANGE", "title": "Change accrual", "subtitle": "Annual leave · 2026", "items": [
+        {"type": "row", "text": "Leave type", "value": "Annual"},
         {"type": "row", "text": "Effective date", "value": "Jul 12, 2026", "note": 3},
         {"type": "row", "text": "Hours per pay period", "value": "4 h → 6 h"},
         {"type": "text", "text": "The first changed accrual is July 25. Thirteen annual accrual rows will change."},

@@ -7,7 +7,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-
 SURFACE = "#FCFCFF"
 CANVAS = "#E9EEF7"
 INK = "#13223D"
