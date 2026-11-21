@@ -29,7 +29,8 @@ Use the pinned source to resolve differences between the older documentation and
 | [Data, maintenance, and settings screens](sections/data-settings-screens.md) | Annotated backup, restore, imports, ledger maintenance, accounting preferences, and help. |
 | [Shared accounting core and compatibility](sections/core-and-compatibility.md) | Recommended library boundary, bridge proof of concept, and a shared parity fixture contract. |
 | [Device storage, backups, and sharing](sections/device-storage.md) | Private desktop JSON store, compatible archives, restore recovery, temporary sharing, and round-trip release checks. |
-| Release and implementation milestones | Later milestones record testing setup, Google Play steps, and bounded implementation work. |
+| [Developer setup and testing](sections/developer-setup-and-testing.md) | Android Studio and emulator setup, physical handset and API coverage, tests and release rehearsal. |
+| Release and implementation milestones | Later milestones record Google Play steps and bounded implementation work. |
 
 ## Decisions carried into the first release
 

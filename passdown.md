@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–8 of the Android specification are complete. Start milestone 9 with the beginner Android Studio, emulator, physical-phone, and testing walkthrough. See the [milestone 8 passdown](android/specficaiton/passdowns/08-device-storage.md) for storage requirements and the platform gates to carry forward.
+Milestones 1–9 of the Android specification are complete. Start milestone 10 with Play Console account, signing, listing, verification and testing tracks. The [milestone 9 passdown](android/specficaiton/passdowns/09-developer-setup.md) records the tools guidance and release gates to carry forward.
 
 ## Decisions to carry forward
 
