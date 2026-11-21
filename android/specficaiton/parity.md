@@ -42,4 +42,45 @@ The [ledger requirements](sections/ledger-and-leave-years.md) describe the deskt
 | `EXP-01` | **Expiring Leave Status** shows deadlines and lot usage guidance. Preferences set reminder thresholds. | Expiration list, lot details, and urgent in-app reminder. | `EXPIRATION-LIST`, `LOT-DETAIL`, `EXPIRATION-REMINDER` | [T-EXP-01](testPlan.md#ledger-and-leave-year-acceptance) | — |
 | `EXP-02` | The desktop CLI records an extension on an eligible expiring lot. | Review and record an approved deadline extension from lot details. | `LOT-EXTENSION` | [T-EXP-02](testPlan.md#ledger-and-leave-year-acceptance) | — |
 | `PARENT-01` | Day edit exposes PPL grant and use. Desktop balances and expirations show the applicable event windows. | Dated grant and use with separate window details. | `DAY-EDIT`, `PPL-WINDOWS` | [T-PARENT-01](testPlan.md#ledger-and-leave-year-acceptance) | Grant-entry layout. |
-| `PARENT-02` | Desktop separately reports PPL-derived and manual FMLA. Day edit asks for overlap acknowledgement. | Track FMLA once per use and show capacity or the reason it is unavailable. | `FMLA-OVERLAP-REVIEW`, `FMLA-STATUS` | [T-PARENT-02](testPlan.md#ledger-and-leave-year-acceptance) | History coverage settings in milestone 3. |
+| `PARENT-02` | Desktop separately reports PPL-derived and manual FMLA. Day edit asks for overlap acknowledgement. | Track FMLA once per use and show capacity or the reason it is unavailable. | `FMLA-OVERLAP-REVIEW`, `FMLA-STATUS` | [T-PARENT-02](testPlan.md#ledger-and-leave-year-acceptance) | History coverage is reviewed under `PREF-RULE-01`. |
+
+## Reports
+
+| Function ID | Desktop entry point and observed behavior | Android disposition | Screen or flow ID | Acceptance test ID | Open decision |
+| --- | --- | --- | --- | --- | --- |
+| `REP-SUM-01` | Analytics **Summary** and global year, refresh and data-quality notices. | Reports home and year summary with recorded, scheduled and full-year context. | `REPORTS-HOME`, `REPORT-SUMMARY` | [T-REP-SUM-01](testPlan.md#reports-acceptance) | — |
+| `REP-SEA-01` | **Seasonality** supports five analyses and category/activity choices for three groupings. | Analysis and leave type controls over a chart and exact table. | `REPORT-SEASONALITY`, `REPORT-FILTERS`, `REPORT-ENTRIES` | [T-REP-SEA-01](testPlan.md#reports-acceptance) | — |
+| `REP-HEAT-01` | **Calendar Heatmap** has nonzero data selectors and year and month layouts. | Both layouts with date details, exact values and source entries. | `REPORT-HEATMAP`, `REPORT-ENTRIES` | [T-REP-HEAT-01](testPlan.md#reports-acceptance) | Compact layout for year view. |
+| `REP-LIFE-01` | **Overtime, Comp, and Credit** has seven summary, lot, performance and monthly views. | Lifecycle report with an analysis selector, table and source details. | `REPORT-LIFECYCLE`, `REPORT-ENTRIES` | [T-REP-LIFE-01](testPlan.md#reports-acceptance) | — |
+| `REP-CUM-01` | **Cumulative Usage** charts selected absence categories across one leave year. | Chart and table for one category or an explicit sum. | `REPORT-CUMULATIVE`, `REPORT-FILTERS`, `REPORT-ENTRIES` | [T-REP-CUM-01](testPlan.md#reports-acceptance) | — |
+| `REP-CHART-01` | Calendar offers six category balance charts. | One report workflow for the six series at period-end cutoffs. | `REPORT-BALANCE-CHART`, `REPORT-FILTERS` | [T-REP-CHART-01](testPlan.md#reports-acceptance) | — |
+| `REP-YOY-01` | Calendar and chart tools compare seven category values as of a chosen month/day across years. | Comparison chart and dated table with a category and date selector. | `REPORT-YEARLY`, `REPORT-FILTERS` | [T-REP-YOY-01](testPlan.md#reports-acceptance) | — |
+| `REP-MONTH-01` | Calendar preview, print, PDF, and the month companion PNG. | An on-phone month preview, Share as PDF or PNG, and platform print. | `REPORT-MONTH`, `SHARE-REPORT`, `PRINT-REPORT` | [T-REP-MONTH-01](testPlan.md#reports-acceptance) | Exact print layout in Android. |
+| `REP-SHARE-01` | Chart windows save graphics and PDF or print. | Share the active filtered report via the Android Sharesheet, with platform print as a secondary action. | `SHARE-REPORT`, `PRINT-REPORT` | [T-REP-SHARE-01](testPlan.md#reports-acceptance) | — |
+
+## Data, settings, and help
+
+| Function ID | Desktop entry point and observed behavior | Android disposition | Screen or flow ID | Acceptance test ID | Open decision |
+| --- | --- | --- | --- | --- | --- |
+| `DATA-SHARE-01` | **Export FedLeave Data** produces a schema-v1 JSON archive. | **Share backup** prepares the same compatible archive and opens Sharesheet. | `DATA-HOME`, `SHARE-BACKUP` | [T-DATA-SHARE-01](testPlan.md#data-and-preferences-acceptance) | — |
+| `DATA-RESTORE-01` | **Import FedLeave Data** supports merge or replace and the CLI accepts a single leave year. | Open the system picker, validate and preview, confirm, and recover safely on failure. | `RESTORE-PICKER`, `RESTORE-REVIEW`, `RESTORE-RESULT` | [T-DATA-RESTORE-01](testPlan.md#data-and-preferences-acceptance) | Staging and recovery in the storage milestone. |
+| `DATA-WMS-01` | **Import From External App** reads FRC-E WMS HTML and replaces matching ledger activity. | Local file selection, read-only review, confirmation and explicit result. | `WMS-PICKER`, `WMS-REVIEW`, `WMS-RESULT` | [T-DATA-WMS-01](testPlan.md#data-and-preferences-acceptance) | Verify fallback for a report with an unrecognized agency schedule. |
+| `DATA-PAYROLL-01` | Desktop command updates or adds an entry by date/category/direction and can require an ID. | Draft advanced transaction action, with import covering supported WMS reports. | `PAYROLL-REVIEW` | [T-DATA-PAYROLL-01](testPlan.md#data-and-preferences-acceptance) | Confirm the separate phone entry point with the project owner. |
+| `DATA-VALIDATE-01` | **Validate Data** checks the backend data, including parental validation. | On-demand data health with warnings and remedies. | `DATA-CHECK` | [T-DATA-VALIDATE-01](testPlan.md#data-and-preferences-acceptance) | — |
+| `DATA-REPAIR-01` | CLI carryover reconciliation includes explicit legacy opening repair. | Offer repair for diagnosed duplicate opening records from data health or carryover review. | `CARRYOVER-REPAIR` | [T-DATA-REPAIR-01](testPlan.md#data-and-preferences-acceptance) | — |
+| `PREF-YEAR-01` | Calendar **Change Leave Year** and Analytics year controls select an available year. | Calendar year chooser and independent report year filter. | `LEAVE-YEAR-CHOOSER`, `REPORTS-HOME` | [T-PREF-YEAR-01](testPlan.md#data-and-preferences-acceptance) | — |
+| `PREF-CAL-01` | Calendar preferences and View toggles set first weekday, payday offset, marker visibility, font size. | Calendar preferences and Android text scaling. | `PREF-CALENDAR` | [T-PREF-CAL-01](testPlan.md#data-and-preferences-acceptance) | — |
+| `PREF-HOL-01` | Holiday tooling reads, generates and imports observed dates and writes a cache. | Review cache, regenerate offline and import an ICS file. | `PREF-HOLIDAYS`, `HOLIDAY-PICKER` | [T-PREF-HOL-01](testPlan.md#data-and-preferences-acceptance) | Decide if a network source belongs in the initial release. |
+| `PREF-RULE-01` | Desktop accounting reads the configured tour, increment, defaults, category policies and FMLA coverage. | Advanced accounting settings and a history review, with explicit confirmation for changes that affect balances. | `PREF-ACCOUNTING`, `FMLA-HISTORY-REVIEW` | [T-PREF-RULE-01](testPlan.md#data-and-preferences-acceptance) | Which agency-specific rules need direct editing in the first release. |
+| `PREF-REM-01` | Expiration reminders support a configured set of pay-period thresholds. | Edit local thresholds and show useful in-app reminders. | `PREF-REMINDERS` | [T-PREF-REM-01](testPlan.md#data-and-preferences-acceptance) | — |
+| `HELP-01` | Calendar and Analytics help, leave abbreviations, project link and About. | Offline in-app help, abbreviation list, version and external project link. | `HELP-HOME`, `HELP-ABOUT` | [T-HELP-01](testPlan.md#data-and-preferences-acceptance) | — |
+
+## Scope exceptions and platform equivalents
+
+| Function ID | Desktop capability | Android disposition | Acceptance test ID |
+| --- | --- | --- | --- |
+| `SCOPE-PLANNER-01` | Standalone What-if Planner. | Deferred beyond the first release. Ledger planning status and projections remain in scope. | [T-SCOPE-PLANNER-01](testPlan.md#scope-acceptance) |
+| `SCOPE-TOOLS-01` | Executable path, arbitrary data directory, CLI flags and raw snapshots, MCP and AI integrations. | Desktop tooling. Android exposes the underlying in-scope app workflows directly and keeps the data store private. | [T-SCOPE-TOOLS-01](testPlan.md#scope-acceptance) |
+| `SCOPE-OS-01` | Desktop installer updater, file-save locations, and exit commands. | Platform update, sharing, file-opening, printing, and navigation behavior. | [T-SCOPE-OS-01](testPlan.md#scope-acceptance) |
+
+See the [desktop sources and decisions](sections/reports-data-and-preferences.md) for the rows above.

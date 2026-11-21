@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1 and 2 of the approved Android specification are complete. Start milestone 3 by adding the remaining desktop capabilities to the [parity matrix](android/specficaiton/parity.md). The [milestone 2 passdown](android/specficaiton/passdowns/02-ledger-and-year-parity.md) has the exact files and entry points to review. See the [milestone 1 passdown](android/specficaiton/passdowns/01-baseline.md) for the pinned desktop build and Calendar balance reference.
+Milestones 1–3 of the Android specification are complete. Start milestone 4 with annotated first-launch, Calendar, day editor and history screens. The [milestone 3 passdown](android/specficaiton/passdowns/03-remaining-features.md) records the reviewed workflows and where to start.
 
 ## Decisions to carry forward
 

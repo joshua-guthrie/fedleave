@@ -19,11 +19,11 @@ Use the pinned source to resolve differences between the older documentation and
 
 | Topic | Draft coverage |
 | --- | --- |
-| [Feature parity matrix](parity.md) | Calendar, ledger, and leave-year workflows. |
+| [Feature parity matrix](parity.md) | Calendar, ledger, reports, data maintenance, preferences, and scope exceptions. |
 | [Calendar balances](sections/calendar-balances.md) | One date-driven balance panel, its screen states, and the rules for today, historical dates, and pay-period ends. |
 | [Ledger and leave years](sections/ledger-and-leave-years.md) | Missing-year setup, editing and history, accrual, carryover, expiration, and PPL/FMLA. |
 | [Acceptance plan](testPlan.md) | Synthetic fixtures and reference results for Calendar, ledger, and leave-year cases. |
-| Reports, settings, sharing, and restore | Later milestones cover each workflow and its annotated screens and tests. |
+| [Reports, data, and preferences](sections/reports-data-and-preferences.md) | Report calculations and display, compatible sharing and restore, imports, preferences, help, and platform equivalents. |
 | Architecture, release, and implementation milestones | Later milestones record core decisions, testing setup, Google Play steps, and bounded implementation work. |
 
 ## Decisions carried into the first release
