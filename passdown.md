@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–6 of the Android specification are complete. Start milestone 7 by choosing the CLI and accounting library boundary and defining parity fixtures. See the [milestone 6 passdown](android/specficaiton/passdowns/06-data-settings-screens.md) for complete screen coverage and the core decision to make next.
+Milestones 1–7 of the Android specification are complete. Start milestone 8 with the app-private JSON store, desktop backup compatibility, and ordered restore and share behavior. See the [milestone 7 passdown](android/specficaiton/passdowns/07-shared-core.md) for the architecture decision and exact handoff.
 
 ## Decisions to carry forward
 
