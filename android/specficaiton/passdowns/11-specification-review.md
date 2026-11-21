@@ -13,7 +13,7 @@ The session began at 91% remaining in the five-hour window and closed at 62% rem
 
 ## Verification and release gates
 
-- Matched all 48 parity rows to acceptance cases and all 45 in-scope workflows to rendered images and visible annotations. Rebuilt 19 image boards from editable sources with identical bytes. The boards contain 72 screen IDs and 95 numbered callouts. Validated local paths and anchors.
+- At this checkpoint, matched every parity row to an acceptance case and every in-scope workflow to rendered images and visible annotations. Rebuilt 19 image boards from editable sources with identical bytes. Validated local paths and anchors. [Current data scope](12-data-scope.md)
 - Confirmed the sick accrual fixture in a disposable desktop ledger. A change from 4 to 3 h effective July 12 updates 13 sick rows and yields 111 h sick and 114 h annual at close.
 - The full Linux desktop suite in the sandbox recorded 1,009 passes, 3 skips, and 4 MCP subprocess timeouts. All four timed-out tests passed on a focused rerun with ordinary subprocess permissions. The mockup renderer passed Ruff.
 - The handset, signed Android candidate, and four actual Linux/Windows GUI backup round trips require implementation. Arrange a Windows runner, VM or tester before production release. The native mockups are design references.

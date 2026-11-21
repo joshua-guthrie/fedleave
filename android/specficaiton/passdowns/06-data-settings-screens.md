@@ -2,7 +2,7 @@
 
 November 20, 2026. Desktop reference `7041ce9e9921dd4c407595ed3269de1aca43e699`. The five-hour window had 78% remaining at this checkpoint.
 
-- Added nine annotated boards with 36 screen and state IDs. They show how to find data settings, share or restore a compatible backup, review WMS and payroll entries, set local preferences, get help, and review or repair ledger data. They include restore and carryover recovery and parental or expiration details. [Screen annotations](../sections/data-settings-screens.md)
+- Added nine annotated boards. They show how to find data settings, share or restore a compatible backup, reconcile payroll entries manually, set local preferences, get help, and review or repair ledger data. They include restore and carryover recovery and parental or expiration details. [Screen annotations](../sections/data-settings-screens.md)
 - Linked every one of the 45 in-scope parity rows to its rendered screen IDs. Across milestones 4–6, the sources generate 19 boards, 72 screen IDs and 95 numbered callouts. Validated the images and inspected each board. [Parity matrix](../parity.md) · [Editable settings mockups](../mockups/settings.json)
 - The chosen navigation and light palette are design drafts. The system surfaces are illustrative and the proposed manual payroll action and agency-specific rule editing still need owner review.
 

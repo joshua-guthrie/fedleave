@@ -114,19 +114,18 @@ Use the fixed-date Calendar and accrual fixtures for balance views. Use the refe
 
 ## Data and preferences acceptance
 
-Use synthetic data for the system picker and Sharesheet. Test typical and corrupt data from a disposable store. [Backup fixtures](../../tests/test_export_import.py) · [WMS fixtures](../../tests/test_wms_http_import.py) · [Holiday tests](../../tests/test_holidays_import.py)
+Use synthetic data for the system picker and Sharesheet. Test typical and corrupt data from a disposable store. [Backup fixtures](../../tests/test_export_import.py) · [Holiday tests](../../tests/test_holidays.py)
 
 | Test ID | Procedure | Pass condition |
 | --- | --- | --- |
 | `T-DATA-SHARE-01` | Share a synthetic backup with two years, canonical settings and a holiday cache. Inspect the received JSON and cancel a second share. | The file is a readable schema-v1 archive with matching fields and IDs. The active ledger is unchanged. Windows and Linux GUI round trips are the compatibility gate defined in the storage milestone. |
 | `T-DATA-RESTORE-01` | Select a valid archive and an older single-year backup. Review collisions. Try merge, replace, cancellation, invalid input, and an interrupted write on separate stores. | Merge adds missing IDs and keeps current values on collision. Replace updates included files and preserves unrelated years. Cancel and invalid input preserve existing files. Recovery after interruption restores a fully usable store. |
-| `T-DATA-WMS-01` | Open the reference HTML fixture with 3 h annual and 1.5 h sick on one day. Have an existing annual match and another day of unrelated leave. Import, repeat and test unknown codes. | Preview shows the actual amounts, replacement and ignored rows. Confirmed action replaces only the reviewed matches. Repeat leaves effective amounts unchanged. Cancel and unknown-code validation preserve existing records. |
 | `T-DATA-PAYROLL-01` | Open **Reconcile entry** for one date with two active matches. Apply after selecting a specific ID and entering a reason. | No automatic match selection. Only the reviewed item changes and its ID remains. |
 | `T-DATA-VALIDATE-01` | Check a valid store, one with an unreadable ledger, and one with invalid parental data. | Valid check completes. Each problem points to the affected year with a recovery path. Validation writes nothing. |
 | `T-DATA-REPAIR-01` | Preview the legacy opening fixture containing both stored metadata and a mirrored opening transaction. Cancel once, then confirm and repeat. | The opening is counted once throughout. Confirmed repair changes only the reviewed generated representation, retains genuine activity, and is idempotent. |
 | `T-PREF-YEAR-01` | In Calendar switch among two known years, then switch the report year separately and reopen Calendar. | Browsing follows the Calendar year. The balance keeps its date context and fresh launch opens Today. Reports show the selected report year without changing ledger data. |
 | `T-PREF-CAL-01` | Switch first weekday, set a payday offset and toggle all four Calendar display flags. Increase system text size. | Markers and display follow preferences and remain legible. The balance picker still labels period ends. No accounting date or amount changes. |
-| `T-PREF-HOL-01` | In airplane mode read existing observed dates and import a synthetic ICS. Try invalid ICS and an offline regeneration. | Valid dates display. Invalid input leaves the prior cache intact. A supported regeneration reports its source and dates and makes no network request. |
+| `T-PREF-HOL-01` | In airplane mode read observed dates from a restored synthetic FedLeave backup. Regenerate the dates offline, then simulate a generation failure. | Restored dates display. Regeneration reports its source and dates and makes no network request. A failure leaves the last valid cache intact. |
 | `T-PREF-RULE-01` | Read an imported work tour and time increment. Preview a new tour and confirm. Review known FMLA history start in a separate copy. | The configured tour is displayed and past recorded hours and tours are preserved. FMLA capacity becomes verified only when qualifying coverage and tour data are present. Unsupported additive fields remain intact. |
 | `T-PREF-REM-01` | Set thresholds to one and three periods and reopen the app with an urgent lot twice on the same date. | Thresholds persist, the report reflects the selection, and the reminder appears at most once that day. |
 | `T-HELP-01` | In airplane mode open help, abbreviations and About from Settings and from a report. | The pages explain the current app, show the version and use readable offline content. Project website is clearly an external action. |
@@ -137,7 +136,7 @@ Use synthetic data for the system picker and Sharesheet. Test typical and corrup
 | --- | --- | --- |
 | `T-SCOPE-PLANNER-01` | Review initial release navigation and Ledger future dates. | The What-if Planner is absent. Real planned entries and dated lookups remain available. |
 | `T-SCOPE-TOOLS-01` | Review Settings, help and data actions. | App language covers all in-scope tasks. There are no desktop process paths, raw snapshot tools, CLI, MCP or AI actions in the phone UI and help. |
-| `T-SCOPE-OS-01` | Exercise Back, report sharing, compatible file picking and the release update process. | The platform actions handle navigation, content exchange and version updates. The app offers the specified backup and report share formats and on-screen tables. Normal app flows require no desktop installer, CSV export, PDF destination preference or Exit command. |
+| `T-SCOPE-OS-01` | Exercise Back, report sharing, backup file selection and the release update process. Inspect every entry point that reads a user-selected file. | The platform actions handle navigation, content exchange and version updates. **Restore backup** is the sole inbound file workflow and accepts compatible FedLeave backups. Share offers the specified backup and report formats. Normal app flows require no desktop installer, CSV export, PDF destination preference or Exit command. |
 
 ## Storage and interchange acceptance
 

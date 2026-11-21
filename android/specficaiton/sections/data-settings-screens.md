@@ -22,23 +22,23 @@ Settings groups week and display preferences, leave-year maintenance, holiday an
 | 1–3 | Show the source filename, candidate years, record collisions and affected settings and caches for the selected mode. A failed validation disables confirmation. Confirm changes only from a current, complete preview. | `DATA-RESTORE-01` |
 | 4–6 | Show applied or retained record counts on success, a cause and another-picker action on rejection, and a recovery action after interruption. Restore from first launch returns to Calendar after success. Recovery takes priority over displaying incomplete data. | `DATA-RESTORE-01` |
 
-## WMS import and manual payroll review
+## Manual payroll review
 
-![System report picker, WMS review, result, and ambiguous manual payroll selection](../mockups/settings-import.png)
+![Choose a stored transaction and review the manually entered change](../mockups/settings-reconcile.png)
 
 | Callout | Interaction and states | Requirements |
 | --- | --- | --- |
-| 1–3 | Select a report file through Android, parse in private storage, and review mapped hours, matched replacements and skipped rows. Ask for leave-year setup when needed. A rejected report identifies the row or mapping issue in app terms. | `DATA-WMS-01`, `CAL-YEAR-01` |
-| 4–5 | Return from the import result to the affected dates. The manual payroll action opens a selector when multiple rows match, then shows the selected record, revised hours and reason before applying. | `DATA-WMS-01`, `DATA-PAYROLL-01` |
+| 1 | Open **Reconcile entry** from a transaction or day. If several entries match, choose the exact entry. | `DATA-PAYROLL-01` |
+| 2–3 | Enter the revised hours and reason, then review the selected record before saving. Cancel returns to the caller without a write. | `DATA-PAYROLL-01` |
 
 ## Calendar, holidays, and reminders
 
-![Year selector, Calendar preferences, holiday cache and picker, and configurable expiration reminders](../mockups/settings-calendar.png)
+![Year selector, Calendar preferences, offline holidays, and configurable expiration reminders](../mockups/settings-calendar.png)
 
 | Callout | Interaction and states | Requirements |
 | --- | --- | --- |
 | 1–2 | Show actual year bounds in the chooser. Apply Calendar display choices without changing calculation dates. Respect larger system fonts and retain period-end labels in the balance picker. | `PREF-YEAR-01`, `PREF-CAL-01` |
-| 3–5 | List observed holiday dates and their cache source. Offer offline regeneration and a picker with import review. Preserve the readable cache if validation fails. Keep nonnegative, distinct reminder thresholds in pay periods. | `PREF-HOL-01`, `PREF-REM-01` |
+| 3–4 | List locally cached observed holiday dates and their source. Offer offline regeneration and preserve the readable cache if it fails. Keep nonnegative, distinct reminder thresholds in pay periods. | `PREF-HOL-01`, `PREF-REM-01` |
 
 ## Accounting settings and help
 

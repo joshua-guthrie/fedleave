@@ -34,7 +34,7 @@ flowchart LR
 | Add, set day, correct, delete, adjust, accrual edit | Existing records, selected IDs and changes, explicit user decisions where required | Validation result and proposed canonical ledger with precise target and changed IDs. |
 | Manual or linked setup, carryover and recovery planning | Schedule, configuration, relevant linked ledger snapshots, reviewed fingerprint | New or revised ledger proposal with dates, amounts, affected years, warnings, provenance and conflicts. Store recovery remains adapter-owned. |
 | Expirations, PPL/FMLA, analysis, chart and month data | Resolved read-only snapshot and selected filters | Exact values, cutoffs, warnings, lot/window identity and contributing rows. |
-| Backup restore and WMS import validation | Parsed archive or report and candidate merged store | Complete validation and a proposal that can be reviewed and applied once. |
+| Backup restore validation | Parsed FedLeave backup and candidate store | Complete validation and a proposal that can be reviewed and applied once. |
 
 ## Proof-of-concept exit conditions
 

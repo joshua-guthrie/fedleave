@@ -37,7 +37,7 @@ Phone forms use full leave-type names, a dated heading, positive hour fields wit
 
 **CAL-FORCE-01 · Adjust to a verified balance.** In maintenance, show the current dated balance, target, difference, and required comment. The saved adjustment records a reconciled increase or decrease. Repeating it for the same date and category replaces the previous adjustment and calculates the difference from the unadjusted result. If the target equals that result there is no adjustment row. Restrict the operation to eligible categories and a finite nonnegative target. PPL and FMLA changes go through their dated records. [Desktop force balance](../../../src/fedleave/commands/forced_balance.py)
 
-An advanced **Reconcile entry** action lets the user review a payroll change with its reason and source. If several rows match the date, category and direction, the user picks the exact transaction. The adjacent WMS import remains a separate reviewed operation. [Payroll reconciliation command](../../../src/fedleave/commands/transactions.py#L456) · [Phone payroll flow](data-settings-screens.md#wms-import-and-manual-payroll-review)
+An advanced **Reconcile entry** action lets the user enter and review a payroll change with its reason and source. If several rows match the date, category and direction, the user picks the exact transaction. [Payroll reconciliation command](../../../src/fedleave/commands/transactions.py#L456) · [Phone payroll flow](data-settings-screens.md#manual-payroll-review)
 
 ## Accrual, caps, and expiration
 

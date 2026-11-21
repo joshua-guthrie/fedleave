@@ -19,7 +19,7 @@ Use a short `specification.md` as an index with requirements by topic under `sec
 | Feature parity | A row for each existing function, its proposed phone workflow or other disposition, and the evidence needed to verify it. |
 | Navigation and screens | A navigation map, annotated screen images, interaction rules, and accessibility and visual design standards. |
 | Rules and architecture | The calculation contract, how the Android app and desktop CLI use core logic, and the cases that must produce identical results. |
-| On-device data and sharing | Desktop-compatible JSON storage and backups, Android sharing, import and restore, upgrades, privacy, and recovery. |
+| On-device data and sharing | Desktop-compatible JSON storage, backup sharing and restore, upgrades, privacy, and recovery. |
 | Testing and Google Play | Beginner setup, automated and manual testing, release checks, publisher account steps, and the production submission plan. |
 | Implementation milestones | Small, testable increments with dependencies, acceptance checks, and a passdown at the end of each usage window. |
 
@@ -52,7 +52,7 @@ Break the first inventory into groups that can be finished independently.
 - **Calendar and ledger.** Today, month and day navigation, pay days and pay periods, balances, daily entries and free-text comments, transaction history, planned leave, corrections and voids, and force balance.
 - **Leave-year rules.** Manual starting balances, carryover and reconciliation, accrual schedules and changes, caps, expirations and use-or-lose, lot allocation, all supported leave categories, and paid parental leave and FMLA.
 - **Reports.** Analytics sections and their filters, source transaction drill-downs, yearly charts and comparisons, and month report graphics. Record the desktop What-if Planner as deferred for the first Android release.
-- **Import, sharing, and settings.** Compatible FedLeave backup and restore, WMS HTML import, holiday cache and calendar sources, report and backup sharing, presentation preferences, help, and about. Check which report formats the desktop actually makes available.
+- **Backups, sharing, and settings.** Compatible FedLeave backup and restore, locally generated or restored holiday dates, report and backup sharing, presentation preferences, help, and about. Check which report formats the desktop actually makes available. Android's inbound file workflow is limited to restoring FedLeave backups.
 
 ## Design the phone screens
 
@@ -110,7 +110,7 @@ Record tradeoffs in duplication, portability, packaging size, and maintenance. L
 | Test level | What the specification should require |
 | --- | --- |
 | Fast unit and parity tests on the computer | Shared synthetic ledgers for accrual, carryover, expiry, fractions, year boundaries, and conflicting transactions. Fix the clock and relevant settings and compare Android results with the desktop reference. |
-| Android integration tests | App-private JSON persistence, upgrades, app-driven creation of missing leave years, backup round trips with the Linux and Windows GUIs, duplicate and invalid imports, and interrupted writes. |
+| Android integration tests | App-private JSON persistence, upgrades, app-driven creation of missing leave years, backup round trips with the Linux and Windows GUIs, duplicate and invalid backups, and interrupted writes. |
 | Screen and accessibility tests | Compose tests for entry and validation, navigation and Back, canceled edits, and recovery after app restart. Check that Share opens the system Sharesheet with the intended file and that dismissing it leaves the ledger intact. Review small-screen layouts, large text, dark mode, and TalkBack. |
 | Manual release rehearsals | On a real phone, install, set up or restore a fictional leave year, enter and correct leave, and reopen the app in airplane mode. Use Share for a graph and a backup in compatible receiving apps. Test restoring a received backup and updating from the previous build without losing data. Keep results tied to the build ID. |
 
@@ -131,10 +131,10 @@ Each row below is a **specification-writing milestone** sized to fit in one five
 | --- | --- | --- |
 | 1. Baseline and scope | Create the spec index, record the desktop reference build, and inventory the core Calendar workflows. | The parity table has its columns, first rows, and a list of remaining sources. |
 | 2. Ledger and year parity | Enumerate transaction editing, leave-year creation, carryover, accrual, and expiration rules. Split PPL/FMLA and lot rules into their own part if needed. | Each reviewed workflow has a source and a testable expected outcome. |
-| 3. Remaining features | Inventory reports, imports, preferences, and the underlying behaviors exposed by desktop tools. Record the Planner and desktop integrations as scope exceptions. | Each desktop capability has a disposition or a named question to resolve. |
+| 3. Remaining features | Inventory reports, backup restore, preferences, and the underlying behaviors exposed by desktop tools. Record the Planner and desktop integrations as scope exceptions. | Each desktop capability has a disposition or a named question to resolve. |
 | 4. Phone navigation and Calendar | Draft annotated first launch, navigation, balances, day edit, and history images. | Each reviewed Calendar function points to a labeled callout and screen ID. |
 | 5. Report screens | Draft annotated reports, charts, filters, and sharing flows. | Each reviewed function has a labeled mockup and covers the relevant empty or error states. |
-| 6. Data and settings screens | Draft annotated import, restore, backup sharing, preferences, and help flows. | Every remaining phone function points to a screen or an annotated flow. |
+| 6. Data and settings screens | Draft annotated backup restore and sharing, maintenance, preferences, and help flows. | Every remaining phone function points to a screen or an annotated flow. |
 | 7. Core and compatibility | Write the CLI/library boundary decision and define the parity fixtures that will compare the engines. | Expected results and any proof-of-concept questions are recorded. |
 | 8. Device storage and file exchange | Write the on-device JSON contract, desktop backup compatibility, sharing rules, and migration behavior. | Every store and shared file type has a defined lifecycle and a verification test. |
 | 9. Tools and testing | Write the install walkthrough, test cases, handset and emulator coverage, and release rehearsal. | A beginner can identify the tools and run each planned check. |

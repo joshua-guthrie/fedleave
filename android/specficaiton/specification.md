@@ -17,6 +17,8 @@ Use the pinned source to resolve differences between the older documentation and
 
 ## Specification index
 
+For a visual review, start with the [Calendar mockups](sections/calendar-screens.md), [Reports mockups](sections/report-screens.md), or [Data and preferences mockups](sections/data-settings-screens.md).
+
 | Topic | Draft coverage |
 | --- | --- |
 | [Feature parity matrix](parity.md) | Calendar, ledger, reports, data maintenance, preferences, and scope exceptions. |
@@ -24,9 +26,9 @@ Use the pinned source to resolve differences between the older documentation and
 | [Phone navigation and Calendar screens](sections/calendar-screens.md) | Annotated first use, balance states, Calendar navigation, day editing, history and corrections. |
 | [Ledger and leave years](sections/ledger-and-leave-years.md) | Missing-year setup, editing and history, accrual, carryover, expiration, and PPL/FMLA. |
 | [Acceptance plan](testPlan.md) | Synthetic fixtures, desktop reference results, phone workflow tests, and storage gates. |
-| [Reports, data, and preferences](sections/reports-data-and-preferences.md) | Report calculations and display, compatible sharing and restore, imports, preferences, help, and platform equivalents. |
+| [Reports, data, and preferences](sections/reports-data-and-preferences.md) | Report calculations and display, compatible sharing and restore, preferences, help, and platform equivalents. |
 | [Report screens and sharing](sections/report-screens.md) | Annotated report navigation, all chart families, filters, source entries, empty states, Share and Print. |
-| [Data, maintenance, and settings screens](sections/data-settings-screens.md) | Annotated backup, restore, imports, ledger maintenance, accounting preferences, and help. |
+| [Data, maintenance, and settings screens](sections/data-settings-screens.md) | Annotated backup, restore, ledger maintenance, accounting preferences, and help. |
 | [Shared accounting core and compatibility](sections/core-and-compatibility.md) | Recommended library boundary, bridge proof of concept, and a shared parity fixture contract. |
 | [Device storage, backups, and sharing](sections/device-storage.md) | Private desktop JSON store, compatible archives, restore recovery, temporary sharing, and round-trip release checks. |
 | [Developer setup and testing](sections/developer-setup-and-testing.md) | Android Studio and emulator setup, physical handset and API coverage, tests and release rehearsal. |
@@ -36,5 +38,5 @@ Use the pinned source to resolve differences between the older documentation and
 ## Decisions carried into the first release
 
 - Use Kotlin and Compose with Material 3 as the starting stack. Scope the first release using the [GitHub issue decisions](specificationPlan.md#github-issues-reflected-in-this-draft). The What-if Planner is deferred. Android's interface and help use app language, and MCP and AI are outside the Android scope.
-- Keep the phone's working datastore in private, desktop-compatible JSON. Portable backups use the existing FedLeave archive format. A user opens the system file picker for restore and the Sharesheet for outbound sharing.
+- Keep the phone's working datastore in private, desktop-compatible JSON. A user opens the system file picker to restore a compatible FedLeave backup. Use the Sharesheet for backups and reports.
 - Use one Calendar balance panel for today, any selected date, and a pay-period closing date. Show future balances as projections. The [Calendar section](sections/calendar-balances.md) defines the first slice and the decisions that still need review.

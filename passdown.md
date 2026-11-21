@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-The Android specification draft is complete through milestone 11. Start with the [specification index](android/specficaiton/specification.md) and [draft decisions for owner review](android/specficaiton/sections/implementation-milestones.md#draft-decisions-for-owner-review). The first implementation checkpoint after review is **I01**, a minimal Compose project opened and run from Android Studio. See the [final specification passdown](android/specficaiton/passdowns/11-specification-review.md) for verification and the handoff.
+The Android specification draft is complete through milestone 11, with the November 21 [data scope revision](android/specficaiton/passdowns/12-data-scope.md). Start with the [specification index](android/specficaiton/specification.md) and [draft decisions for owner review](android/specficaiton/sections/implementation-milestones.md#draft-decisions-for-owner-review). The first implementation checkpoint after review is **I01**, a minimal Compose project opened and run from Android Studio.
 
 Specification work finished with 62% of the five-hour window remaining. Milestones 3–11 each have their own local commit.
 
@@ -12,7 +12,7 @@ Specification work finished with 62% of the five-hour window remaining. Mileston
 - The phone spec will account for each desktop capability and link every phone workflow to annotated mockups and acceptance tests. Kotlin, Compose, and Android Studio are the recommended starting point. The existing desktop CLI stays available through its callable core.
 - Android Calendar should have one **Balances** panel. It opens at **As of today**. A date picker marks pay-period ends, and selecting a date updates the same panel. Show future dates as projections and explore expandable earned and used details for pay periods.
 - Prompt from the task when Today or a deliberate future request needs a missing leave year. Preview before creating, resolve by stored dates, and suggest carryover from an eligible adjacent source. [Draft ledger requirements](android/specficaiton/sections/ledger-and-leave-years.md)
-- Keep the desktop-compatible JSON store on the phone. Use the Android Sharesheet for supported reports, images, and existing-format backups.
+- Keep the desktop-compatible JSON store on the phone. **Restore backup** is the sole inbound file workflow. Use the Android Sharesheet for supported reports, images, and existing-format backups.
 - Treat 30% remaining in the five-hour window as the cutoff. Record a passdown and make a local commit at each specification milestone. Split large milestones by screen or behavior, and record a final checkpoint if the window ends mid-milestone.
 
 ## Previous plan publication

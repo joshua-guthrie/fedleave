@@ -15,7 +15,6 @@
         {"type": "card", "text": "On this device", "body": "2 leave years · 2026–2027. FedLeave keeps working files private to this app.", "note": 2},
         {"type": "action", "text": "Share backup", "note": 3},
         {"type": "action", "text": "Restore backup", "emphasis": false},
-        {"type": "action", "text": "Import WMS leave report", "emphasis": false},
         {"type": "action", "text": "Check data", "emphasis": false}
       ]},
       {"id": "SHARE-BACKUP", "title": "Share backup", "subtitle": "Android system sheet · illustrative", "items": [
@@ -62,33 +61,24 @@
     ]
   },
   {
-    "file": "settings-import.png",
-    "title": "Review payroll records before importing",
-    "subtitle": "Choose the report, inspect matching records, and confirm the proposed changes.",
+    "file": "settings-reconcile.png",
+    "title": "Reconcile a transaction manually",
+    "subtitle": "Select a matching entry and review the revised hours before saving.",
     "screens": [
-      {"id": "WMS-PICKER", "title": "Open WMS report", "subtitle": "Android file picker · illustrative", "items": [
-        {"type": "card", "text": "clocking-report.html", "body": "FRC-E WMS clocking report", "note": 1},
-        {"type": "action", "text": "Open"},
-        {"type": "action", "text": "Cancel", "emphasis": false}
-      ]},
-      {"id": "WMS-REVIEW", "title": "Review WMS import", "subtitle": "clocking-report.html", "items": [
-        {"type": "row", "text": "Jan 13 · Annual", "value": "3 h used", "note": 2},
-        {"type": "row", "text": "Jan 13 · Sick", "value": "1.5 h used"},
-        {"type": "row", "text": "Matching entries to replace", "value": "1"},
-        {"type": "row", "text": "Regular-time rows skipped", "value": "2"},
-        {"type": "action", "text": "Review replacement", "emphasis": false},
-        {"type": "action", "text": "Apply import", "note": 3}
-      ]},
-      {"id": "WMS-RESULT", "title": "Review import result", "items": [
-        {"type": "card", "text": "2 leave entries recorded", "body": "Replaced 1 matching entry and skipped 2 regular-time rows.", "note": 4},
-        {"type": "action", "text": "View transactions"}
-      ]},
       {"id": "PAYROLL-REVIEW", "title": "Reconcile entry", "subtitle": "Jan 13, 2026 · Annual use",
         "items": [
           {"type": "row", "text": "20260113-001", "value": "2 h"},
           {"type": "row", "text": "20260113-002", "value": "1 h"},
-          {"type": "card", "text": "Choose the matching entry", "body": "More than one entry has this date, leave type and direction.", "note": 5},
+          {"type": "card", "text": "Choose the matching entry", "body": "More than one entry has this date, leave type and direction.", "note": 1},
           {"type": "action", "text": "Select entry"}
+        ]
+      },
+      {"id": "PAYROLL-CONFIRM", "title": "Review reconciliation", "subtitle": "Jan 13, 2026 · Record 20260113-001",
+        "items": [
+          {"type": "row", "text": "Annual leave used", "value": "2 h → 3 h", "note": 2},
+          {"type": "row", "text": "Reason", "value": "Verified hours"},
+          {"type": "action", "text": "Save reconciliation", "note": 3},
+          {"type": "action", "text": "Cancel", "emphasis": false}
         ]
       }
     ]
@@ -115,15 +105,10 @@
       {"id": "PREF-HOLIDAYS", "title": "Holidays", "subtitle": "2026 · Cached federal holidays", "items": [
         {"type": "row", "text": "Jan 1", "value": "New Year’s Day", "note": 3},
         {"type": "row", "text": "Jan 19", "value": "MLK Jr. Day"},
-        {"type": "action", "text": "Regenerate offline", "emphasis": false},
-        {"type": "action", "text": "Open holiday calendar"}
-      ]},
-      {"id": "HOLIDAY-PICKER", "title": "Open holiday calendar", "subtitle": "Android file picker · illustrative", "items": [
-        {"type": "card", "text": "agency-holidays.ics", "body": "Calendar file · Review the dates before applying.", "note": 4},
-        {"type": "action", "text": "Open"}
+        {"type": "action", "text": "Regenerate offline", "emphasis": false}
       ]},
       {"id": "PREF-REMINDERS", "title": "Expiration reminders", "items": [
-        {"type": "row", "text": "Pay periods before expiry", "value": "1, 3, 6, 12", "note": 5},
+        {"type": "row", "text": "Pay periods before expiry", "value": "1, 3, 6, 12", "note": 4},
         {"type": "text", "text": "FedLeave shows a reminder in the app when tracked leave is due soon."},
         {"type": "action", "text": "Save thresholds"}
       ]}
