@@ -1,5 +1,7 @@
 # Phone navigation and Calendar screens
 
+The main Calendar board below shows **Option A**. The owner still needs to choose between this layout and the alternative. [Compare both layouts](calendar-layout-options.md)
+
 Use three persistent destinations for familiar tasks. **Calendar** opens first and keeps daily work nearby. **Reports** owns analytical views and month previews. **Settings** owns preferences, data maintenance and help. Opening a detailed task or system sheet retains the calling destination. Use the Calendar, Reports and Settings labels alongside any icons. The main screens use a fixed blue Material 3 palette for the specification. Implementation also needs a coordinated dark palette, 48 dp touch targets, Android text scaling, keyboard-safe layouts and TalkBack labels. Numbers on the mockups are specification annotations.
 
 [Calendar behavior](calendar-balances.md) · [Ledger and leave-year behavior](ledger-and-leave-years.md) · [Acceptance plan](../testPlan.md#calendar-acceptance-cases)

@@ -49,15 +49,17 @@ Substitute each date in the expected-results table for the balance command. The 
 | Test ID | Procedure | Pass condition |
 | --- | --- | --- |
 | `T-CAL-BAL-01` | Open Calendar on a fresh launch with the fixture and fixed date. Advance the local clock to January 17 while Today is active. | The only Balances panel shows **As of today**, January 16, annual 90 h, and sick 20 h. The date updates to January 17 and the balances remain 90 h and 20 h. |
-| `T-CAL-BAL-02` | Open **Change date**, choose January 13, and confirm. Open it again and dismiss with Back. | The same panel shows January 13 with annual 92 h and sick 20 h. Dismissal leaves the selection and figures in place. |
+| `T-CAL-BAL-02` | Open the balance picker using the chosen layout's date control, choose January 13, and confirm. Open it again and dismiss with Back. | The same panel shows January 13 with annual 92 h and sick 20 h. Dismissal leaves the selection and figures in place. |
 | `T-CAL-BAL-03` | Inspect the picker and select January 24 using its marked cell or quick choice. Open pay-period details. | January 24 is marked and announced as period end. January 30 is distinct as payday. The panel shows January 24, annual 92 h, and sick 24 h. Details show period 1, its date range, payday, annual 6 h earned and 14 h used, and sick 4 h earned and 0 h used. |
 | `T-CAL-BAL-04` | Select January 22, then January 24, then January 25. | The panel labels each **Projected balance** with its date and matches the three dated results. January 22 excludes the January 24 accrual. January 24 excludes January 25's use. |
 | `T-CAL-BAL-05` | Choose a future balance date and browse another month, then tap **Today**. Reopen Calendar from a fresh launch after choosing an ordinary date. | Both paths show January and the January 16 Today values. The Today action restores the selected calendar day to January 16. |
 | `T-CAL-BAL-06` | With January 13 showing, simulate a failed retrieval for January 22. Also deliver a successful older response after a newer date is chosen. | The requested date displays an unavailable state and retry or date-change action. January 13's values never appear under January 22. A late response leaves the new selection intact. |
 | `T-CAL-BAL-07` | Request January 4, 2027 using this fixture and identify the leave year used by the calculation. | Use the 2026 leave year because the date falls in its stored range. Show annual 233 h and sick 120 h through January 4. |
-| `T-CAL-NAV-01` | Select January 13 in the balance picker, navigate to February in the main calendar, and choose an editing day. | The calendar follows the navigation. The panel continues showing January 13 and its figures until the user uses **Change date** or **Today**. |
+| `T-CAL-NAV-01` | Select January 13 in the balance picker, navigate to February in the main calendar, and choose an editing day. | The calendar follows the navigation. The panel continues showing January 13 and its figures until the user confirms another balance date or taps **Today**. |
 
 After the existing-year review and navigation cases, compare a snapshot of the canonical datastore before and after. The date picker and balance calculations leave its contents intact. [Calendar requirements](sections/calendar-balances.md#requirements)
+
+If the owner chooses Option B, run these cases with the tappable balance card, the month selector, and direct day editing on a compact handset. Enable automatic accrual display and add the sample comp entry on January 24. Check that January 24 shows two activity lines and an overflow count and that tapping it reveals the third entry. Check an empty day and large system text. The full-width day list keeps dates actionable when the grid is too narrow. [Calendar layout comparison](sections/calendar-layout-options.md)
 
 ## Ledger and leave-year acceptance
 

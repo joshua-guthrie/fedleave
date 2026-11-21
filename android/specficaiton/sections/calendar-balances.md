@@ -18,13 +18,13 @@ This front-window sample uses fictional November data. The detailed annotated ph
 | ID | Android behavior |
 | --- | --- |
 | `CAL-BAL-01` | A fresh open of Calendar starts on the device's current local date. The panel reads **As of today** and shows the date and balances in hours. Follow the device's local date while Today is active. |
-| `CAL-BAL-02` | **Change date** opens a calendar picker at the panel's current date. On selection and confirmation, update the panel's date and figures together. Dismissing the picker preserves both. |
+| `CAL-BAL-02` | Open a calendar picker at the panel's current date. Option A uses a **Change date** button. Option B makes the balance card tappable. After confirmation, update the panel's date and figures together. Dismissing the picker preserves both. [Layout decision](calendar-layout-options.md) |
 | `CAL-BAL-03` | Mark a pay-period end from the stored schedule in the month grid and picker. Announce **Pay-period end** in the date's accessible label. Provide nearby period ends as quick choices with the date and period number. A selected end date shows that day's closing balance in the same panel. Period details provide the number, start and end dates, payday, and earned and used hours by category. Review the proposed collapsed disclosure in the screen milestone. |
 | `CAL-BAL-04` | For a date later than today, show **Projected balance** and the exact selected date. Use the calculation for that day, with effective scheduled activity and accrued hours through that date. |
 | `CAL-BAL-05` | **Today** restores the current month, active calendar day, and balance date. A fresh open also starts on today after a previous manual date choice. |
 | `CAL-BAL-06` | Keep a balance result paired with the date it covers. If a requested date cannot be loaded, show it with an unavailable state and a retry or date-change action. Carry forward applicable warnings and show an unavailable category value as unavailable. A slow older request must never replace the result for the current selection. |
 | `CAL-BAL-07` | Use the stored leave-year start and end dates to resolve the selected day. A January date can belong to the preceding leave year. Prompt from the current task when an intentional date request needs a missing current or future year. [Leave-year setup](ledger-and-leave-years.md#start-or-find-a-leave-year) |
-| `CAL-NAV-01` | Browsing another month or selecting a calendar day for inspection and editing keeps the balance date selected in the panel. Selecting a date through **Change date** or using **Today** changes the balance cutoff. |
+| `CAL-NAV-01` | Browsing another month or selecting a calendar day for inspection and editing keeps the balance date selected in the panel. Confirming a balance date in the picker or using **Today** changes the balance cutoff. |
 
 ## Data and calculation rules
 

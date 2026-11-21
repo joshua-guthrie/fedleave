@@ -4,6 +4,8 @@
 
 The Android specification draft is complete through milestone 11, with the November 21 [data scope revision](android/specficaiton/passdowns/12-data-scope.md). Start with the [specification index](android/specficaiton/specification.md) and [draft decisions for owner review](android/specficaiton/sections/implementation-milestones.md#draft-decisions-for-owner-review). The first implementation checkpoint after review is **I01**, a minimal Compose project opened and run from Android Studio.
 
+The Calendar main screen decision is pending. Review [Option A and Option B](android/specficaiton/sections/calendar-layout-options.md) before I05. [Calendar alternative passdown](android/specficaiton/passdowns/13-calendar-layout.md)
+
 Specification work finished with 62% of the five-hour window remaining. Milestones 3–11 each have their own local commit.
 
 ## Decisions to carry forward

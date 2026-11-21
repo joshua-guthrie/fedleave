@@ -114,9 +114,14 @@ class Screen:
 
     def row(self, item):
         label, value = item["text"], item.get("value", "")
+        value_end = self.inner_right - 10
         self.box(self.left, self.cursor, self.inner_right, self.cursor + 35, "#F0F4FC", 8)
         self.text(self.left + 10, self.cursor + 17, label, 15, INK, True, "lm")
-        self.text(self.inner_right - 10, self.cursor + 17, value, 14, MUTED, anchor="rm")
+        if item.get("dropdown"):
+            x, y = value_end - 5, self.cursor + 17
+            self.draw.line((x - 4, y - 2, x, y + 2, x + 4, y - 2), fill=PRIMARY, width=2)
+            value_end -= 16
+        self.text(value_end, self.cursor + 17, value, 14, MUTED, anchor="rm")
         self.mark(item.get("note"), self.cursor + 17)
         self.cursor += 42
 
@@ -128,6 +133,8 @@ class Screen:
         color = WARN if item.get("warning") else INK
         self.box(self.left, y, self.inner_right, y + height, fill, 13)
         self.text(self.left + 14, y + 10, item["text"], 16, color, bold=True)
+        if indicator := item.get("indicator"):
+            self.text(self.inner_right - 14, y + 10, indicator, 21, PRIMARY, bold=True, anchor="ra")
         for index, text in enumerate(lines):
             self.text(self.left + 14, y + 34 + 19 * index, text, 14, color)
         self.mark(item.get("note"), y + 19)
@@ -169,7 +176,50 @@ class Screen:
         self.mark(item.get("note"), first_row + 18)
         self.cursor = first_row + 28 * ((item["start"] + item.get("days", 31) - 1) // 7) + 25
         legend = "●  Pay-period end      ▬  Payday" if paydays else "●  Pay-period end"
-        self.paragraph({"text": legend}, 12, MUTED, padding=8)
+        self.paragraph({"text": item.get("legend", legend)}, 12, MUTED, padding=8)
+
+    def activity_calendar(self, item):
+        left = self.x + 8
+        column_width = (PHONE_WIDTH - 16) // 7
+        row_height = 60
+        first_row = self.cursor + 24
+        for column, label in enumerate(("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat")):
+            x = left + column * column_width + column_width // 2
+            self.text(x, self.cursor + 5, label, 11, MUTED, anchor="mm")
+
+        period_ends = set(item.get("ends", []))
+        paydays = set(item.get("paydays", []))
+        activity = item.get("activity", {})
+        for day in range(1, item["days"] + 1):
+            row, column = divmod(item["start"] + day - 1, 7)
+            x = left + column * column_width
+            y = first_row + row * row_height
+            today = day == item.get("today")
+            self.box(x + 1, y + 1, x + column_width - 1, y + row_height - 2, SELECTED if today else "#F0F4FC", 7)
+            if today:
+                self.draw.rounded_rectangle(
+                    (x + 1, y + 1, x + column_width - 1, y + row_height - 2), 7, outline=PRIMARY, width=1,
+                )
+            self.text(x + 5, y + 4, str(day), 13, PRIMARY if today else INK, today or day in period_ends)
+            if day in period_ends:
+                self.draw.ellipse((x + 37, y + 9, x + 43, y + 15), fill=PRIMARY)
+            if day in paydays:
+                self.box(x + 34, y + 10, x + 43, y + 13, "#597451", 1)
+
+            entries = activity.get(str(day), [])
+            for index, entry in enumerate(entries[:2]):
+                line_y = y + 23 + index * 12
+                self.text(x + 5, line_y, entry["text"], 11, INK, bold=True)
+                if entry.get("planned"):
+                    self.text(x + column_width - 5, line_y, "P", 10, PRIMARY, bold=True, anchor="ra")
+            if len(entries) > 2:
+                self.text(x + 5, y + 47, f"+{len(entries) - 2}", 10, PRIMARY, bold=True)
+
+        row_count = (item["start"] + item["days"] + 6) // 7
+        self.mark(item.get("note"), first_row + row_height * 2)
+        self.cursor = first_row + row_count * row_height + 9
+        self.paragraph({"text": "A Annual   S Sick   C Comp   ·   Hours"}, 11, MUTED, padding=0)
+        self.paragraph({"text": "P Planned     ● Period end     — Payday"}, 11, MUTED, padding=4)
 
     def chart(self, item):
         y = self.cursor
