@@ -30,7 +30,8 @@ Use the pinned source to resolve differences between the older documentation and
 | [Shared accounting core and compatibility](sections/core-and-compatibility.md) | Recommended library boundary, bridge proof of concept, and a shared parity fixture contract. |
 | [Device storage, backups, and sharing](sections/device-storage.md) | Private desktop JSON store, compatible archives, restore recovery, temporary sharing, and round-trip release checks. |
 | [Developer setup and testing](sections/developer-setup-and-testing.md) | Android Studio and emulator setup, physical handset and API coverage, tests and release rehearsal. |
-| Release and implementation milestones | Later milestones record Google Play steps and bounded implementation work. |
+| [Google Play publishing](sections/google-play.md) | Account and device verification, signed candidate, store listing, test tracks, and production submission. |
+| Implementation milestones | The final review divides implementation into bounded increments and records open decisions. |
 
 ## Decisions carried into the first release
 

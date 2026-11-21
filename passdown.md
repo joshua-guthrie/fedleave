@@ -2,7 +2,7 @@
 
 ## Where to resume
 
-Milestones 1–9 of the Android specification are complete. Start milestone 10 with Play Console account, signing, listing, verification and testing tracks. The [milestone 9 passdown](android/specficaiton/passdowns/09-developer-setup.md) records the tools guidance and release gates to carry forward.
+Milestones 1–10 of the Android specification are complete. Start the final review and implementation breakdown in milestone 11. The [milestone 10 passdown](android/specficaiton/passdowns/10-google-play.md) records the Play timing, ownership decisions and final review checklist.
 
 ## Decisions to carry forward
 
